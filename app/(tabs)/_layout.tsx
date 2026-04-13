@@ -1,33 +1,65 @@
 import { Tabs } from 'expo-router';
+import { BarChart2, Home, PlusCircle, Settings, Wallet } from 'lucide-react-native';
 import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTransactionStore } from '../../store/useTransactionStore';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const setEditingTransaction = useTransactionStore((state) => state.setEditingTransaction);
 
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
+        headerShown: true,
         tabBarButton: HapticTab,
+        tabBarStyle: {
+          backgroundColor: colorScheme === 'dark' ? '#0f172a' : '#ffffff',
+        },
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'ホーム',
+          tabBarIcon: ({ color }) => <Home size={24} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="balance"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: '残高',
+          tabBarIcon: ({ color }) => <Wallet size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="input"
+        options={{
+          title: '入力',
+          tabBarIcon: ({ color }) => <PlusCircle size={24} color={color} />,
+        }}
+        listeners={{
+          tabPress: (e) => {
+            // タブボタンから直接遷移した場合は、編集状態を解除して新規入力にする
+            setEditingTransaction(null);
+          },
+        }}
+      />
+      <Tabs.Screen
+        name="analysis"
+        options={{
+          title: '分析',
+          tabBarIcon: ({ color }) => <BarChart2 size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: '設定',
+          tabBarIcon: ({ color }) => <Settings size={24} color={color} />,
         }}
       />
     </Tabs>
