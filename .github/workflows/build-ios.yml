@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14 # 最新のビルド環境を使用
+    runs-on: macos-latest # 最新のビルド環境を使用
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -15,6 +15,10 @@ jobs:
         with:
           node-version: 20
           cache: "npm"
+
+      # --- ここを追加 ---
+      - name: Set Xcode version
+        run: sudo xcode-select -s /Applications/Xcode_16.app # もしくは 16.0.app
 
       - name: Install dependencies
         run: npm install
