@@ -1,0 +1,65 @@
+============================================================
+家計簿アプリ開発仕様書 (React Native + Expo)
+============================================================
+
+1. プロジェクト構成
+------------------------------------------------------------
+- メインフレームワーク: React Native (Expo SDK)
+- 開発環境: Windows (実機確認: iPhone Expo Go)
+- 言語: TypeScript
+- スタイリング: NativeWind (Tailwind CSS)
+- データベース: expo-sqlite (ローカル完結)
+- グラフライブラリ: Victory Native XL
+- 状態管理: Zustand
+- フォーム管理: React Hook Form + Zod
+
+2. 実装フェーズ・ステップ
+------------------------------------------------------------
+
+■フェーズ1：プロジェクト基盤とデータ保存
+[ ] プロジェクト初期化 (npx create-expo-app)
+[ ] NativeWind / Expo Router のセットアップ
+[ ] expo-sqlite によるデータベース接続クラスの作成
+    - テーブル名: transactions
+    - カラム: id, amount, category_id, date, memo
+[ ] 基本的なCRUD（作成・取得・削除）関数の実装
+[ ] タブナビゲーションの配置 (Home / Input / Settings)
+
+■フェーズ2：入力フォームとバリデーション
+[ ] React Hook Form による入力画面の構築
+[ ] Zod によるバリデーションルールの定義
+    - 金額: 数値のみ、空欄不可
+    - カテゴリ: 選択必須
+[ ] カテゴリマスター（定数）の定義とアイコン表示
+    - アイコンライブラリ: Lucide React Native
+[ ] 日付選択UI (DateTimePicker) の組み込み
+
+■フェーズ3：Victory Native XL による可視化
+[ ] グラフ表示用データ集計ロジック (Custom Hooks)
+    - 日付別・カテゴリ別の集計処理
+[ ] 今月の支出比率（円グラフ/Donut Chart）の実装
+[ ] 収支推移（折れ線グラフ/Line Chart）の実装
+[ ] グラフのインタラクション（タップ時の詳細表示）の実装
+
+■フェーズ4：UX向上とブラッシュアップ
+[ ] FlashList を用いた高速な履歴リスト表示
+[ ] 月別フィルター機能（カレンダー/ピッカー）
+[ ] アプリ全体のテーマカラー設定（ダークモード対応）
+[ ] アプリ用アイコンおよびスプラッシュ画面の設定
+
+3. データベース定義 (SQLite)
+------------------------------------------------------------
+TABLE: transactions
+- id          : INTEGER PRIMARY KEY AUTOINCREMENT
+- amount      : INTEGER NOT NULL (正:収入 / 負:支出)
+- category_id : TEXT NOT NULL
+- date        : TEXT NOT NULL (ISO8601 string)
+- memo        : TEXT
+
+4. 開発時の留意点 (Windows)
+------------------------------------------------------------
+- 実機確認: 常に iPhone の Expo Go で最新の挙動を確認すること。
+- SQLite確認: データの整合性は console.log または抽出テストで検証する。
+- グラフ描画: Victory Native XL は Skia を使用するため、型の定義を厳密に行う。
+
+============================================================
