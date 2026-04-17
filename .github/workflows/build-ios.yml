@@ -1,49 +1,49 @@
 name: Build iOS IPA (Unsigned)
 on:
-    workflow_dispatch:
-        # 手動実行用ボタンを出す設定
+  workflow_dispatch:
+    # 手動実行用ボタンを出す設定
 
 jobs:
-    build:
-        runs-on: macos-14 # 最新のビルド環境を使用
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+  build:
+    runs-on: macos-14 # 最新のビルド環境を使用
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 20
-                  cache: "npm"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
 
-            - name: Install dependencies
-              run: npm install
+      - name: Install dependencies
+        run: npm install
 
-            - name: Install Expo CLI & Prebuild
-              run: |
-                  npx expo prebuild --platform ios
+      - name: Install Expo CLI & Prebuild
+        run: |
+          npx expo prebuild --platform ios
 
-            - name: Build with Xcode (Unsigned)
-              run: |
-                  xcodebuild -workspace ios/*.xcworkspace \
-                    -scheme $(ls ios/*.xcodeproj | xargs basename -s .xcodeproj) \
-                    -configuration Release \
-                    -sdk iphoneos \
-                    -derivedDataPath build \
-                    CODE_SIGNING_ALLOWED=NO \
-                    CODE_SIGNING_REQUIRED=NO \
-                    CODE_SIGNING_ENTITLEMENTS="" \
-                    PROVISIONING_PROFILE_SPECIFIER=""
+      - name: Build with Xcode (Unsigned)
+        run: |
+          xcodebuild -workspace ios/*.xcworkspace \
+            -scheme my-app \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ENTITLEMENTS="" \
+            PROVISIONING_PROFILE_SPECIFIER=""
 
-            - name: Create Payload and IPA
-              run: |
-                  mkdir -p Payload
-                  # .appフォルダを探してPayloadへコピー
-                  cp -r build/Build/Products/Release-iphoneos/*.app Payload/
-                  zip -r HouseholdBudget.ipa Payload
+      - name: Create Payload and IPA
+        run: |
+          mkdir -p Payload
+          # .appフォルダを探してPayloadへコピー
+          cp -r build/Build/Products/Release-iphoneos/*.app Payload/
+          zip -r HouseholdBudget.ipa Payload
 
-            - name: Upload IPA Artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: ios-ipa
-                  path: HouseholdBudget.ipa
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: HouseholdBudget.ipa
