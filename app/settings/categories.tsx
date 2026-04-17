@@ -1,23 +1,26 @@
 import { Stack, useRouter } from 'expo-router';
-import { ArrowDownCircle, ArrowUpCircle, ChevronLeft, CircleEllipsis, Edit2, Plus, Trash2 } from 'lucide-react-native';
+import { ArrowDownCircle, ArrowUpCircle, ChevronDown, ChevronLeft, ChevronUp, CircleEllipsis, Edit2, Plus, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { useTransactionStore } from '../../store/useTransactionStore';
+import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 
 export default function CategoryManagementScreen() {
     const router = useRouter();
-    const colorScheme = useColorScheme();
+    const colorScheme = useAppColorScheme();
     const isDark = colorScheme === 'dark';
 
     const {
         majorCategories,
         addMajorCategory, updateMajorCategory, deleteMajorCategory,
-        addMinorCategory, updateMinorCategory, deleteMinorCategory
+        addMinorCategory, updateMinorCategory, deleteMinorCategory,
+        reorderMajorCategories, reorderMinorCategories
     } = useTransactionStore();
 
     const [type, setType] = useState<'expense' | 'income'>('expense');
     const [editingMajor, setEditingMajor] = useState<any>(null);
+    const [selectedIcon, setSelectedIcon] = useState('others');
     const [modalVisible, setModalVisible] = useState(false);
     const [minorModalVisible, setMinorModalVisible] = useState(false);
     const [editingMinor, setEditingMinor] = useState<any>(null);
@@ -45,12 +48,14 @@ export default function CategoryManagementScreen() {
             await addMajorCategory({
                 id,
                 label: newItemLabel.trim(),
-                icon: 'others',
+                icon: selectedIcon,
                 color: '#6366f1',
                 type,
+                displayOrder: filteredMajors.length
             });
             setModalVisible(false);
             setNewItemLabel('');
+            setSelectedIcon('others');
         } catch (e) {
             Alert.alert('エラー', '保存に失敗しました');
         } finally {
@@ -65,10 +70,12 @@ export default function CategoryManagementScreen() {
             await updateMajorCategory({
                 ...editingMajor,
                 label: newItemLabel.trim(),
+                icon: selectedIcon,
             });
             setModalVisible(false);
             setEditingMajor(null);
             setNewItemLabel('');
+            setSelectedIcon('others');
         } catch (e) {
             Alert.alert('エラー', '保存に失敗しました');
         } finally {
@@ -86,7 +93,8 @@ export default function CategoryManagementScreen() {
                 await addMinorCategory({
                     id: `minor_${Date.now()}`,
                     parent_id: currentParentId,
-                    label: newItemLabel.trim()
+                    label: newItemLabel.trim(),
+                    displayOrder: majorCategories.find(m => m.id === currentParentId)?.subCategories.length || 0
                 });
             }
             setMinorModalVisible(false);
@@ -144,7 +152,7 @@ export default function CategoryManagementScreen() {
             </View>
 
             <ScrollView style={{ flex: 1, padding: 16 }}>
-                {filteredMajors.map((major) => {
+                {filteredMajors.map((major, index) => {
                     const IconComp = CATEGORY_ICONS[major.icon] || CircleEllipsis;
                     return (
                         <View key={major.id} style={{ backgroundColor: colors.card, borderRadius: 20, marginBottom: 16, overflow: 'hidden' }}>
@@ -153,38 +161,63 @@ export default function CategoryManagementScreen() {
                                     <IconComp size={20} color={major.color} />
                                 </View>
                                 <Text style={{ flex: 1, marginLeft: 12, fontSize: 16, fontWeight: 'bold', color: colors.text }}>{major.label}</Text>
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        setEditingMajor(major);
-                                        setNewItemLabel(major.label);
-                                        setModalVisible(true);
-                                    }}
-                                    style={{ padding: 8 }}
-                                >
-                                    <Edit2 size={18} color={colors.textMuted} />
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={() => handleDeleteMajor(major.id)} style={{ padding: 8 }}>
-                                    <Trash2 size={18} color="#ef4444" />
-                                </TouchableOpacity>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    {index > 0 && (
+                                        <TouchableOpacity onPress={() => reorderMajorCategories(type, index, index - 1)} style={{ padding: 8 }}>
+                                            <ChevronUp size={20} color={colors.textMuted} />
+                                        </TouchableOpacity>
+                                    )}
+                                    {index < filteredMajors.length - 1 && (
+                                        <TouchableOpacity onPress={() => reorderMajorCategories(type, index, index + 1)} style={{ padding: 8 }}>
+                                            <ChevronDown size={20} color={colors.textMuted} />
+                                        </TouchableOpacity>
+                                    )}
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setEditingMajor(major);
+                                            setNewItemLabel(major.label);
+                                            setSelectedIcon(major.icon || 'others');
+                                            setModalVisible(true);
+                                        }}
+                                        style={{ padding: 8 }}
+                                    >
+                                        <Edit2 size={18} color={colors.textMuted} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={() => handleDeleteMajor(major.id)} style={{ padding: 8 }}>
+                                        <Trash2 size={18} color="#ef4444" />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
 
                             <View style={{ padding: 12, backgroundColor: isDark ? '#0f172a44' : '#f8fafc' }}>
-                                {major.subCategories.map((minor) => (
+                                {major.subCategories.map((minor, mIndex) => (
                                     <View key={minor.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 4 }}>
                                         <Text style={{ flex: 1, fontSize: 14, color: colors.text }}>{minor.label}</Text>
-                                        <TouchableOpacity
-                                            onPress={() => {
-                                                setEditingMinor(minor);
-                                                setNewItemLabel(minor.label);
-                                                setMinorModalVisible(true);
-                                            }}
-                                            style={{ padding: 6 }}
-                                        >
-                                            <Edit2 size={14} color={colors.textMuted} />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity onPress={() => handleDeleteMinor(minor.id)} style={{ padding: 6 }}>
-                                            <Trash2 size={14} color="#ef4444" />
-                                        </TouchableOpacity>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            {mIndex > 0 && (
+                                                <TouchableOpacity onPress={() => reorderMinorCategories(major.id, mIndex, mIndex - 1)} style={{ padding: 6 }}>
+                                                    <ChevronUp size={16} color={colors.textMuted} />
+                                                </TouchableOpacity>
+                                            )}
+                                            {mIndex < major.subCategories.length - 1 && (
+                                                <TouchableOpacity onPress={() => reorderMinorCategories(major.id, mIndex, mIndex + 1)} style={{ padding: 6 }}>
+                                                    <ChevronDown size={16} color={colors.textMuted} />
+                                                </TouchableOpacity>
+                                            )}
+                                            <TouchableOpacity
+                                                onPress={() => {
+                                                    setEditingMinor(minor);
+                                                    setNewItemLabel(minor.label);
+                                                    setMinorModalVisible(true);
+                                                }}
+                                                style={{ padding: 6 }}
+                                            >
+                                                <Edit2 size={14} color={colors.textMuted} />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => handleDeleteMinor(minor.id)} style={{ padding: 6 }}>
+                                                <Trash2 size={14} color="#ef4444" />
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
                                 ))}
                                 <TouchableOpacity
@@ -208,6 +241,7 @@ export default function CategoryManagementScreen() {
                     onPress={() => {
                         setEditingMajor(null);
                         setNewItemLabel('');
+                        setSelectedIcon('others');
                         setModalVisible(true);
                     }}
                     style={{
@@ -255,9 +289,36 @@ export default function CategoryManagementScreen() {
                             autoFocus
                             editable={!isLoading}
                         />
+                        <Text style={{ color: colors.textMuted, marginBottom: 12, fontSize: 13 }}>アイコン</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
+                            {Object.entries(CATEGORY_ICONS).map(([key, Icon]) => {
+                                const isSelected = selectedIcon === key;
+                                return (
+                                    <TouchableOpacity
+                                        key={key}
+                                        onPress={() => setSelectedIcon(key)}
+                                        style={{
+                                            width: 44, height: 44, borderRadius: 12,
+                                            backgroundColor: isSelected ? colors.indigo : colors.inputBg,
+                                            alignItems: 'center', justifyContent: 'center',
+                                            marginRight: 10,
+                                            borderWidth: 2, borderColor: isSelected ? colors.indigo : 'transparent'
+                                        }}
+                                    >
+                                        <Icon size={22} color={isSelected ? 'white' : colors.textMuted} />
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+
                         <View style={{ flexDirection: 'row', gap: 12 }}>
                             <TouchableOpacity
-                                onPress={() => setModalVisible(false)}
+                                onPress={() => {
+                                    setModalVisible(false);
+                                    setEditingMajor(null);
+                                    setNewItemLabel('');
+                                    setSelectedIcon('others');
+                                }}
                                 disabled={isLoading}
                                 style={{ flex: 1, padding: 16, borderRadius: 12, backgroundColor: isDark ? '#334155' : '#f1f5f9', alignItems: 'center', opacity: isLoading ? 0.5 : 1 }}
                             >

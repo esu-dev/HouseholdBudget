@@ -2,6 +2,7 @@ import { useFont } from '@shopify/react-native-skia';
 import React from 'react';
 import { Text, View } from 'react-native';
 import { Area, CartesianChart, Line } from 'victory-native';
+import { useAppColorScheme } from '../hooks/useAppColorScheme';
 import { TimeScale, useTransactionAnalysis } from '../hooks/useTransactionAnalysis';
 import { Transaction } from '../types/transaction';
 
@@ -13,6 +14,8 @@ interface NetWorthTrendChartProps {
 }
 
 export const NetWorthTrendChart = ({ transactions, allTransactions, targetDate, timeScale }: NetWorthTrendChartProps) => {
+  const colorScheme = useAppColorScheme();
+  const isDark = colorScheme === 'dark';
   const { netWorthTrendData } = useTransactionAnalysis(transactions, allTransactions, targetDate, timeScale);
 
   // 追加された Roboto フォントを読み込む
@@ -90,7 +93,7 @@ export const NetWorthTrendChart = ({ transactions, allTransactions, targetDate, 
           axisOptions={{
             font: font ?? undefined,
             tickCount: timeScale === 'day' ? 8 : timeScale === 'month' ? 12 : Math.min(netWorthTrendData.length, 5),
-            labelColor: "#64748b",
+            labelColor: "#94a3b8",
             lineColor: "#e2e8f0",
             labelOffset: 8,
             formatXLabel: formatXLabel,

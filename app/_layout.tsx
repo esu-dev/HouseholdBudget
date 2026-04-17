@@ -1,11 +1,12 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useColorScheme as useNativewindColorScheme } from 'nativewind';
 import 'react-native-reanimated';
 import "../global.css";
 
 import { useEffect } from 'react';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAppColorScheme } from '../hooks/useAppColorScheme';
 import { initDatabase } from '../services/database';
 
 export const unstable_settings = {
@@ -13,7 +14,13 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const colorScheme = useAppColorScheme();
+  const { setColorScheme } = useNativewindColorScheme();
+  const isDark = colorScheme === 'dark';
+
+  useEffect(() => {
+    setColorScheme(colorScheme);
+  }, [colorScheme]);
 
   useEffect(() => {
     initDatabase().catch(err => {
@@ -22,12 +29,12 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
-      <StatusBar style="auto" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
     </ThemeProvider>
   );
 }

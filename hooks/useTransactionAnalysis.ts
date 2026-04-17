@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { Transaction } from '../types/transaction';
 import { useTransactionStore } from '../store/useTransactionStore';
+import { Transaction } from '../types/transaction';
 
 export type CategoryChartData = {
   label: string;
@@ -16,8 +16,8 @@ export type DailyTrendData = {
 export type TimeScale = 'day' | 'month' | 'year';
 
 export const useTransactionAnalysis = (
-  transactions: Transaction[], 
-  allTransactions?: Transaction[], 
+  transactions: Transaction[],
+  allTransactions?: Transaction[],
   targetDate?: Date,
   timeScale: TimeScale = 'day'
 ) => {
@@ -26,15 +26,16 @@ export const useTransactionAnalysis = (
   // カテゴリ別の支出集計 (円グラフ用)
   // 大カテゴリ単位で集計することで、グラフの視認性を高める
   const categoryData = useMemo(() => {
-    const expenses = transactions.filter(t => t.amount < 0);
+    // 振替は集計から除外
+    const expenses = transactions.filter(t => t.amount < 0 && t.category_id !== 'transfer');
     const majorTotals: Record<string, number> = {};
 
     expenses.forEach(t => {
       // transaction.category_id は小カテゴリのIDなので、親の大カテゴリを特定する
-      const major = majorCategories.find(maj => 
+      const major = majorCategories.find(maj =>
         maj.subCategories.some(min => min.id === t.category_id)
       );
-      
+
       const majorId = major?.id || 'others';
       majorTotals[majorId] = (majorTotals[majorId] || 0) + Math.abs(t.amount);
     });
@@ -49,22 +50,63 @@ export const useTransactionAnalysis = (
     }).sort((a, b) => b.value - a.value);
   }, [transactions, majorCategories]);
 
-  // 日付別の収支推移 (棒グラフ用)
-  const dailyTrendData = useMemo(() => {
-    const daily: Record<string, number> = {};
-    
-    transactions.forEach(t => {
-      const dateKey = t.date.split('T')[0];
-      daily[dateKey] = (daily[dateKey] || 0) + t.amount;
-    });
+  // 期間別の収支推移 (棒グラフ用)
+  const trendData = useMemo(() => {
+    if (timeScale === 'day') {
+      const daily: Record<string, number> = {};
+      
+      transactions.forEach(t => {
+        if (t.category_id === 'transfer') return;
+        const dateKey = t.date.split('T')[0];
+        daily[dateKey] = (daily[dateKey] || 0) + t.amount;
+      });
 
-    return Object.entries(daily)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, amount]) => ({
-        date,
-        amount,
-      }));
-  }, [transactions]);
+      return Object.entries(daily)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, amount]) => ({
+          label: date.split('-')[2], // 日
+          amount,
+        }));
+    } else if (timeScale === 'month') {
+      const monthly: Record<string, number> = {};
+      
+      transactions.forEach(t => {
+        if (t.category_id === 'transfer') return;
+        const date = new Date(t.date);
+        const monthKey = `${date.getMonth() + 1}`;
+        monthly[monthKey] = (monthly[monthKey] || 0) + t.amount;
+      });
+
+      return Array.from({ length: 12 }, (_, i) => {
+        const monthLabel = `${i + 1}`;
+        return {
+          label: monthLabel,
+          amount: monthly[monthLabel] || 0,
+        };
+      });
+    } else {
+      const yearly: Record<string, number> = {};
+      let minYear = new Date().getFullYear();
+      let maxYear = minYear;
+
+      transactions.forEach(t => {
+        if (t.category_id === 'transfer') return;
+        const year = new Date(t.date).getFullYear();
+        yearly[year] = (yearly[year] || 0) + t.amount;
+        if (year < minYear) minYear = year;
+        if (year > maxYear) maxYear = year;
+      });
+
+      const results = [];
+      for (let y = minYear; y <= maxYear; y++) {
+        results.push({
+          label: `${y}`,
+          amount: yearly[y] || 0,
+        });
+      }
+      return results;
+    }
+  }, [transactions, timeScale]);
 
   // 純資産推移 (エリア/折れ線グラフ用)
   const netWorthTrendData = useMemo(() => {
@@ -142,5 +184,5 @@ export const useTransactionAnalysis = (
     }
   }, [allTransactions, transactions, targetDate, timeScale]);
 
-  return { categoryData, dailyTrendData, netWorthTrendData };
+  return { categoryData, trendData, netWorthTrendData };
 };

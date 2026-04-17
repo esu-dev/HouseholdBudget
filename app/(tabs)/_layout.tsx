@@ -4,18 +4,18 @@ import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { useTransactionStore } from '../../store/useTransactionStore';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const colorScheme = useAppColorScheme();
   const setEditingTransaction = useTransactionStore((state) => state.setEditingTransaction);
 
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: true,
+        headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
           backgroundColor: colorScheme === 'dark' ? '#0f172a' : '#ffffff',

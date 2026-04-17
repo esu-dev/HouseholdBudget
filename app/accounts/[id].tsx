@@ -2,14 +2,15 @@ import { FlashList } from '@shopify/flash-list';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Calendar, CircleEllipsis, Store, Wallet } from 'lucide-react-native';
 import React, { useMemo } from 'react';
-import { Text, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { CATEGORY_ICONS } from '../../constants/categories';
+import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { useTransactionStore } from '../../store/useTransactionStore';
 
 export default function AccountHistoryScreen() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
-    const colorScheme = useColorScheme();
+    const colorScheme = useAppColorScheme();
     const isDark = colorScheme === 'dark';
     const { transactions, accounts, accountBalances, setEditingTransaction, majorCategories } = useTransactionStore();
 
@@ -80,6 +81,7 @@ export default function AccountHistoryScreen() {
         }
 
         const label = minorCategory?.label || '不明';
+        const toAccount = item.to_account_id ? accounts.find(a => a.id === item.to_account_id) : null;
         const color = majorCategory?.color || '#64748b';
         const IconComp = CATEGORY_ICONS[majorCategory?.icon || 'others'] || CircleEllipsis;
         const amount = item.amount ?? 0;
@@ -88,7 +90,7 @@ export default function AccountHistoryScreen() {
             <TouchableOpacity
                 onPress={() => {
                     setEditingTransaction(item);
-                    router.push('/input');
+                    router.replace('/input');
                 }}
                 style={{
                     backgroundColor: colors.card,
@@ -112,7 +114,11 @@ export default function AccountHistoryScreen() {
                 <View style={{ flex: 1, marginLeft: 16 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <View>
-                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>{label}</Text>
+                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>
+                                {item.category_id === 'transfer' && toAccount 
+                                    ? `${item.amount > 0 ? '←' : '→'} ${toAccount.name}` 
+                                    : label}
+                            </Text>
                             {item.payee && (
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                                     <Store size={10} color={colors.textMuted} />
@@ -149,7 +155,7 @@ export default function AccountHistoryScreen() {
                 data={sectionedTransactions}
                 renderItem={renderItem}
                 keyExtractor={(item, index) => item.type === 'header' ? `header-${item.date}-${index}` : `item-${item.id}-${index}`}
-                estimatedItemSize={80}
+                //estimatedItemSize={80}
                 ListHeaderComponent={() => (
                     <View style={{ padding: 24, paddingBottom: 8 }}>
                         <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>取引履歴</Text>

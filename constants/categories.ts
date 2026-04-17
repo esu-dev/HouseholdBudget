@@ -1,28 +1,27 @@
-import { 
-  Utensils, 
-  TrainFront, 
-  Lightbulb, 
-  Gamepad2, 
-  Wallet, 
-  CircleEllipsis,
-  Home,
-  ShoppingBag,
-  Heart,
-  Smartphone,
+import {
+  Banknote,
   Briefcase,
-  TrendingUp,
-  Gift,
-  Coffee,
   Car,
+  CircleEllipsis,
+  Coffee,
+  CreditCard,
+  Gamepad2,
+  Gift,
+  Heart,
+  Home,
+  Lightbulb,
   Plane,
+  Scissors,
+  Shirt,
+  ShoppingBag,
+  Smartphone,
+  TrainFront,
+  TrendingUp,
   Tv,
   Users,
-  Shirt,
-  Scissors,
-  MedicineBox,
-  CreditCard,
-  Banknote,
-  type LucideIcon 
+  Utensils,
+  Wallet,
+  type LucideIcon
 } from 'lucide-react-native';
 
 export type CategoryType = 'expense' | 'income';
@@ -34,11 +33,13 @@ export type MajorCategory = {
   color: string;
   type: CategoryType;
   subCategories: MinorCategory[];
+  displayOrder: number;
 };
 
 export type MinorCategory = {
   id: string;
   label: string;
+  displayOrder: number;
 };
 
 // 全てのアイコンを定義
@@ -77,10 +78,11 @@ export const CATEGORIES: MajorCategory[] = [
     icon: 'food',
     color: '#f97316',
     type: 'expense',
+    displayOrder: 0,
     subCategories: [
-      { id: 'food', label: '食費（一般）' }, // 既存互換
-      { id: 'dining_out', label: '外食' },
-      { id: 'cafe', label: 'カフェ・間食' },
+      { id: 'food', label: '食費（一般）', displayOrder: 0 }, // 既存互換
+      { id: 'dining_out', label: '外食', displayOrder: 1 },
+      { id: 'cafe', label: 'カフェ・間食', displayOrder: 2 },
     ]
   },
   {
@@ -89,10 +91,11 @@ export const CATEGORIES: MajorCategory[] = [
     icon: 'transport',
     color: '#3b82f6',
     type: 'expense',
+    displayOrder: 1,
     subCategories: [
-      { id: 'transport', label: '公共交通（電車・バス）' }, // 既存互換
-      { id: 'taxi', label: 'タクシー' },
-      { id: 'car', label: '車（ガソリン・駐車場）' },
+      { id: 'transport', label: '公共交通（電車・バス）', displayOrder: 0 }, // 既存互換
+      { id: 'taxi', label: 'タクシー', displayOrder: 1 },
+      { id: 'car', label: '車（ガソリン・駐車場）', displayOrder: 2 },
     ]
   },
   {
@@ -101,10 +104,11 @@ export const CATEGORIES: MajorCategory[] = [
     icon: 'shopping',
     color: '#ec4899',
     type: 'expense',
+    displayOrder: 2,
     subCategories: [
-      { id: 'shopping', label: '日用品' }, // 既存互換
-      { id: 'fashion', label: '衣服' },
-      { id: 'beauty', label: '美容・サロン' },
+      { id: 'shopping', label: '日用品', displayOrder: 0 }, // 既存互換
+      { id: 'fashion', label: '衣服', displayOrder: 1 },
+      { id: 'beauty', label: '美容・サロン', displayOrder: 2 },
     ]
   },
   {
@@ -113,10 +117,11 @@ export const CATEGORIES: MajorCategory[] = [
     icon: 'housing',
     color: '#6366f1',
     type: 'expense',
+    displayOrder: 3,
     subCategories: [
-      { id: 'housing', label: '家賃・ローン' }, // 既存互換
-      { id: 'utilities', label: '公共料金（電気・ガス・水道）' },
-      { id: 'communication', label: '通信費（携帯・ネット）' },
+      { id: 'housing', label: '家賃・ローン', displayOrder: 0 }, // 既存互換
+      { id: 'utilities', label: '公共料金（電気・ガス・水道）', displayOrder: 1 },
+      { id: 'communication', label: '通信費（携帯・ネット）', displayOrder: 2 },
     ]
   },
   {
@@ -125,10 +130,11 @@ export const CATEGORIES: MajorCategory[] = [
     icon: 'entertainment',
     color: '#a855f7',
     type: 'expense',
+    displayOrder: 4,
     subCategories: [
-      { id: 'entertainment', label: '娯楽・レジャー' }, // 既存互換
-      { id: 'hobbies', label: '趣味・教養' },
-      { id: 'social', label: '交際費' },
+      { id: 'entertainment', label: '娯楽・レジャー', displayOrder: 0 }, // 既存互換
+      { id: 'hobbies', label: '趣味・教養', displayOrder: 1 },
+      { id: 'social', label: '交際費', displayOrder: 2 },
     ]
   },
   {
@@ -137,9 +143,10 @@ export const CATEGORIES: MajorCategory[] = [
     icon: 'health',
     color: '#ef4444',
     type: 'expense',
+    displayOrder: 5,
     subCategories: [
-      { id: 'health', label: '健康維持' }, // 既存互換
-      { id: 'medical', label: '医療費・薬品' },
+      { id: 'health', label: '健康維持', displayOrder: 0 }, // 既存互換
+      { id: 'medical', label: '医療費・薬品', displayOrder: 1 },
     ]
   },
 
@@ -150,9 +157,10 @@ export const CATEGORIES: MajorCategory[] = [
     icon: 'salary',
     color: '#10b981',
     type: 'income',
+    displayOrder: 0,
     subCategories: [
-      { id: 'salary', label: '給与' }, // 既存互換
-      { id: 'bonus', label: '賞与' },
+      { id: 'salary', label: '給与', displayOrder: 0 }, // 既存互換
+      { id: 'bonus', label: '賞与', displayOrder: 1 },
     ]
   },
   {
@@ -161,10 +169,11 @@ export const CATEGORIES: MajorCategory[] = [
     icon: 'gift',
     color: '#f59e0b',
     type: 'income',
+    displayOrder: 1,
     subCategories: [
-      { id: 'gift', label: 'お祝い・プレゼント' }, // 既存互換
-      { id: 'side_income', label: '副業・臨時収入' },
-      { id: 'other_income', label: 'その他雑収入' },
+      { id: 'gift', label: 'お祝い・プレゼント', displayOrder: 0 }, // 既存互換
+      { id: 'side_income', label: '副業・臨時収入', displayOrder: 1 },
+      { id: 'other_income', label: 'その他雑収入', displayOrder: 2 },
     ]
   },
 
@@ -174,8 +183,10 @@ export const CATEGORIES: MajorCategory[] = [
     icon: 'others',
     color: '#64748b',
     type: 'expense',
+    displayOrder: 6,
     subCategories: [
-      { id: 'others', label: 'その他' }, // 既存互換
+      { id: 'others', label: 'その他', displayOrder: 0 },
+      { id: 'transfer', label: '振替', displayOrder: 1 },
     ]
   },
 ];

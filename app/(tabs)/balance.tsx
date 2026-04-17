@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
-import { ArrowDownCircle, ArrowUpCircle, Scale, Wallet } from 'lucide-react-native';
+import { ArrowDownCircle, ArrowUpCircle, Wallet } from 'lucide-react-native';
 import React, { useEffect, useMemo } from 'react';
-import { ScrollView, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { useTransactionStore } from '../../store/useTransactionStore';
 
 export default function BalanceScreen() {
     const router = useRouter();
-    const colorScheme = useColorScheme();
+    const colorScheme = useAppColorScheme();
     const isDark = colorScheme === 'dark';
     const { transactions, accounts, accountBalances, fetchData } = useTransactionStore();
 
@@ -25,8 +26,10 @@ export default function BalanceScreen() {
 
     // 合計資産（純資産）を計算
     const netWorth = useMemo(() => {
-        return Object.values(accountBalances).reduce((sum, val) => sum + val, 0);
-    }, [accountBalances]);
+        return accounts.reduce((sum, account) => {
+            return sum + (accountBalances[account.id] || 0);
+        }, 0);
+    }, [accountBalances, accounts]);
 
     // 今月の収支
     const monthlyStats = useMemo(() => {
@@ -49,7 +52,7 @@ export default function BalanceScreen() {
 
     return (
         <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
-            <View style={{ padding: 20 }}>
+            <View style={{ padding: 20, paddingTop: 30 }}>
                 <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.text, marginBottom: 20, paddingTop: 10 }}>資産状況</Text>
 
                 {/* 純資産カード */}
