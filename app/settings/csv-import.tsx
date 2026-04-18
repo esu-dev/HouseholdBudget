@@ -92,37 +92,37 @@ export default function CsvImportScreen() {
         }
     };
 
-const startImport = async (data: string[][], type: ExternalCsvType, catMap: Record<string, string>, accMap: Record<string, string>) => {
-    setIsLoading(true);
-    try {
-        const result = await externalCsvImportService.processImport(data, type, catMap, accMap);
-        setImportResult(result);
-        await fetchData();
-        Alert.alert('インポート完了', `${result.successCount}件の取引を取り込みました。`);
-    } catch (error) {
-        Alert.alert('エラー', 'インポート中にエラーが発生しました。');
-    } finally {
-        setIsLoading(false);
-        setPendingCsvData(null);
-    }
-};
+    const startImport = async (data: string[][], type: ExternalCsvType, catMap: Record<string, string>, accMap: Record<string, string>) => {
+        setIsLoading(true);
+        try {
+            const result = await externalCsvImportService.processImport(data, type, catMap, accMap);
+            setImportResult(result);
+            await fetchData();
+            Alert.alert('インポート完了', `${result.successCount}件の取引を取り込みました。`);
+        } catch (error) {
+            Alert.alert('エラー', 'インポート中にエラーが発生しました。');
+        } finally {
+            setIsLoading(false);
+            setPendingCsvData(null);
+        }
+    };
 
-const saveAndImport = async () => {
-    // Save current mappings to DB
-    for (const [ext, int] of Object.entries(categoryMappings)) {
-        await databaseService.updateCsvCategoryMapping(ext, int);
-    }
-    for (const [ext, int] of Object.entries(accountMappings)) {
-        await databaseService.updateCsvAccountMapping(ext, int);
-    }
+    const saveAndImport = async () => {
+        // Save current mappings to DB
+        for (const [ext, int] of Object.entries(categoryMappings)) {
+            await databaseService.updateCsvCategoryMapping(ext, int);
+        }
+        for (const [ext, int] of Object.entries(accountMappings)) {
+            await databaseService.updateCsvAccountMapping(ext, int);
+        }
 
-    setMappingModalVisible(false);
-    if (pendingCsvData) {
-        startImport(pendingCsvData.data, pendingCsvData.type, categoryMappings, accountMappings);
-    }
-};
+        setMappingModalVisible(false);
+        if (pendingCsvData) {
+            startImport(pendingCsvData.data, pendingCsvData.type, categoryMappings, accountMappings);
+        }
+    };
 
-return (
+    return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Stack.Screen options={{ headerShown: false }} />
 
