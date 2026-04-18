@@ -128,7 +128,7 @@ export default function CsvImportScreen() {
 
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 60, backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => router.back()}>
+            <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                 <ChevronLeft size={28} color={colors.text} />
             </TouchableOpacity>
             <Text style={{ flex: 1, textAlign: 'center', fontSize: 18, fontWeight: 'bold', color: colors.text, marginRight: 28 }}>
@@ -152,6 +152,7 @@ export default function CsvImportScreen() {
             <TouchableOpacity
                 onPress={handlePickFile}
                 disabled={isLoading}
+                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
                 style={{
                     backgroundColor: colors.indigo,
                     padding: 20,
@@ -219,7 +220,7 @@ export default function CsvImportScreen() {
             <View style={{ marginBottom: 40 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>保存済みの対応関係</Text>
-                    <TouchableOpacity onPress={() => router.push('/settings/csv-mapping-list')}>
+                    <TouchableOpacity onPress={() => router.push('/settings/csv-mapping-list')} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                         <Text style={{ fontSize: 12, color: colors.indigo, fontWeight: 'bold' }}>すべて見る</Text>
                     </TouchableOpacity>
                 </View>
@@ -263,6 +264,7 @@ export default function CsvImportScreen() {
                                                         const normalized = extCat.trim().replace(/\s+/g, ' ');
                                                         setCategoryMappings(prev => ({ ...prev, [normalized]: minor.id }));
                                                     }}
+                                                    hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
                                                     style={{
                                                         paddingHorizontal: 12,
                                                         paddingVertical: 8,
@@ -298,6 +300,7 @@ export default function CsvImportScreen() {
                                                         const normalized = extAcc.trim().replace(/\s+/g, ' ');
                                                         setAccountMappings(prev => ({ ...prev, [normalized]: acc.id }));
                                                     }}
+                                                    hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
                                                     style={{
                                                         paddingHorizontal: 12,
                                                         paddingVertical: 8,
@@ -323,12 +326,14 @@ export default function CsvImportScreen() {
                     <View style={{ flexDirection: 'row', gap: 12, paddingTop: 16 }}>
                         <TouchableOpacity
                             onPress={() => setMappingModalVisible(false)}
+                            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
                             style={{ flex: 1, padding: 16, borderRadius: 16, backgroundColor: colors.inputBg, alignItems: 'center' }}
                         >
                             <Text style={{ fontWeight: 'bold', color: colors.textMuted }}>キャンセル</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             onPress={saveAndImport}
+                            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
                             style={{ flex: 2, padding: 16, borderRadius: 16, backgroundColor: colors.indigo, alignItems: 'center' }}
                         >
                             <Text style={{ fontWeight: 'bold', color: 'white' }}>保存して取り込む</Text>

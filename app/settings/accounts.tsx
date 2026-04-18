@@ -160,7 +160,7 @@ export default function AccountManagementScreen() {
 
             {/* Header */}
             <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.card }}>
-                <TouchableOpacity onPress={() => router.back()}>
+                <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                     <ChevronLeft size={28} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={{ flex: 1, textAlign: 'center', fontSize: 18, fontWeight: 'bold', color: colors.text, marginRight: 28 }}>
@@ -214,6 +214,7 @@ export default function AccountManagementScreen() {
                                             <TouchableOpacity
                                                 disabled={index === 0}
                                                 onPress={() => reorderAccounts(index, index - 1)}
+                                                hitSlop={{ top: 10, bottom: 5, left: 10, right: 10 }}
                                                 style={{ padding: 4, opacity: index === 0 ? 0.3 : 1 }}
                                             >
                                                 <ChevronUp size={18} color={colors.textMuted} />
@@ -221,6 +222,7 @@ export default function AccountManagementScreen() {
                                             <TouchableOpacity
                                                 disabled={index === otherAccounts.length - 1}
                                                 onPress={() => reorderAccounts(index, index + 1)}
+                                                hitSlop={{ top: 5, bottom: 10, left: 10, right: 10 }}
                                                 style={{ padding: 4, opacity: index === otherAccounts.length - 1 ? 0.3 : 1 }}
                                             >
                                                 <ChevronDown size={18} color={colors.textMuted} />
@@ -230,6 +232,7 @@ export default function AccountManagementScreen() {
                                     {account.type === 'card' && account.withdrawalAccountId && (
                                         <TouchableOpacity
                                             onPress={() => handleSync(account.id)}
+                                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                             style={{ padding: 8 }}
                                         >
                                             <RefreshCw size={20} color={colors.indigo} />
@@ -247,12 +250,17 @@ export default function AccountManagementScreen() {
                                             setWithdrawalAccountId(account.withdrawalAccountId);
                                             setModalVisible(true);
                                         }}
+                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                         style={{ padding: 8 }}
                                     >
                                         <Edit2 size={20} color={colors.textMuted} />
                                     </TouchableOpacity>
                                     {account.id !== 'cash' && (
-                                        <TouchableOpacity onPress={() => handleDelete(account.id)} style={{ padding: 8 }}>
+                                        <TouchableOpacity 
+                                            onPress={() => handleDelete(account.id)} 
+                                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                            style={{ padding: 8 }}
+                                        >
                                             <Trash2 size={20} color="#ef4444" />
                                         </TouchableOpacity>
                                     )}
@@ -279,6 +287,7 @@ export default function AccountManagementScreen() {
                         setWithdrawalAccountId(undefined);
                         setModalVisible(true);
                     }}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     style={{
                         flexDirection: 'row',
                         alignItems: 'center',

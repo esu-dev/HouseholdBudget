@@ -45,8 +45,8 @@ export default function SettingsScreen() {
             '既存のデータはすべて上書きされます。バックアップファイル(.db)を選択してください。復元後はアプリの再起動が必要です。',
             [
                 { text: 'キャンセル', style: 'cancel' },
-                { 
-                    text: 'ファイルを選択', 
+                {
+                    text: 'ファイルを選択',
                     onPress: async () => {
                         try {
                             await dataManagementService.restoreDatabase();
@@ -67,8 +67,8 @@ export default function SettingsScreen() {
             '家計簿の全データ（取引履歴、予算設定、口座、カテゴリなど）を削除し、初期状態に戻します。この操作は取り消せません。本当によろしいですか？',
             [
                 { text: 'キャンセル', style: 'cancel' },
-                { 
-                    text: '削除する', 
+                {
+                    text: '削除する',
                     style: 'destructive',
                     onPress: async () => {
                         try {
@@ -84,14 +84,14 @@ export default function SettingsScreen() {
     };
 
     const MenuItem = ({ icon: Icon, title, subtitle, onPress, iconColor = colors.indigo, iconBgColor = isDark ? '#312e81' : '#eef2ff' }: any) => (
-        <TouchableOpacity 
+        <TouchableOpacity
             onPress={onPress}
-            style={{ 
-                flexDirection: 'row', 
-                alignItems: 'center', 
-                backgroundColor: colors.card, 
-                padding: 16, 
-                borderRadius: 20, 
+            style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: colors.card,
+                padding: 16,
+                borderRadius: 20,
                 marginBottom: 12,
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 1 },
@@ -115,110 +115,110 @@ export default function SettingsScreen() {
         <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
             <View style={{ padding: 20, paddingTop: 30 }}>
                 <Text style={{ fontSize: 28, fontWeight: 'bold', color: colors.text, marginBottom: 24 }}>設定</Text>
-                
+
                 <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 }}>家計簿の設定</Text>
-                
-                <MenuItem 
-                    icon={ListTree} 
-                    title="カテゴリ設定" 
-                    subtitle="支出・収入のカテゴリを編集" 
+
+                <MenuItem
+                    icon={ListTree}
+                    title="カテゴリ設定"
+                    subtitle="支出・収入のカテゴリを編集"
                     onPress={() => router.push('/settings/categories')}
                 />
 
-                <MenuItem 
-                    icon={PiggyBank} 
-                    title="予算設定" 
-                    subtitle="月ごとのカテゴリ別予算を管理" 
+                <MenuItem
+                    icon={PiggyBank}
+                    title="予算設定"
+                    subtitle="月ごとのカテゴリ別予算を管理"
                     onPress={() => router.push('/settings/budgets')}
                 />
-                
-                <MenuItem 
-                    icon={Wallet} 
-                    title="口座・アカウント設定" 
-                    subtitle="現金、銀行、カードの管理" 
-                    onPress={() => router.push('/settings/accounts')} 
+
+                <MenuItem
+                    icon={Wallet}
+                    title="口座・アカウント設定"
+                    subtitle="現金、銀行、カードの管理"
+                    onPress={() => router.push('/settings/accounts')}
                 />
 
-                <MenuItem 
-                    icon={Palette} 
-                    title="表示設定" 
-                    subtitle="テーマの変更が可能" 
-                    onPress={() => router.push('/settings/theme')} 
+                <MenuItem
+                    icon={Palette}
+                    title="表示設定"
+                    subtitle="テーマの変更が可能"
+                    onPress={() => router.push('/settings/theme')}
                 />
 
-                <MenuItem 
-                    icon={FileUp} 
-                    title="外部CSVインポート" 
-                    subtitle="他アプリ（毎日家計簿）のCSVを読込" 
-                    onPress={() => router.push('/settings/csv-import')} 
+                <MenuItem
+                    icon={FileUp}
+                    title="外部CSVインポート"
+                    subtitle="他アプリ（毎日家計簿）のCSVを読込"
+                    onPress={() => router.push('/settings/csv-import')}
                 />
 
-                <MenuItem 
-                    icon={ZapOff} 
-                    title="自動学習の除外設定" 
-                    subtitle="カテゴリを自動設定しない支払先" 
-                    onPress={() => router.push('/settings/ignored-payees')} 
+                <MenuItem
+                    icon={ZapOff}
+                    title="自動学習の除外設定"
+                    subtitle="カテゴリを自動設定しない支払先"
+                    onPress={() => router.push('/settings/ignored-payees')}
                 />
 
                 <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginTop: 12, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 }}>アプリ設定</Text>
-                
-                <MenuItem 
-                    icon={Bell} 
-                    title="通知設定" 
-                    subtitle="入力忘れ防止リマインダーなど" 
-                    onPress={() => {}} 
-                />
-                
-                <MenuItem 
-                    icon={Shield} 
-                    title="プライバシーとセキュリティ" 
-                    subtitle="画面ロック、パスコード設定" 
-                    onPress={() => {}} 
+
+                <MenuItem
+                    icon={Bell}
+                    title="通知設定"
+                    subtitle="入力忘れ防止リマインダーなど"
+                    onPress={() => { }}
                 />
 
-                <MenuItem 
-                    icon={PieChart} 
-                    title="データ管理" 
-                    subtitle="データのバックアップ・復元" 
-                    onPress={() => {}} 
+                <MenuItem
+                    icon={Shield}
+                    title="プライバシーとセキュリティ"
+                    subtitle="画面ロック、パスコード設定"
+                    onPress={() => { }}
+                />
+
+                <MenuItem
+                    icon={PieChart}
+                    title="データ管理"
+                    subtitle="データのバックアップ・復元"
+                    onPress={() => { }}
                 />
 
                 <View style={{ gap: 12, marginBottom: 24 }}>
-                    <MenuItem 
-                        icon={FileDown} 
-                        title="CSVエクスポート" 
-                        subtitle="取引データをCSV形式で出力" 
-                        onPress={handleCsvExport} 
+                    <MenuItem
+                        icon={FileDown}
+                        title="CSVエクスポート"
+                        subtitle="取引データをCSV形式で出力"
+                        onPress={handleCsvExport}
                     />
 
-                    <MenuItem 
-                        icon={Save} 
-                        title="データベースのバックアップ" 
-                        subtitle="現在の状態をファイルとして保存" 
-                        onPress={handleBackup} 
+                    <MenuItem
+                        icon={Save}
+                        title="データベースのバックアップ"
+                        subtitle="現在の状態をファイルとして保存"
+                        onPress={handleBackup}
                         iconColor={colors.success}
                         iconBgColor={isDark ? '#064e3b' : '#f0fdf4'}
                     />
 
-                    <MenuItem 
-                        icon={FileUp} 
-                        title="データベースの復元" 
-                        subtitle="バックアップからデータを書き戻す" 
-                        onPress={handleRestore} 
+                    <MenuItem
+                        icon={FileUp}
+                        title="データベースの復元"
+                        subtitle="バックアップからデータを書き戻す"
+                        onPress={handleRestore}
                     />
                 </View>
 
-                <MenuItem 
-                    icon={Trash2} 
-                    title="全データの削除" 
-                    subtitle="すべての取引と設定をリセット" 
-                    onPress={handleDeleteAll} 
+                <MenuItem
+                    icon={Trash2}
+                    title="全データの削除"
+                    subtitle="すべての取引と設定をリセット"
+                    onPress={handleDeleteAll}
                     iconColor={colors.danger}
                     iconBgColor={isDark ? '#451a1a' : '#fef2f2'}
                 />
 
                 <View style={{ alignItems: 'center', marginTop: 32, marginBottom: 60 }}>
-                    <Text style={{ fontSize: 12, color: colors.textMuted }}>Household Budget v1.0.0</Text>
+                    <Text style={{ fontSize: 12, color: colors.textMuted }}>Household Budget v1.0.2</Text>
                 </View>
             </View>
         </ScrollView>

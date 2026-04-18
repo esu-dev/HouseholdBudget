@@ -52,6 +52,7 @@ export default function AnalysisScreen() {
     const ScaleButton = ({ label, value }: { label: string, value: TimeScale }) => (
         <TouchableOpacity
             onPress={() => setTimeScale(value)}
+            hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
             className={`flex-1 py-2 rounded-xl items-center ${
                 timeScale === value ? 'bg-indigo-600 shadow-md' : 'bg-white dark:bg-slate-800'
             }`}
@@ -67,7 +68,7 @@ export default function AnalysisScreen() {
             <View className="bg-white dark:bg-slate-800 px-4 pt-[30px] pb-4 flex-row justify-between items-center shadow-sm z-10">
                 {timeScale !== 'year' ? (
                     <>
-                        <TouchableOpacity onPress={() => changeDate(-1)} className="p-2">
+                        <TouchableOpacity onPress={() => changeDate(-1)} className="p-2" hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                             <ChevronLeft size={24} color="#6366f1" />
                         </TouchableOpacity>
 
@@ -75,7 +76,7 @@ export default function AnalysisScreen() {
                             {dateLabel}
                         </Text>
 
-                        <TouchableOpacity onPress={() => changeDate(1)} className="p-2">
+                        <TouchableOpacity onPress={() => changeDate(1)} className="p-2" hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                             <ChevronRight size={24} color="#6366f1" />
                         </TouchableOpacity>
                     </>

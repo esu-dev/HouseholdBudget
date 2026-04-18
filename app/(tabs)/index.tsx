@@ -1,10 +1,9 @@
-import { FlashList } from '@shopify/flash-list';
+import { CategoryDonutChart } from '@/components/CategoryDonutChart';
 import { router } from 'expo-router';
 import { CalendarIcon, ChevronLeft, ChevronRight, CircleEllipsis, List, Store, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
-import { CategoryDonutChart } from '../../components/CategoryDonutChart';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { useTransactionStore } from '../../store/useTransactionStore';
@@ -18,11 +17,11 @@ LocaleConfig.locales['ja'] = {
 };
 LocaleConfig.defaultLocale = 'ja';
 
-const TransactionItem = React.memo(({ 
-    item, 
-    majorCategories, 
-    accounts, 
-    onPress 
+const TransactionItem = React.memo(({
+    item,
+    majorCategories,
+    accounts,
+    onPress
 }: any) => {
     let minorCategory = null;
     let majorCategory = null;
@@ -35,7 +34,7 @@ const TransactionItem = React.memo(({
             break;
         }
     }
-    
+
     const account = accounts.find((a: any) => a.id === item.account_id);
     const toAccount = item.to_account_id ? accounts.find((a: any) => a.id === item.to_account_id) : null;
     const label = minorCategory?.label || '不明';
@@ -58,8 +57,8 @@ const TransactionItem = React.memo(({
                 <View className="flex-row justify-between items-center">
                     <View>
                         <Text className="text-base font-bold text-slate-900 dark:text-white">
-                            {item.category_id === 'transfer' && toAccount 
-                                ? `${item.amount > 0 ? '←' : '→'} ${toAccount.name}` 
+                            {item.category_id === 'transfer' && toAccount
+                                ? `${item.amount > 0 ? '←' : '→'} ${toAccount.name}`
                                 : label}
                         </Text>
                         <Text className="text-[10px] text-slate-400">
@@ -103,7 +102,7 @@ export default function HomeScreen() {
     const isDark = colorScheme === 'dark';
     const { transactions, accounts, fetchData, fetchBudgets, budgets, setEditingTransaction, majorCategories } = useTransactionStore();
     const [selectedMonth, setSelectedMonth] = useState(new Date());
-    const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+    const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
     const [selectedDay, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
     const [isBudgetModalVisible, setIsBudgetModalVisible] = useState(false);
@@ -162,10 +161,10 @@ export default function HomeScreen() {
         });
 
         if (selectedDay) {
-            marks[selectedDay] = { 
-                ...marks[selectedDay], 
-                selected: true, 
-                selectedColor: '#6366f1' 
+            marks[selectedDay] = {
+                ...marks[selectedDay],
+                selected: true,
+                selectedColor: '#6366f1'
             };
         }
         return marks;
@@ -243,16 +242,16 @@ export default function HomeScreen() {
 
     const sectionedTransactions = useMemo(() => {
         const groups: Record<string, any[]> = {};
-        const sorted = [...filteredTransactions].sort((a, b) => 
+        const sorted = [...filteredTransactions].sort((a, b) =>
             new Date(b.date).getTime() - new Date(a.date).getTime()
         );
 
         sorted.forEach(t => {
             const dateObj = new Date(t.date);
-            const dateStr = dateObj.toLocaleDateString('ja-JP', { 
-                month: 'long', 
-                day: 'numeric', 
-                weekday: 'short' 
+            const dateStr = dateObj.toLocaleDateString('ja-JP', {
+                month: 'long',
+                day: 'numeric',
+                weekday: 'short'
             });
             if (!groups[dateStr]) groups[dateStr] = [];
             groups[dateStr].push(t);
@@ -281,9 +280,9 @@ export default function HomeScreen() {
     const renderItem = useCallback(({ item }: { item: any }) => {
         if (item.type === 'header') {
             return (
-                <View className="px-6 py-2 mt-2 flex-row items-center">
+                <View style={{ paddingHorizontal: 24, paddingVertical: 8, marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
                     <CalendarIcon size={12} color="#94a3b8" />
-                    <Text className="text-[12px] font-bold text-slate-400 dark:text-slate-500 ml-2 uppercase tracking-widest">
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#94a3b8', marginLeft: 8, textTransform: 'uppercase' }}>
                         {item.date}
                     </Text>
                 </View>
@@ -291,10 +290,10 @@ export default function HomeScreen() {
         }
 
         return (
-            <TransactionItem 
-                item={item} 
-                majorCategories={majorCategories} 
-                accounts={accounts} 
+            <TransactionItem
+                item={item}
+                majorCategories={majorCategories}
+                accounts={accounts}
                 onPress={handleTransactionPress}
             />
         );
@@ -333,9 +332,10 @@ export default function HomeScreen() {
             <View className="p-4">
                 {/* 予算サマリーカード */}
                 {totalBudget > 0 && (
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         onPress={() => setIsBudgetModalVisible(true)}
                         activeOpacity={0.7}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         className="bg-white dark:bg-slate-800 p-6 rounded-[32px] shadow-sm mb-6"
                     >
                         <View className="flex-row justify-between items-center mb-4">
@@ -355,16 +355,16 @@ export default function HomeScreen() {
 
                         {/* プログレスバー */}
                         <View className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                            <View 
-                                className={`h-full ${progressColor}`} 
-                                style={{ width: `${progress * 100}%` }} 
+                            <View
+                                className={`h-full ${progressColor}`}
+                                style={{ width: `${progress * 100}%` }}
                             />
                         </View>
                         <View className="flex-row justify-between mt-2">
                             <Text className="text-[10px] text-slate-400 font-medium">支出: ¥{totals.expense.toLocaleString()}</Text>
                             <Text className="text-[10px] text-slate-400 font-medium">{Math.round(progress * 100)}%</Text>
                         </View>
-                        
+
                         <View className="flex-row items-center justify-center mt-4">
                             <Text className="text-[10px] text-indigo-500 font-bold mr-1">カテゴリ別の詳細を表示</Text>
                             <ChevronRight size={10} color="#6366f1" />
@@ -406,32 +406,35 @@ export default function HomeScreen() {
                 </View>
 
                 <CategoryDonutChart transactions={monthTransactions} />
-                
+
                 <View className="flex-row justify-between items-end mt-4 mb-2 ml-2">
                     <Text className="text-xl font-bold text-slate-900 dark:text-white">
                         最近の履歴
                     </Text>
-                    
+
                     {/* フィルタリングチップ */}
                     <View className="flex-row bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             onPress={() => setFilterType('all')}
+                            hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
                             className={`px-3 py-1.5 rounded-lg ${filterType === 'all' ? 'bg-white dark:bg-slate-600 shadow-sm' : ''}`}
                         >
                             <Text className={`text-xs font-bold ${filterType === 'all' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`}>
                                 すべて
                             </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             onPress={() => setFilterType('income')}
+                            hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
                             className={`px-3 py-1.5 rounded-lg ${filterType === 'income' ? 'bg-white dark:bg-slate-600 shadow-sm' : ''}`}
                         >
                             <Text className={`text-xs font-bold ${filterType === 'income' ? 'text-green-600 dark:text-green-400' : 'text-slate-400'}`}>
                                 収入
                             </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             onPress={() => setFilterType('expense')}
+                            hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
                             className={`px-3 py-1.5 rounded-lg ${filterType === 'expense' ? 'bg-white dark:bg-slate-600 shadow-sm' : ''}`}
                         >
                             <Text className={`text-xs font-bold ${filterType === 'expense' ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'}`}>
@@ -448,7 +451,7 @@ export default function HomeScreen() {
         <View className="flex-1 bg-slate-50 dark:bg-slate-900">
             <View className="bg-white dark:bg-slate-800 px-4 pt-[30px] pb-4 flex-row justify-between items-center shadow-sm z-10">
                 <View className="flex-row items-center">
-                    <TouchableOpacity onPress={() => changeMonth(-1)} className="p-2">
+                    <TouchableOpacity onPress={() => changeMonth(-1)} className="p-2" hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                         <ChevronLeft size={24} color="#6366f1" />
                     </TouchableOpacity>
 
@@ -456,75 +459,95 @@ export default function HomeScreen() {
                         {monthLabel}
                     </Text>
 
-                    <TouchableOpacity onPress={() => changeMonth(1)} className="p-2">
+                    <TouchableOpacity onPress={() => changeMonth(1)} className="p-2" hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                         <ChevronRight size={24} color="#6366f1" />
                     </TouchableOpacity>
                 </View>
 
-                <View className="flex-row bg-slate-100 dark:bg-slate-700 rounded-xl p-1">
-                    <TouchableOpacity 
+                <View style={{ flexDirection: 'row', backgroundColor: isDark ? '#334155' : '#f1f5f9', borderRadius: 12, padding: 4 }}>
+                    <TouchableOpacity
                         onPress={() => setViewMode('list')}
-                        className={`p-2 rounded-lg ${viewMode === 'list' ? 'bg-white dark:bg-slate-600 shadow-sm' : ''}`}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        style={{
+                            padding: 8,
+                            borderRadius: 8,
+                            backgroundColor: viewMode === 'list' ? (isDark ? '#475569' : 'white') : 'transparent',
+                            shadowColor: viewMode === 'list' ? '#000' : 'transparent',
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: viewMode === 'list' ? 0.1 : 0,
+                            shadowRadius: 2,
+                            elevation: viewMode === 'list' ? 2 : 0
+                        }}
                     >
                         <List size={20} color={viewMode === 'list' ? '#6366f1' : '#94a3b8'} />
                     </TouchableOpacity>
-                    <TouchableOpacity 
-                        onPress={() => Alert.alert('お知らせ', 'カレンダー機能は現在一時停止中です。')}
-                        className={`p-2 rounded-lg ${viewMode === 'calendar' ? 'bg-white dark:bg-slate-600 shadow-sm' : ''}`}
+                    <TouchableOpacity
+                        onPress={() => setViewMode('calendar')}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        style={{
+                            padding: 8,
+                            borderRadius: 8,
+                            backgroundColor: viewMode === 'calendar' ? (isDark ? '#475569' : 'white') : 'transparent',
+                            shadowColor: viewMode === 'calendar' ? '#000' : 'transparent',
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: viewMode === 'calendar' ? 0.1 : 0,
+                            shadowRadius: 2,
+                            elevation: viewMode === 'calendar' ? 2 : 0
+                        }}
                     >
                         <CalendarIcon size={20} color={viewMode === 'calendar' ? '#6366f1' : '#94a3b8'} />
                     </TouchableOpacity>
                 </View>
             </View>
 
-            {viewMode === 'list' ? (
-                <FlashList
-                    data={sectionedTransactions}
-                    keyExtractor={(item, index) => item.type === 'header' ? `header-${item.date}-${index}` : item.id?.toString() || `${index}`}
-                    renderItem={renderItem}
-                    getItemType={(item) => item.type}
-                    estimatedItemSize={80}
-                    ListHeaderComponent={renderHeaderContent}
-                    showsVerticalScrollIndicator={false}
-                />
-            ) : (
-                <ScrollView showsVerticalScrollIndicator={false}>
-                    {renderHeaderContent()}
-                    
-                    <View className="mx-4 mb-6 rounded-3xl overflow-hidden shadow-sm">
-                        <Calendar
-                            current={selectedMonth.toISOString().split('T')[0]}
-                            onDayPress={day => setSelectedDate(day.dateString)}
-                            markedDates={markedDates}
-                            theme={calendarTheme}
-                            markingType={'multi-dot'}
-                            hideArrows={true} // 月移動はヘッダーで行うため
-                            enableSwipeMonths={false}
-                        />
-                    </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+                {renderHeaderContent()}
 
-                    <View className="mb-10">
-                        <Text className="text-sm font-bold text-slate-400 dark:text-slate-500 mb-4 ml-6 uppercase tracking-widest">
-                            {selectedDay.replace(/-/g, '/')} の履歴
-                        </Text>
-                        {dayTransactions.length > 0 ? (
-                            dayTransactions.map(t => (
-                                <TransactionItem 
-                                    key={t.id}
-                                    item={t}
-                                    majorCategories={majorCategories}
-                                    accounts={accounts}
-                                    onPress={handleTransactionPress}
-                                />
-                            ))
-                        ) : (
-                            <View className="bg-white dark:bg-slate-800 p-8 rounded-2xl mx-4 items-center">
-                                <Text className="text-slate-400">この日の取引はありません</Text>
+                {viewMode === 'list' ? (
+                    <View style={{ paddingBottom: 40 }}>
+                        {sectionedTransactions.map((item, index) => (
+                            <View key={item.type === 'header' ? `header-${item.date}-${index}` : item.id?.toString() || `item-${index}`}>
+                                {renderItem({ item })}
                             </View>
-                        )}
+                        ))}
                     </View>
-                </ScrollView>
-            )}
+                ) : (
+                    <>
+                        <View className="mx-4 mb-6 rounded-3xl overflow-hidden shadow-sm">
+                            <Calendar
+                                current={selectedMonth.toISOString().split('T')[0]}
+                                onDayPress={day => setSelectedDate(day.dateString)}
+                                markedDates={markedDates}
+                                theme={calendarTheme}
+                                markingType={'multi-dot'}
+                                hideArrows={true}
+                                enableSwipeMonths={false}
+                            />
+                        </View>
+
+                        <View className="mb-10">
+                            <Text className="text-sm font-bold text-slate-400 dark:text-slate-500 mb-4 ml-6 uppercase tracking-widest">
+                                {selectedDay.replace(/-/g, '/')} の履歴
+                            </Text>
+                            {dayTransactions.length > 0 ? (
+                                dayTransactions.map(t => (
+                                    <TransactionItem
+                                        key={t.id}
+                                        item={t}
+                                        majorCategories={majorCategories}
+                                        accounts={accounts}
+                                        onPress={handleTransactionPress}
+                                    />
+                                ))
+                            ) : (
+                                <View className="bg-white dark:bg-slate-800 p-8 rounded-2xl mx-4 items-center">
+                                    <Text className="text-slate-400">この日の取引はありません</Text>
+                                </View>
+                            )}
+                        </View>
+                    </>
+                )}
+            </ScrollView>
 
             {/* 予算内訳モーダル */}
             <Modal
@@ -537,8 +560,9 @@ export default function HomeScreen() {
                     <View className="bg-slate-50 dark:bg-slate-900 rounded-t-[40px] h-[85%] p-6">
                         <View className="flex-row justify-between items-center mb-6">
                             <Text className="text-xl font-black text-slate-900 dark:text-white">予算の内訳</Text>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 onPress={() => setIsBudgetModalVisible(false)}
+                                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
                                 className="bg-slate-200 dark:bg-slate-700 p-2 rounded-full"
                             >
                                 <X size={20} color={isDark ? '#f1f5f9' : '#0f172a'} />
@@ -555,7 +579,7 @@ export default function HomeScreen() {
                                 return (
                                     <View key={item.id} className="bg-white dark:bg-slate-800 p-5 rounded-3xl mb-4 shadow-sm">
                                         <View className="flex-row items-center mb-4">
-                                            <View 
+                                            <View
                                                 className="w-10 h-10 rounded-2xl items-center justify-center mr-4"
                                                 style={{ backgroundColor: item.color + '20' }}
                                             >
@@ -575,9 +599,9 @@ export default function HomeScreen() {
 
                                         {/* プログレスバー */}
                                         <View className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                            <View 
-                                                className={`h-full ${progressColor}`} 
-                                                style={{ width: `${progress * 100}%` }} 
+                                            <View
+                                                className={`h-full ${progressColor}`}
+                                                style={{ width: `${progress * 100}%` }}
                                             />
                                         </View>
                                     </View>
