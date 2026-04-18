@@ -39,17 +39,22 @@ jobs:
             CODE_SIGNING_ENTITLEMENTS="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            IPHONEOS_DEPLOYMENT_TARGET=15.1 \
-            -allowProvisioningUpdates \
-            | xcbeautify || echo "Build continues despite warnings..."
 
       - name: Create Payload and IPA
         run: |
+          # 以前の残骸を消去
+          rm -rf Payload HouseholdBudget.ipa
           mkdir -p Payload
-          # build/Build/... の中にある .app を探す。パスが深いので慎重にコピー
-          find build/Build/Products/Release-iphoneos -name "*.app" -exec cp -r {} Payload/ \;
-          zip -r HouseholdBudget.ipa Payload
+          
+          # .appファイルを確実に抽出
+          APP_PATH=$(find build/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
+          echo "Found App at: $APP_PATH"
+          
+          # Payloadフォルダの中に.appをコピー
+          cp -r "$APP_PATH" Payload/
+          
+          # SideStoreが認識できる形式でzip圧縮（拡張子をipaにする）
+          zip -qr HouseholdBudget.ipa Payload
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
