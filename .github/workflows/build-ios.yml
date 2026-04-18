@@ -21,11 +21,19 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_16.1.app
 
       - name: Install dependencies
-        run: npm install
+        run:
+          # 署名なしビルドを邪魔する開発用パッケージを、ビルド時のみ一時的に削除します
+          npm uninstall expo-dev-client expo-dev-launcher
+          npm install
 
       - name: Install Expo CLI & Prebuild
         run: |
-          npx expo prebuild --platform ios
+          # 開発用クライアントを含めないように、--no-install を付けて
+          # 純粋なプロダクション（配布用）に近い状態で prebuild します
+          npx expo prebuild --platform ios --no-install
+          
+          # その後、必要な Pods だけをインストール
+          cd ios && pod install && cd ..
 
       - name: Build with Xcode (Unsigned)
         run: |
@@ -39,6 +47,9 @@ jobs:
             CODE_SIGNING_ENTITLEMENTS="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            ASSETCATALOG_COMPILER_SKIP_APP_ICON_CHECK=YES \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            IPHONEOS_DEPLOYMENT_TARGET=15.1
 
       - name: Create Payload and IPA
         run: |
@@ -48,7 +59,6 @@ jobs:
           
           # .appファイルを確実に抽出
           APP_PATH=$(find build/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
-          echo "Found App at: $APP_PATH"
           
           # Payloadフォルダの中に.appをコピー
           cp -r "$APP_PATH" Payload/
