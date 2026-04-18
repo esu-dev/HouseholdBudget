@@ -1,7 +1,8 @@
 import { Stack, useRouter } from 'expo-router';
-import { Building2, Check, ChevronLeft, CreditCard, Edit2, Plus, RefreshCw, Trash2, Wallet } from 'lucide-react-native';
+import { Building2, Check, ChevronDown, ChevronLeft, ChevronUp, CreditCard, Edit2, Plus, RefreshCw, Trash2, Wallet } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { useTransactionStore } from '../../store/useTransactionStore';
 import { Account, CardType } from '../../types/account';
@@ -24,7 +25,7 @@ export default function AccountManagementScreen() {
     const colorScheme = useAppColorScheme();
     const isDark = colorScheme === 'dark';
 
-    const { accounts, addAccount, updateAccount, deleteAccount, syncCardTransfers, isLoading } = useTransactionStore();
+    const { accounts, addAccount, updateAccount, deleteAccount, syncCardTransfers, reorderAccounts, isLoading } = useTransactionStore();
 
     const [modalVisible, setModalVisible] = useState(false);
     const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -45,6 +46,13 @@ export default function AccountManagementScreen() {
         inputBg: isDark ? '#1e293b' : '#f1f5f9',
         indigo: '#6366f1',
     };
+
+    const { cashAccount, otherAccounts } = React.useMemo(() => {
+        return {
+            cashAccount: accounts.find(a => a.id === 'cash'),
+            otherAccounts: accounts.filter(a => a.id !== 'cash')
+        };
+    }, [accounts]);
 
     const handleAddOrUpdate = async () => {
         if (!accountName.trim()) {
@@ -71,6 +79,7 @@ export default function AccountManagementScreen() {
                     closingDay: closingDayNum,
                     withdrawalDay: withdrawalDayNum,
                     withdrawalAccountId: accountType === 'card' ? withdrawalAccountId : undefined,
+                    displayOrder: editingAccount.displayOrder ?? 0
                 });
             } else {
                 await addAccount({
@@ -82,6 +91,7 @@ export default function AccountManagementScreen() {
                     closingDay: closingDayNum,
                     withdrawalDay: withdrawalDayNum,
                     withdrawalAccountId: accountType === 'card' ? withdrawalAccountId : undefined,
+                    displayOrder: accounts.length
                 });
             }
             setModalVisible(false);
@@ -109,11 +119,11 @@ export default function AccountManagementScreen() {
             // 今月と先月、来月分を同期
             const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
             const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-            
+
             await syncCardTransfers(accountId, now.toISOString());
             await syncCardTransfers(accountId, lastMonth.toISOString());
             await syncCardTransfers(accountId, nextMonth.toISOString());
-            
+
             Alert.alert('同期完了', `${account.name} の最近の振替を更新しました。`);
         } catch (e) {
             Alert.alert('エラー', '振替の同期に失敗しました');
@@ -121,8 +131,7 @@ export default function AccountManagementScreen() {
     };
 
     const handleDelete = (id: string) => {
-        // デフォルトのアカウントは削除できないようにする（簡易ガード）
-        if (['cash', 'bank', 'card'].includes(id)) {
+        if (id === 'cash') {
             Alert.alert('エラー', 'このアカウントは削除できません');
             return;
         }
@@ -146,11 +155,11 @@ export default function AccountManagementScreen() {
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
             <Stack.Screen options={{ headerShown: false }} />
 
             {/* Header */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 60, backgroundColor: colors.card }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.card }}>
                 <TouchableOpacity onPress={() => router.back()}>
                     <ChevronLeft size={28} color={colors.text} />
                 </TouchableOpacity>
@@ -164,73 +173,101 @@ export default function AccountManagementScreen() {
                     登録済みのアカウント
                 </Text>
 
-                {accounts.map((account) => {
-                    const typeInfo = ACCOUNT_TYPES.find(t => t.id === account.type) || ACCOUNT_TYPES[3];
-                    const IconComp = typeInfo.icon;
+                {/* 口座リストの描画 */}
+                {(() => {
+                    const renderAccountItem = (account: Account, index: number, isOther: boolean) => {
+                        const typeInfo = ACCOUNT_TYPES.find(t => t.id === account.type) || ACCOUNT_TYPES[3];
+                        const IconComp = typeInfo.icon;
 
-                    return (
-                        <View key={account.id} style={{ backgroundColor: colors.card, padding: 16, borderRadius: 20, marginBottom: 12, flexDirection: 'row', alignItems: 'center' }}>
-                            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: typeInfo.color + '20', alignItems: 'center', justifyContent: 'center' }}>
-                                <IconComp size={22} color={typeInfo.color} />
-                            </View>
-                            <View style={{ flex: 1, marginLeft: 16 }}>
-                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>{account.name}</Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
-                                    <Text style={{ fontSize: 12, color: colors.textMuted }}>{typeInfo.label}</Text>
-                                    {account.type === 'card' && account.cardType && account.cardType !== 'none' && (
-                                        <Text style={{ fontSize: 10, color: colors.indigo, backgroundColor: colors.indigo + '10', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, fontWeight: 'bold' }}>
-                                            {CARD_TYPES.find(ct => ct.id === account.cardType)?.label}
-                                        </Text>
-                                    )}
-                                    {account.type === 'card' && (account.closingDay !== undefined || account.withdrawalDay !== undefined) && (
-                                        <Text style={{ fontSize: 11, color: colors.textMuted }}>
-                                            （〆:{formatDayLabel(account.closingDay) || '-'} / 引:{formatDayLabel(account.withdrawalDay) || '-'}）
-                                        </Text>
+                        return (
+                            <View key={account.id} style={{ backgroundColor: colors.card, padding: 16, borderRadius: 20, marginBottom: 12, flexDirection: 'row', alignItems: 'center' }}>
+                                <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: typeInfo.color + '20', alignItems: 'center', justifyContent: 'center' }}>
+                                    <IconComp size={22} color={typeInfo.color} />
+                                </View>
+                                <View style={{ flex: 1, marginLeft: 16 }}>
+                                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>{account.name}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                                        <Text style={{ fontSize: 12, color: colors.textMuted }}>{typeInfo.label}</Text>
+                                        {account.type === 'card' && account.cardType && account.cardType !== 'none' && (
+                                            <Text style={{ fontSize: 10, color: colors.indigo, backgroundColor: colors.indigo + '10', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, fontWeight: 'bold' }}>
+                                                {CARD_TYPES.find(ct => ct.id === account.cardType)?.label}
+                                            </Text>
+                                        )}
+                                        {account.type === 'card' && (account.closingDay !== undefined || account.withdrawalDay !== undefined) && (
+                                            <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                                                （〆:{formatDayLabel(account.closingDay) || '-'} / 引:{formatDayLabel(account.withdrawalDay) || '-'}）
+                                            </Text>
+                                        )}
+                                        {account.type === 'card' && account.withdrawalAccountId && (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                                <Building2 size={10} color={colors.textMuted} />
+                                                <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                                                    {accounts.find(a => a.id === account.withdrawalAccountId)?.name || '不明な口座'}
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                </View>
+                                <View style={{ flexDirection: 'row', gap: 4 }}>
+                                    {isOther && (
+                                        <View style={{ flexDirection: 'column', marginRight: 4 }}>
+                                            <TouchableOpacity
+                                                disabled={index === 0}
+                                                onPress={() => reorderAccounts(index, index - 1)}
+                                                style={{ padding: 4, opacity: index === 0 ? 0.3 : 1 }}
+                                            >
+                                                <ChevronUp size={18} color={colors.textMuted} />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                disabled={index === otherAccounts.length - 1}
+                                                onPress={() => reorderAccounts(index, index + 1)}
+                                                style={{ padding: 4, opacity: index === otherAccounts.length - 1 ? 0.3 : 1 }}
+                                            >
+                                                <ChevronDown size={18} color={colors.textMuted} />
+                                            </TouchableOpacity>
+                                        </View>
                                     )}
                                     {account.type === 'card' && account.withdrawalAccountId && (
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                            <Building2 size={10} color={colors.textMuted} />
-                                            <Text style={{ fontSize: 11, color: colors.textMuted }}>
-                                                {accounts.find(a => a.id === account.withdrawalAccountId)?.name || '不明な口座'}
-                                            </Text>
-                                        </View>
+                                        <TouchableOpacity
+                                            onPress={() => handleSync(account.id)}
+                                            style={{ padding: 8 }}
+                                        >
+                                            <RefreshCw size={20} color={colors.indigo} />
+                                        </TouchableOpacity>
+                                    )}
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setEditingAccount(account);
+                                            setAccountName(account.name);
+                                            setAccountType(account.type);
+                                            setCardType(account.cardType || 'none');
+                                            setLoginUrl(account.loginUrl || '');
+                                            setClosingDay(account.closingDay !== undefined ? account.closingDay?.toString() : '');
+                                            setWithdrawalDay(account.withdrawalDay !== undefined ? account.withdrawalDay?.toString() : '');
+                                            setWithdrawalAccountId(account.withdrawalAccountId);
+                                            setModalVisible(true);
+                                        }}
+                                        style={{ padding: 8 }}
+                                    >
+                                        <Edit2 size={20} color={colors.textMuted} />
+                                    </TouchableOpacity>
+                                    {account.id !== 'cash' && (
+                                        <TouchableOpacity onPress={() => handleDelete(account.id)} style={{ padding: 8 }}>
+                                            <Trash2 size={20} color="#ef4444" />
+                                        </TouchableOpacity>
                                     )}
                                 </View>
                             </View>
-                            <View style={{ flexDirection: 'row', gap: 8 }}>
-                                {account.type === 'card' && account.withdrawalAccountId && (
-                                    <TouchableOpacity
-                                        onPress={() => handleSync(account.id)}
-                                        style={{ padding: 8 }}
-                                    >
-                                        <RefreshCw size={20} color={colors.indigo} />
-                                    </TouchableOpacity>
-                                )}
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        setEditingAccount(account);
-                                        setAccountName(account.name);
-                                        setAccountType(account.type);
-                                        setCardType(account.cardType || 'none');
-                                        setLoginUrl(account.loginUrl || '');
-                                        setClosingDay(account.closingDay !== undefined ? account.closingDay?.toString() : '');
-                                        setWithdrawalDay(account.withdrawalDay !== undefined ? account.withdrawalDay?.toString() : '');
-                                        setWithdrawalAccountId(account.withdrawalAccountId);
-                                        setModalVisible(true);
-                                    }}
-                                    style={{ padding: 8 }}
-                                >
-                                    <Edit2 size={20} color={colors.textMuted} />
-                                </TouchableOpacity>
-                                {!['cash', 'bank', 'card'].includes(account.id) && (
-                                    <TouchableOpacity onPress={() => handleDelete(account.id)} style={{ padding: 8 }}>
-                                        <Trash2 size={20} color="#ef4444" />
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        </View>
+                        );
+                    };
+
+                    return (
+                        <>
+                            {cashAccount && renderAccountItem(cashAccount, -1, false)}
+                            {otherAccounts.map((account, index) => renderAccountItem(account, index, true))}
+                        </>
                     );
-                })}
+                })()}
 
                 <TouchableOpacity
                     onPress={() => {
@@ -450,6 +487,6 @@ export default function AccountManagementScreen() {
                     </ScrollView>
                 </View>
             </Modal>
-        </View>
+        </SafeAreaView>
     );
 }

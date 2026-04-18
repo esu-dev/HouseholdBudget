@@ -22,8 +22,8 @@ export const initDatabase = async () => {
       card_type TEXT DEFAULT 'none',
       login_url TEXT,
       closing_day INTEGER,
-      withdrawal_day INTEGER,
       withdrawal_account_id TEXT,
+      display_order INTEGER DEFAULT 0,
       FOREIGN KEY (withdrawal_account_id) REFERENCES accounts(id)
     );
     
@@ -141,6 +141,10 @@ export const initDatabase = async () => {
   try {
     await db.execAsync('ALTER TABLE transactions ADD COLUMN to_account_id TEXT');
   } catch (e) {}
+  
+  try {
+    await db.execAsync('ALTER TABLE accounts ADD COLUMN display_order INTEGER DEFAULT 0');
+  } catch (e) {}
 
   try {
     await db.execAsync('ALTER TABLE major_categories ADD COLUMN display_order INTEGER DEFAULT 0');
@@ -160,9 +164,7 @@ export const initDatabase = async () => {
   const accountCount = await db.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM accounts');
   if (!accountCount || accountCount.count === 0) {
     await db.execAsync(`
-      INSERT INTO accounts (id, name, type) VALUES ('cash', '現金', 'cash');
-      INSERT INTO accounts (id, name, type) VALUES ('bank', '銀行口座', 'bank');
-      INSERT INTO accounts (id, name, type) VALUES ('card', 'クレジットカード', 'card');
+      INSERT INTO accounts (id, name, type, display_order) VALUES ('cash', '現金', 'cash', 0);
     `);
   }
 
@@ -347,7 +349,7 @@ export const databaseService = {
   // Accounts
   async getAllAccounts(): Promise<Account[]> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
-    const rows = await db.getAllAsync<any>('SELECT * FROM accounts');
+    const rows = await db.getAllAsync<any>('SELECT * FROM accounts ORDER BY display_order ASC');
     return rows.map(row => ({
       id: row.id,
       name: row.name,
@@ -356,14 +358,32 @@ export const databaseService = {
       loginUrl: row.login_url,
       closingDay: row.closing_day,
       withdrawalDay: row.withdrawal_day,
-      withdrawalAccountId: row.withdrawal_account_id
+      withdrawalAccountId: row.withdrawal_account_id,
+      displayOrder: row.display_order
     }));
+  },
+
+  async updateAccountsOrder(accounts: { id: string, displayOrder: number }[]): Promise<void> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    await db.execAsync('BEGIN TRANSACTION;');
+    try {
+      for (const account of accounts) {
+        await db.runAsync(
+          'UPDATE accounts SET display_order = ? WHERE id = ?',
+          account.displayOrder, account.id
+        );
+      }
+      await db.execAsync('COMMIT;');
+    } catch (e) {
+      await db.execAsync('ROLLBACK;');
+      throw e;
+    }
   },
 
   async addAccount(account: Omit<Account, 'balance'>): Promise<void> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     await db.runAsync(
-      'INSERT INTO accounts (id, name, type, card_type, login_url, closing_day, withdrawal_day, withdrawal_account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO accounts (id, name, type, card_type, login_url, closing_day, withdrawal_day, withdrawal_account_id, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       account.id,
       account.name,
       account.type,
@@ -371,14 +391,15 @@ export const databaseService = {
       account.loginUrl ?? null,
       account.closingDay ?? null,
       account.withdrawalDay ?? null,
-      account.withdrawalAccountId ?? null
+      account.withdrawalAccountId ?? null,
+      account.displayOrder ?? 0
     );
   },
 
   async updateAccount(account: Omit<Account, 'balance'>): Promise<void> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     await db.runAsync(
-      'UPDATE accounts SET name = ?, type = ?, card_type = ?, login_url = ?, closing_day = ?, withdrawal_day = ?, withdrawal_account_id = ? WHERE id = ?',
+      'UPDATE accounts SET name = ?, type = ?, card_type = ?, login_url = ?, closing_day = ?, withdrawal_day = ?, withdrawal_account_id = ?, display_order = ? WHERE id = ?',
       account.name,
       account.type,
       account.cardType ?? 'none',
@@ -386,6 +407,7 @@ export const databaseService = {
       account.closingDay ?? null,
       account.withdrawalDay ?? null,
       account.withdrawalAccountId ?? null,
+      account.displayOrder ?? 0,
       account.id
     );
   },
@@ -723,9 +745,7 @@ export const databaseService = {
       // シーディング（初期データの再投入）
       // アカウント
       await db.execAsync(`
-        INSERT INTO accounts (id, name, type) VALUES ('cash', '現金', 'cash');
-        INSERT INTO accounts (id, name, type) VALUES ('bank', '銀行口座', 'bank');
-        INSERT INTO accounts (id, name, type) VALUES ('card', 'クレジットカード', 'card');
+        INSERT INTO accounts (id, name, type, display_order) VALUES ('cash', '現金', 'cash', 0);
       `);
 
       // カテゴリ

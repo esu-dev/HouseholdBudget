@@ -138,9 +138,11 @@ export const externalCsvImportService = {
       }
 
       if (type === 'income_expense') {
-        const extCategory = row[1]?.trim();
+        const normalizeName = (val: string | undefined) => val ? val.trim().replace(/\s+/g, ' ') : '';
+
+        const extCategory = normalizeName(row[1]);
         const amountStr = row[3]?.trim();
-        const extAccount = row[6]?.trim();
+        const extAccount = normalizeName(row[6]);
         const memo = row[8]?.trim() || '';
         const classification = row[9]?.trim() || ''; // 10th column: "収" or "支"
 
@@ -190,9 +192,11 @@ export const externalCsvImportService = {
         // Transfer logic (already similar logging style could be added)
         // ... (skipping for now to keep the change focused)
         // Actually, let's add it for transfer too.
-        const extFromAccount = row[1]?.trim();
+        const normalizeName = (val: string | undefined) => val ? val.trim().replace(/\s+/g, ' ') : '';
+
+        const extFromAccount = normalizeName(row[1]);
         const outAmountStr = row[2]?.trim();
-        const extToAccount = row[4]?.trim();
+        const extToAccount = normalizeName(row[4]);
         const inAmountStr = row[5]?.trim();
         const memo = row[8]?.trim() || '';
 

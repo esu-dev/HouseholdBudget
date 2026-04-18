@@ -11,6 +11,7 @@ export type Account = {
   closingDay?: number;
   withdrawalDay?: number;
   withdrawalAccountId?: string;
+  displayOrder: number;
 };
 
 // バランス計算用のヘルパー型

@@ -33,6 +33,7 @@ interface TransactionState {
   deleteAccount: (id: string) => Promise<void>;
   upsertBudget: (budget: CreateBudgetInput) => Promise<void>;
   syncCardTransfers: (accountId: string, dateStr: string) => Promise<void>;
+  reorderAccounts: (startIndex: number, endIndex: number) => Promise<void>;
   setEditingTransaction: (transaction: Transaction | null) => void;
   // Category Actions
   addMajorCategory: (major: Omit<MajorCategory, 'subCategories'>) => Promise<void>;
@@ -303,6 +304,29 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
     } catch (error) {
       set({ error: 'Failed to sync transfers', isLoading: false });
     }
+  },
+
+  reorderAccounts: async (startIndex: number, endIndex: number) => {
+    const { accounts } = get();
+    // 現金以外の口座を対象にする
+    const cashAccount = accounts.find(a => a.id === 'cash');
+    const otherAccounts = accounts.filter(a => a.id !== 'cash');
+    
+    const result = Array.from(otherAccounts);
+    const [removed] = result.splice(startIndex, 1);
+    result.splice(endIndex, 0, removed);
+    
+    const updates = result.map((a, index) => ({
+      id: a.id,
+      displayOrder: index + 1 // 現金が0番目
+    }));
+    
+    if (cashAccount) {
+      updates.unshift({ id: 'cash', displayOrder: 0 });
+    }
+    
+    await databaseService.updateAccountsOrder(updates);
+    await get().fetchData();
   },
 
   setEditingTransaction: (transaction: Transaction | null) => {
