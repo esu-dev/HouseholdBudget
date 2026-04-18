@@ -54,18 +54,21 @@ jobs:
 
       - name: Create Payload and IPA
         run: |
-          # 以前の残骸を消去
-          rm -rf Payload HouseholdBudget.ipa
-          mkdir -p Payload
+          # 1. きれいな作業場を作る
+          rm -rf Payload HouseholdBudget.ipa export_app
+          mkdir -p export_app/Payload
           
-          # .appファイルを確実に抽出
+          # 2. .appファイルを一旦別の場所にコピー（シンボリックリンクを維持する -a オプション）
           APP_PATH=$(find build/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
+          cp -Ra "$APP_PATH" export_app/Payload/
           
-          # Payloadフォルダの中に.appをコピー
-          cp -r "$APP_PATH" Payload/
+          # 3. フォルダの中に移動してからzipする（これが重要！）
+          # フォルダの外側からzipすると、余計なパスが含まれて "vector too long" の原因になります
+          cd export_app
+          zip -qr ../HouseholdBudget.ipa Payload
+          cd ..
           
-          # SideStoreが認識できる形式でzip圧縮（拡張子をipaにする）
-          zip -qr HouseholdBudget.ipa Payload
+          echo "IPA creation complete."
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
