@@ -3,8 +3,8 @@ import { ArrowDownCircle, ArrowUpCircle, ChevronDown, ChevronLeft, ChevronUp, Ci
 import React, { useState } from 'react';
 import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CATEGORY_ICONS } from '../../constants/categories';
-import { useTransactionStore } from '../../store/useTransactionStore';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
+import { useTransactionStore } from '../../store/useTransactionStore';
 
 export default function CategoryManagementScreen() {
     const router = useRouter();
@@ -127,7 +127,10 @@ export default function CategoryManagementScreen() {
 
             {/* Header */}
             <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 60, backgroundColor: colors.card }}>
-                <TouchableOpacity onPress={() => router.back()}>
+                <TouchableOpacity
+                    onPress={() => router.back()}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
                     <ChevronLeft size={24} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, flex: 1, textAlign: 'center', marginRight: 24 }}>カテゴリ設定</Text>

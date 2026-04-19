@@ -40,12 +40,12 @@ export default function InputScreen() {
   const navigation = useNavigation();
   const colorScheme = useAppColorScheme();
   const isDark = colorScheme === 'dark';
-  
+
   const { addTransaction, addTransactions, updateTransaction, deleteTransaction, accounts, fetchData, editingTransaction, setEditingTransaction, majorCategories, addTransfer } = useTransactionStore();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedMajorId, setSelectedMajorId] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
-  
+
   // 最後に反映した取引IDを保持して、不必要なリセットを防ぐ
   const lastResolvedId = useRef<number | string | null | undefined>(undefined);
 
@@ -86,9 +86,9 @@ export default function InputScreen() {
   const selectedDate = watch('date');
   const payee = watch('payee');
 
-  const currentMajorCategories = React.useMemo(() => 
+  const currentMajorCategories = React.useMemo(() =>
     majorCategories.filter(c => c.type === transactionType)
-  , [majorCategories, transactionType]);
+    , [majorCategories, transactionType]);
 
   const selectedMajor = currentMajorCategories.find(c => c.id === selectedMajorId);
 
@@ -160,7 +160,7 @@ export default function InputScreen() {
       });
       setSelectedMajorId(null);
     }
-    
+
     lastResolvedId.current = editingTransaction?.id || null;
   }, [editingTransaction]); // majorCategoriesを依存関係から外す
 
@@ -170,7 +170,7 @@ export default function InputScreen() {
 
     reset();
     setEditingTransaction(null);
-    
+
     if (wasEditing && accountId) {
       // 編集モードだった場合は、履歴スタックに「入力」を残さないために replace で戻る
       router.replace({ pathname: '/accounts/[id]', params: { id: accountId } });
@@ -212,7 +212,7 @@ export default function InputScreen() {
     const amountNum = Number(data.amount);
     const amount = data.type === 'income' ? Math.abs(amountNum) : -Math.abs(amountNum);
     const feeNum = data.fee ? Math.abs(Number(data.fee)) : 0;
-    
+
     // 自動学習除外設定の反映
     if (data.payee && data.payee.trim()) {
       if (data.ignore_learning) {
@@ -255,7 +255,7 @@ export default function InputScreen() {
         });
       }
     }
-    
+
     navigateAfterAction();
   };
 
@@ -265,12 +265,12 @@ export default function InputScreen() {
 
   const handleDelete = () => {
     if (!editingTransaction) return;
-    
+
     Alert.alert('確認', 'この取引を削除しますか？', [
       { text: 'キャンセル', style: 'cancel' },
-      { 
-        text: '削除', 
-        style: 'destructive', 
+      {
+        text: '削除',
+        style: 'destructive',
         onPress: async () => {
           await deleteTransaction(editingTransaction.id);
           navigateAfterAction();
@@ -285,63 +285,66 @@ export default function InputScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
       >
         <ScrollView style={{ flex: 1, padding: 16, paddingTop: 60 }} showsVerticalScrollIndicator={false}>
-        {/* CSV Import Section */}
-        {!editingTransaction && accounts.some(acc => acc.cardType && acc.cardType !== 'none') && (
-          <View style={{ marginBottom: 24 }}>
-            <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 }}>
-              CSVからインポート
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-              {accounts.filter(acc => acc.cardType && acc.cardType !== 'none').map((account) => (
-                <TouchableOpacity
-                  key={`csv-${account.id}`}
-                  onPress={() => handleCsvImport(account.id, account.cardType)}
-                  disabled={isImporting}
-                  style={{ 
-                    flex: 1,
-                    minWidth: '45%',
-                    backgroundColor: colors.card, 
-                    padding: 16, 
-                    borderRadius: 20, 
-                    flexDirection: 'row', 
-                    alignItems: 'center',
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    opacity: isImporting ? 0.6 : 1
-                  }}
-                >
-                  <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primarySub, alignItems: 'center', justifyContent: 'center' }}>
-                    <FileUp size={18} color={colors.primary} />
-                  </View>
-                  <View style={{ marginLeft: 12, flex: 1 }}>
-                     <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.text }} numberOfLines={1}>{account.name}</Text>
-                     <Text style={{ fontSize: 10, color: colors.textMuted }}>{account.cardType === 'jp_bank' ? 'JP BANK' : 'JCB'}</Text>
-                   </View>
-                   {account.loginUrl && (
-                     <TouchableOpacity 
-                       onPress={() => Linking.openURL(account.loginUrl!)}
-                       style={{ padding: 8, backgroundColor: colors.inputBg, borderRadius: 10 }}
-                     >
-                       <ExternalLink size={16} color={colors.primary} />
-                     </TouchableOpacity>
-                   )}
-                 </TouchableOpacity>
-              ))}
+          {/* CSV Import Section */}
+          {!editingTransaction && accounts.some(acc => acc.cardType && acc.cardType !== 'none') && (
+            <View style={{ marginBottom: 24 }}>
+              <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 }}>
+                CSVからインポート
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                {accounts.filter(acc => acc.cardType && acc.cardType !== 'none').map((account) => (
+                  <TouchableOpacity
+                    key={`csv-${account.id}`}
+                    onPress={() => handleCsvImport(account.id, account.cardType)}
+                    disabled={isImporting}
+                    style={{
+                      flex: 1,
+                      minWidth: '45%',
+                      backgroundColor: colors.card,
+                      padding: 16,
+                      borderRadius: 20,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      opacity: isImporting ? 0.6 : 1
+                    }}
+                  >
+                    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primarySub, alignItems: 'center', justifyContent: 'center' }}>
+                      <FileUp size={18} color={colors.primary} />
+                    </View>
+                    <View style={{ marginLeft: 12, flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.text }} numberOfLines={1}>{account.name}</Text>
+                      <Text style={{ fontSize: 10, color: colors.textMuted }}>{account.cardType === 'jp_bank' ? 'JP BANK' : 'JCB'}</Text>
+                    </View>
+                    {account.loginUrl && (
+                      <TouchableOpacity
+                        onPress={() => Linking.openURL(account.loginUrl!)}
+                        style={{ padding: 8, backgroundColor: colors.inputBg, borderRadius: 10 }}
+                      >
+                        <ExternalLink size={16} color={colors.primary} />
+                      </TouchableOpacity>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        <View style={{ backgroundColor: colors.card, padding: 24, borderRadius: 24, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 }}>
+          <View style={{ backgroundColor: colors.card, padding: 24, borderRadius: 24, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 {editingTransaction && (
-                  <TouchableOpacity onPress={handleCancel} style={{ marginRight: 12 }}>
+                  <TouchableOpacity
+                    onPress={handleCancel} style={{ marginRight: 12 }}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
                     <ChevronLeft size={24} color={colors.text} />
                   </TouchableOpacity>
                 )}
@@ -357,21 +360,21 @@ export default function InputScreen() {
             </View>
 
             <View style={{ flexDirection: 'row', backgroundColor: isDark ? '#334155' : '#f1f5f9', padding: 4, borderRadius: 16, marginBottom: 32 }}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => toggleType('expense')}
                 style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: transactionType === 'expense' ? (isDark ? '#475569' : 'white') : 'transparent' }}
               >
                 <ArrowDownCircle size={18} color={transactionType === 'expense' ? colors.expense : colors.textMuted} />
                 <Text style={{ marginLeft: 8, fontWeight: 'bold', color: transactionType === 'expense' ? colors.text : colors.textMuted }}>支出</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => toggleType('income')}
                 style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: transactionType === 'income' ? (isDark ? '#475569' : 'white') : 'transparent' }}
               >
                 <ArrowUpCircle size={18} color={transactionType === 'income' ? colors.income : colors.textMuted} />
                 <Text style={{ marginLeft: 8, fontWeight: 'bold', color: transactionType === 'income' ? colors.text : colors.textMuted }}>収入</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => toggleType('transfer')}
                 style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: transactionType === 'transfer' ? (isDark ? '#475569' : 'white') : 'transparent' }}
               >
@@ -441,7 +444,7 @@ export default function InputScreen() {
                             setValue('category_id', '');
                           }
                         }}
-                        style={{ 
+                        style={{
                           padding: 12, borderRadius: 16, alignItems: 'center', marginRight: 10, minWidth: 80,
                           backgroundColor: isSelected ? colors.primarySub : colors.inputBg,
                           borderWidth: 2, borderColor: isSelected ? colors.primary : 'transparent'
@@ -466,7 +469,7 @@ export default function InputScreen() {
                           <TouchableOpacity
                             key={minor.id}
                             onPress={() => setValue('category_id', minor.id)}
-                            style={{ 
+                            style={{
                               paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginRight: 8, marginBottom: 8,
                               backgroundColor: isSelected ? selectedMajor.color : (isDark ? '#334155' : '#f1f5f9'),
                               borderWidth: 1, borderColor: isSelected ? selectedMajor.color : colors.border
@@ -504,7 +507,7 @@ export default function InputScreen() {
                         setValue('to_account_id', '');
                       }
                     }}
-                    style={{ 
+                    style={{
                       flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 16, marginRight: 8, marginBottom: 8,
                       backgroundColor: isAccSelected ? colors.primarySub : colors.inputBg,
                       borderWidth: 2, borderColor: isAccSelected ? colors.primary : 'transparent'
@@ -529,7 +532,7 @@ export default function InputScreen() {
                       <TouchableOpacity
                         key={`to-${account.id}`}
                         onPress={() => setValue('to_account_id', account.id)}
-                        style={{ 
+                        style={{
                           flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 16, marginRight: 8, marginBottom: 8,
                           backgroundColor: isAccSelected ? colors.primarySub : colors.inputBg,
                           borderWidth: 2, borderColor: isAccSelected ? colors.primary : 'transparent'
@@ -548,9 +551,9 @@ export default function InputScreen() {
                 )}
               </>
             )}
-            
+
             <Text style={{ color: colors.textMuted, marginTop: 24, marginBottom: 8, fontWeight: '500' }}>日付</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setShowDatePicker(!showDatePicker)}
               style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.inputBg, padding: 16, borderRadius: 12 }}
             >
@@ -605,12 +608,12 @@ export default function InputScreen() {
                   control={control}
                   name="ignore_learning"
                   render={({ field: { onChange, value } }) => (
-                    <View style={{ 
-                      flexDirection: 'row', 
-                      alignItems: 'center', 
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
                       justifyContent: 'space-between',
-                      backgroundColor: colors.inputBg, 
-                      padding: 12, 
+                      backgroundColor: colors.inputBg,
+                      padding: 12,
                       borderRadius: 12,
                       marginTop: 8
                     }}>
@@ -659,10 +662,10 @@ export default function InputScreen() {
       </KeyboardAvoidingView>
 
       <View style={{ padding: 16, backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border, paddingBottom: 32 }}>
-         <TouchableOpacity 
+        <TouchableOpacity
           onPress={handleSubmit(onSubmit)}
-          style={{ 
-            padding: 20, borderRadius: 16, alignItems: 'center', 
+          style={{
+            padding: 20, borderRadius: 16, alignItems: 'center',
             backgroundColor: transactionType === 'expense' ? colors.primary : (transactionType === 'income' ? colors.income : colors.primary)
           }}
         >

@@ -4,13 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { ScrollView, Text, TouchableOpacity, View, ActivityIndicator, Alert, Modal } from 'react-native';
 import { databaseService } from '../../services/database';
 import { useTransactionStore } from '../../store/useTransactionStore';
-import { CATEGORIES } from '../../constants/categories';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 
 export default function CsvMappingListScreen() {
     const router = useRouter();
     const colorScheme = useAppColorScheme();
-    const { accounts } = useTransactionStore();
+    const { accounts, majorCategories } = useTransactionStore();
     
     const [isLoading, setIsLoading] = useState(true);
     const [categoryMappings, setCategoryMappings] = useState<Record<string, string>>({});
@@ -111,7 +110,7 @@ export default function CsvMappingListScreen() {
                     ) : (
                         <View style={{ backgroundColor: colors.card, borderRadius: 20, overflow: 'hidden', marginBottom: 32 }}>
                             {Object.entries(categoryMappings).map(([ext, int], index) => {
-                                const internalLabel = CATEGORIES.flatMap(m => m.subCategories).find(s => s.id === int)?.label || int;
+                                const internalLabel = majorCategories.flatMap(m => m.subCategories).find(s => s.id === int)?.label || int;
                                 return (
                                     <View key={ext} style={{ padding: 16, borderBottomWidth: index === Object.keys(categoryMappings).length - 1 ? 0 : 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <View style={{ flex: 1 }}>
@@ -181,7 +180,7 @@ export default function CsvMappingListScreen() {
                         <ScrollView style={{ flex: 1 }}>
                             {editingItem?.type === 'category' ? (
                                 <View style={{ gap: 8 }}>
-                                    {CATEGORIES.flatMap(major => major.subCategories).map(minor => {
+                                    {majorCategories.flatMap(major => major.subCategories).map(minor => {
                                         const isSelected = editingItem.internalId === minor.id;
                                         return (
                                             <TouchableOpacity 

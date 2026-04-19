@@ -5,14 +5,14 @@ import { ScrollView, Text, TouchableOpacity, View, Alert, Modal, ActivityIndicat
 import { externalCsvImportService, ExternalCsvType, ImportResult } from '../../services/externalCsvImportService';
 import { databaseService } from '../../services/database';
 import { useTransactionStore } from '../../store/useTransactionStore';
-import { MajorCategory, CATEGORIES } from '../../constants/categories';
+import { MajorCategory } from '../../constants/categories';
 import { Account } from '../../types/account';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 
 export default function CsvImportScreen() {
     const router = useRouter();
     const colorScheme = useAppColorScheme();
-    const { accounts, fetchData } = useTransactionStore();
+    const { accounts, majorCategories, fetchData } = useTransactionStore();
 
     const [isLoading, setIsLoading] = useState(false);
     const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -257,7 +257,7 @@ export default function CsvImportScreen() {
                                     <View key={extCat} style={{ marginBottom: 12, backgroundColor: colors.card, padding: 16, borderRadius: 16 }}>
                                         <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.text, marginBottom: 8 }}>{extCat}</Text>
                                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
-                                            {CATEGORIES.flatMap(major => major.subCategories).map(minor => (
+                                            {majorCategories.flatMap(major => major.subCategories).map(minor => (
                                                 <TouchableOpacity
                                                     key={minor.id}
                                                     onPress={() => {

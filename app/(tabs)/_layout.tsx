@@ -19,6 +19,7 @@ export default function TabLayout() {
         tabBarButton: HapticTab,
         tabBarStyle: {
           backgroundColor: colorScheme === 'dark' ? '#0f172a' : '#ffffff',
+          paddingBottom: 10,
         },
       }}>
       <Tabs.Screen
