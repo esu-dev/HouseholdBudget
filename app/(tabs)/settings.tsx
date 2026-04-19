@@ -218,7 +218,7 @@ export default function SettingsScreen() {
                 />
 
                 <View style={{ alignItems: 'center', marginTop: 32, marginBottom: 60 }}>
-                    <Text style={{ fontSize: 12, color: colors.textMuted }}>Household Budget v1.0.2</Text>
+                    <Text style={{ fontSize: 12, color: colors.textMuted }}>Household Budget v1.0.3</Text>
                 </View>
             </View>
         </ScrollView>
