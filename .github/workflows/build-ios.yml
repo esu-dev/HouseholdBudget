@@ -36,14 +36,8 @@ jobs:
 
       - name: Build with Xcode (Unsigned)
         run: |
-          set -e
-
-          # スキーム名を自動取得（ワークスペース内の最初のスキームを取得）
-          SCHEME=$(xcodebuild -workspace ios/MyHouseholdBudget.xcworkspace -list | grep -A 1 "Schemes:" | tail -n 1 | xargs)
-          echo "Building scheme: $SCHEME"
-
-          xcodebuild -workspace ios/*.xcworkspace -list \
-            -scheme MyHouseholdBudget \
+          xcodebuild -workspace ios/*.xcworkspace \
+            -scheme myapp \
             -configuration Release \
             -derivedDataPath build \
             -jobs 2 \
@@ -54,8 +48,7 @@ jobs:
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             ASSETCATALOG_COMPILER_SKIP_APP_ICON_CHECK=YES \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            IPHONEOS_DEPLOYMENT_TARGET=15.1
-            #| xcbeautify || { echo "Build Failed"; exit 1; }
+            IPHONEOS_DEPLOYMENT_TARGET=15.1 | xcbeautify || { echo "Build Failed"; exit 1; }
 
       - name: Create Payload and IPA
         run: |
