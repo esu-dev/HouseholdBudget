@@ -36,12 +36,14 @@ jobs:
 
       - name: Build with Xcode (Unsigned)
         run: |
+          set -e
+
           # スキーム名を自動取得（ワークスペース内の最初のスキームを取得）
           SCHEME=$(xcodebuild -workspace ios/MyHouseholdBudget.xcworkspace -list | grep -A 1 "Schemes:" | tail -n 1 | xargs)
           echo "Building scheme: $SCHEME"
 
-          xcodebuild -workspace ios/*.xcworkspace \
-            -scheme "$SCHEME" \
+          xcodebuild -workspace ios/*.xcworkspace -list \
+            -scheme MyHouseholdBudget \
             -configuration Release \
             -derivedDataPath build \
             -jobs 2 \
