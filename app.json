@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "my-app",
+    "name": "My家計簿",
     "slug": "my-app",
-    "version": "1.0.0",
+    "version": "1.0.3",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/appicon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
