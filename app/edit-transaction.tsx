@@ -6,11 +6,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Alert, InputAccessoryView, Keyboard, KeyboardAvoidingView, Linking, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as z from 'zod';
-import { CATEGORY_ICONS } from '../../constants/categories';
-import { useAppColorScheme } from '../../hooks/useAppColorScheme';
-import { csvImportService } from '../../services/csvImportService';
-import { databaseService } from '../../services/database';
-import { useTransactionStore } from '../../store/useTransactionStore';
+import { CATEGORY_ICONS } from '../constants/categories';
+import { useAppColorScheme } from '../hooks/useAppColorScheme';
+import { csvImportService } from '../services/csvImportService';
+import { databaseService } from '../services/database';
+import { useTransactionStore } from '../store/useTransactionStore';
 
 
 
@@ -35,7 +35,7 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function InputScreen() {
+export default function EditTransactionScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const colorScheme = useAppColorScheme();
@@ -167,8 +167,12 @@ export default function InputScreen() {
   const navigateAfterAction = () => {
     reset();
     setEditingTransaction(null);
-    // 新規追加完了後はホームへ戻る
-    router.replace('/');
+
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
   };
 
   const handleCsvImport = async (accountId: string, cardType: any) => {
@@ -340,7 +344,10 @@ export default function InputScreen() {
                 </Text>
               </View>
               {editingTransaction && (
-                <TouchableOpacity onPress={handleDelete}>
+                <TouchableOpacity
+                  onPress={handleDelete}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
                   <Trash2 size={22} color={colors.danger} />
                 </TouchableOpacity>
               )}

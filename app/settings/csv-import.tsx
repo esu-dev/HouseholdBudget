@@ -225,15 +225,24 @@ export default function CsvImportScreen() {
                     </TouchableOpacity>
                 </View>
                 <View style={{ backgroundColor: colors.card, borderRadius: 20, padding: 16 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
-                        <View style={{ alignItems: 'center' }}>
-                            <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>{Object.keys(categoryMappings).length}</Text>
-                            <Text style={{ fontSize: 12, color: colors.textMuted }}>カテゴリ</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' }}>
+                        <View style={{ alignItems: 'center', flex: 1 }}>
+                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>
+                                {Object.entries(categoryMappings).filter(([_, int]) => majorCategories.find(m => m.subCategories.some(s => s.id === int))?.type === 'expense').length}
+                            </Text>
+                            <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>カテゴリ(支出)</Text>
                         </View>
-                        <View style={{ width: 1, height: 30, backgroundColor: colors.border }} />
-                        <View style={{ alignItems: 'center' }}>
-                            <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>{Object.keys(accountMappings).length}</Text>
-                            <Text style={{ fontSize: 12, color: colors.textMuted }}>口座</Text>
+                        <View style={{ width: 1, height: 24, backgroundColor: colors.border }} />
+                        <View style={{ alignItems: 'center', flex: 1 }}>
+                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>
+                                {Object.entries(categoryMappings).filter(([_, int]) => majorCategories.find(m => m.subCategories.some(s => s.id === int))?.type === 'income').length}
+                            </Text>
+                            <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>カテゴリ(収入)</Text>
+                        </View>
+                        <View style={{ width: 1, height: 24, backgroundColor: colors.border }} />
+                        <View style={{ alignItems: 'center', flex: 1 }}>
+                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>{Object.keys(accountMappings).length}</Text>
+                            <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>口座</Text>
                         </View>
                     </View>
                 </View>
@@ -256,8 +265,50 @@ export default function CsvImportScreen() {
                                 {missingMappings.categories.map(extCat => (
                                     <View key={extCat} style={{ marginBottom: 12, backgroundColor: colors.card, padding: 16, borderRadius: 16 }}>
                                         <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.text, marginBottom: 8 }}>{extCat}</Text>
+                                        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                                            <TouchableOpacity 
+                                                onPress={() => {
+                                                    // Toggle filter if needed, but here we just show both for now or filter.
+                                                    // Given the space, maybe just group them with labels is better in horizontal scroll.
+                                                }}
+                                                style={{ paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, backgroundColor: colors.indigo + '20' }}
+                                            >
+                                                <Text style={{ fontSize: 10, color: colors.indigo, fontWeight: 'bold' }}>支出</Text>
+                                            </TouchableOpacity>
+                                        </View>
                                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
-                                            {majorCategories.flatMap(major => major.subCategories).map(minor => (
+                                            {majorCategories.filter(m => m.type === 'expense').flatMap(major => major.subCategories).map(minor => (
+                                                <TouchableOpacity
+                                                    key={minor.id}
+                                                    onPress={() => {
+                                                        const normalized = extCat.trim().replace(/\s+/g, ' ');
+                                                        setCategoryMappings(prev => ({ ...prev, [normalized]: minor.id }));
+                                                    }}
+                                                    hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                                                    style={{
+                                                        paddingHorizontal: 12,
+                                                        paddingVertical: 8,
+                                                        borderRadius: 12,
+                                                        marginRight: 8,
+                                                        backgroundColor: categoryMappings[extCat.trim().replace(/\s+/g, ' ')] === minor.id ? colors.indigo : colors.inputBg,
+                                                        borderWidth: 1,
+                                                        borderColor: categoryMappings[extCat.trim().replace(/\s+/g, ' ')] === minor.id ? colors.indigo : colors.border
+                                                    }}
+                                                >
+                                                    <Text style={{ fontSize: 12, color: categoryMappings[extCat.trim().replace(/\s+/g, ' ')] === minor.id ? 'white' : colors.text, fontWeight: categoryMappings[extCat.trim().replace(/\s+/g, ' ')] === minor.id ? 'bold' : 'normal' }}>
+                                                        {minor.label}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </ScrollView>
+                                        <View style={{ height: 12 }} />
+                                        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                                            <TouchableOpacity style={{ paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, backgroundColor: colors.warning + '20' }}>
+                                                <Text style={{ fontSize: 10, color: colors.warning, fontWeight: 'bold' }}>収入</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
+                                            {majorCategories.filter(m => m.type === 'income').flatMap(major => major.subCategories).map(minor => (
                                                 <TouchableOpacity
                                                     key={minor.id}
                                                     onPress={() => {

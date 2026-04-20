@@ -18,6 +18,7 @@ export default function CsvMappingListScreen() {
     // Modal state
     const [editingItem, setEditingItem] = useState<{ type: 'category' | 'account', externalName: string, internalId: string } | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
+    const [modalCategoryType, setModalCategoryType] = useState<'expense' | 'income'>('expense');
 
     const isDark = colorScheme === 'dark';
     const colors = {
@@ -68,6 +69,12 @@ export default function CsvMappingListScreen() {
 
     const handleEdit = (type: 'category' | 'account', externalName: string, internalId: string) => {
         setEditingItem({ type, externalName, internalId });
+        
+        if (type === 'category') {
+            const major = majorCategories.find(m => m.subCategories.some(s => s.id === internalId));
+            setModalCategoryType(major?.type || 'expense');
+        }
+        
         setModalVisible(true);
     };
 
@@ -104,33 +111,67 @@ export default function CsvMappingListScreen() {
                 </View>
             ) : (
                 <ScrollView style={{ flex: 1, padding: 20 }}>
-                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 16, textTransform: 'uppercase' }}>カテゴリ対応</Text>
-                    {Object.keys(categoryMappings).length === 0 ? (
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 16, textTransform: 'uppercase' }}>カテゴリ対応（支出）</Text>
+                    {Object.entries(categoryMappings).filter(([_, int]) => majorCategories.find(m => m.subCategories.some(s => s.id === int))?.type === 'expense').length === 0 ? (
                         <Text style={{ fontSize: 14, color: colors.textMuted, textAlign: 'center', marginBottom: 32 }}>設定されていません</Text>
                     ) : (
                         <View style={{ backgroundColor: colors.card, borderRadius: 20, overflow: 'hidden', marginBottom: 32 }}>
-                            {Object.entries(categoryMappings).map(([ext, int], index) => {
-                                const internalLabel = majorCategories.flatMap(m => m.subCategories).find(s => s.id === int)?.label || int;
-                                return (
-                                    <View key={ext} style={{ padding: 16, borderBottomWidth: index === Object.keys(categoryMappings).length - 1 ? 0 : 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={{ fontSize: 12, color: colors.textMuted }}>CSV項目: {ext}</Text>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                                                <Tag size={14} color={colors.indigo} />
-                                                <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.text, marginLeft: 6 }}>{internalLabel}</Text>
+                            {Object.entries(categoryMappings)
+                                .filter(([_, int]) => majorCategories.find(m => m.subCategories.some(s => s.id === int))?.type === 'expense')
+                                .map(([ext, int], index, filteredArr) => {
+                                    const internalLabel = majorCategories.flatMap(m => m.subCategories).find(s => s.id === int)?.label || int;
+                                    return (
+                                        <View key={ext} style={{ padding: 16, borderBottomWidth: index === filteredArr.length - 1 ? 0 : 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={{ fontSize: 12, color: colors.textMuted }}>CSV項目: {ext}</Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                                                    <Tag size={14} color={colors.indigo} />
+                                                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.text, marginLeft: 6 }}>{internalLabel}</Text>
+                                                </View>
+                                            </View>
+                                            <View style={{ flexDirection: 'row', gap: 12 }}>
+                                                <TouchableOpacity onPress={() => handleEdit('category', ext, int)}>
+                                                    <Edit2 size={20} color={colors.textMuted} />
+                                                </TouchableOpacity>
+                                                <TouchableOpacity onPress={() => handleDelete('category', ext)}>
+                                                    <Trash2 size={20} color={colors.danger} />
+                                                </TouchableOpacity>
                                             </View>
                                         </View>
-                                        <View style={{ flexDirection: 'row', gap: 12 }}>
-                                            <TouchableOpacity onPress={() => handleEdit('category', ext, int)}>
-                                                <Edit2 size={20} color={colors.textMuted} />
-                                            </TouchableOpacity>
-                                            <TouchableOpacity onPress={() => handleDelete('category', ext)}>
-                                                <Trash2 size={20} color={colors.danger} />
-                                            </TouchableOpacity>
+                                    );
+                                })}
+                        </View>
+                    )}
+
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 16, textTransform: 'uppercase' }}>カテゴリ対応（収入）</Text>
+                    {Object.entries(categoryMappings).filter(([_, int]) => majorCategories.find(m => m.subCategories.some(s => s.id === int))?.type === 'income').length === 0 ? (
+                        <Text style={{ fontSize: 14, color: colors.textMuted, textAlign: 'center', marginBottom: 32 }}>設定されていません</Text>
+                    ) : (
+                        <View style={{ backgroundColor: colors.card, borderRadius: 20, overflow: 'hidden', marginBottom: 32 }}>
+                            {Object.entries(categoryMappings)
+                                .filter(([_, int]) => majorCategories.find(m => m.subCategories.some(s => s.id === int))?.type === 'income')
+                                .map(([ext, int], index, filteredArr) => {
+                                    const internalLabel = majorCategories.flatMap(m => m.subCategories).find(s => s.id === int)?.label || int;
+                                    return (
+                                        <View key={ext} style={{ padding: 16, borderBottomWidth: index === filteredArr.length - 1 ? 0 : 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={{ fontSize: 12, color: colors.textMuted }}>CSV項目: {ext}</Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                                                    <Tag size={14} color={colors.indigo} />
+                                                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.text, marginLeft: 6 }}>{internalLabel}</Text>
+                                                </View>
+                                            </View>
+                                            <View style={{ flexDirection: 'row', gap: 12 }}>
+                                                <TouchableOpacity onPress={() => handleEdit('category', ext, int)}>
+                                                    <Edit2 size={20} color={colors.textMuted} />
+                                                </TouchableOpacity>
+                                                <TouchableOpacity onPress={() => handleDelete('category', ext)}>
+                                                    <Trash2 size={20} color={colors.danger} />
+                                                </TouchableOpacity>
+                                            </View>
                                         </View>
-                                    </View>
-                                );
-                            })}
+                                    );
+                                })}
                         </View>
                     )}
 
@@ -179,29 +220,50 @@ export default function CsvMappingListScreen() {
 
                         <ScrollView style={{ flex: 1 }}>
                             {editingItem?.type === 'category' ? (
-                                <View style={{ gap: 8 }}>
-                                    {majorCategories.flatMap(major => major.subCategories).map(minor => {
-                                        const isSelected = editingItem.internalId === minor.id;
-                                        return (
-                                            <TouchableOpacity 
-                                                key={minor.id}
-                                                onPress={() => saveMapping(minor.id)}
-                                                style={{ 
-                                                    flexDirection: 'row', 
-                                                    alignItems: 'center', 
-                                                    justifyContent: 'space-between',
-                                                    padding: 16, 
-                                                    borderRadius: 16, 
-                                                    backgroundColor: isSelected ? colors.indigo : colors.card,
-                                                    borderWidth: 1,
-                                                    borderColor: isSelected ? colors.indigo : colors.border
-                                                }}
-                                            >
-                                                <Text style={{ fontWeight: 'bold', color: isSelected ? 'white' : colors.text }}>{minor.label}</Text>
-                                                {isSelected && <Check size={20} color="white" />}
-                                            </TouchableOpacity>
-                                        );
-                                    })}
+                                <View>
+                                    {/* Type Switcher */}
+                                    <View style={{ flexDirection: 'row', backgroundColor: colors.card, padding: 4, borderRadius: 12, marginBottom: 16 }}>
+                                        <TouchableOpacity 
+                                            onPress={() => setModalCategoryType('expense')}
+                                            style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8, backgroundColor: modalCategoryType === 'expense' ? colors.indigo : 'transparent' }}
+                                        >
+                                            <Text style={{ fontSize: 13, fontWeight: 'bold', color: modalCategoryType === 'expense' ? 'white' : colors.textMuted }}>支出</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity 
+                                            onPress={() => setModalCategoryType('income')}
+                                            style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8, backgroundColor: modalCategoryType === 'income' ? colors.indigo : 'transparent' }}
+                                        >
+                                            <Text style={{ fontSize: 13, fontWeight: 'bold', color: modalCategoryType === 'income' ? 'white' : colors.textMuted }}>収入</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <View style={{ gap: 8 }}>
+                                        {majorCategories
+                                            .filter(major => major.type === modalCategoryType)
+                                            .flatMap(major => major.subCategories)
+                                            .map(minor => {
+                                                const isSelected = editingItem.internalId === minor.id;
+                                                return (
+                                                    <TouchableOpacity 
+                                                        key={minor.id}
+                                                        onPress={() => saveMapping(minor.id)}
+                                                        style={{ 
+                                                            flexDirection: 'row', 
+                                                            alignItems: 'center', 
+                                                            justifyContent: 'space-between',
+                                                            padding: 16, 
+                                                            borderRadius: 16, 
+                                                            backgroundColor: isSelected ? colors.indigo : colors.card,
+                                                            borderWidth: 1,
+                                                            borderColor: isSelected ? colors.indigo : colors.border
+                                                        }}
+                                                    >
+                                                        <Text style={{ fontWeight: 'bold', color: isSelected ? 'white' : colors.text }}>{minor.label}</Text>
+                                                        {isSelected && <Check size={20} color="white" />}
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                    </View>
                                 </View>
                             ) : (
                                 <View style={{ gap: 8 }}>

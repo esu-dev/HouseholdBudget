@@ -1,6 +1,6 @@
 import { CategoryDonutChart } from '@/components/CategoryDonutChart';
 import { router } from 'expo-router';
-import { CalendarIcon, ChevronLeft, ChevronRight, CircleEllipsis, List, Store, X } from 'lucide-react-native';
+import { CalendarIcon, ChevronLeft, ChevronRight, CircleEllipsis, List, MessageSquare, Store, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
@@ -88,6 +88,15 @@ const TransactionItem = React.memo(({
                         ) : null}
                     </View>
                 </View>
+
+                {item.memo ? (
+                    <View className="flex-row items-center mt-0.5">
+                        <MessageSquare size={10} color="#94a3b8" />
+                        <Text className="text-[10px] text-slate-400 dark:text-slate-500 ml-1" numberOfLines={1}>
+                            {item.memo}
+                        </Text>
+                    </View>
+                ) : null}
             </View>
 
             <View className="ml-2">
@@ -274,7 +283,7 @@ export default function HomeScreen() {
 
     const handleTransactionPress = useCallback((item: any) => {
         setEditingTransaction(item);
-        router.push('/input');
+        router.push('/edit-transaction');
     }, [setEditingTransaction]);
 
     const renderItem = useCallback(({ item }: { item: any }) => {

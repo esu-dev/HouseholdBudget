@@ -1,8 +1,8 @@
 import { FlashList } from '@shopify/flash-list';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Calendar, CircleEllipsis, Store, Wallet } from 'lucide-react-native';
-import React, { useMemo } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { ArrowLeft, Calendar, CircleEllipsis, MessageSquare, Store, Wallet } from 'lucide-react-native';
+import React, { useMemo, useState } from 'react';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { useTransactionStore } from '../../store/useTransactionStore';
@@ -26,9 +26,38 @@ export default function AccountHistoryScreen() {
         indigo: '#6366f1',
     };
 
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
+    const availableCategories = useMemo(() => {
+        const accountTxs = transactions.filter(t => t.account_id === id);
+        const catIds = new Set(accountTxs.map(t => t.category_id));
+        const cats: { id: string, label: string }[] = [];
+        
+        // 特殊な「振替」カテゴリをチェック
+        if (catIds.has('transfer')) {
+            cats.push({ id: 'transfer', label: '振替' });
+        }
+
+        majorCategories.forEach(maj => {
+            maj.subCategories.forEach(min => {
+                if (catIds.has(min.id)) {
+                    cats.push({ id: min.id, label: min.label });
+                }
+            });
+        });
+        return cats;
+    }, [transactions, id, majorCategories]);
+
     const filteredTransactions = useMemo(() => {
-        return transactions.filter(t => t.account_id === id);
-    }, [transactions, id]);
+        return transactions.filter(t => {
+            const matchesAccount = t.account_id === id;
+            if (!matchesAccount) return false;
+            if (selectedCategoryId) {
+                return t.category_id === selectedCategoryId;
+            }
+            return true;
+        });
+    }, [transactions, id, selectedCategoryId]);
 
     const sectionedTransactions = useMemo(() => {
         const groups: Record<string, any[]> = {};
@@ -90,7 +119,7 @@ export default function AccountHistoryScreen() {
             <TouchableOpacity
                 onPress={() => {
                     setEditingTransaction(item);
-                    router.replace('/input');
+                    router.push('/edit-transaction');
                 }}
                 style={{
                     backgroundColor: colors.card,
@@ -115,14 +144,22 @@ export default function AccountHistoryScreen() {
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <View>
                             <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>
-                                {item.category_id === 'transfer' && toAccount 
-                                    ? `${item.amount > 0 ? '←' : '→'} ${toAccount.name}` 
+                                {item.category_id === 'transfer' && toAccount
+                                    ? `${item.amount > 0 ? '←' : '→'} ${toAccount.name}`
                                     : label}
                             </Text>
                             {item.payee && (
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                                     <Store size={10} color={colors.textMuted} />
                                     <Text style={{ fontSize: 11, color: colors.textMuted, marginLeft: 4 }}>{item.payee}</Text>
+                                </View>
+                            )}
+                            {item.memo && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                                    <MessageSquare size={10} color={colors.textMuted} />
+                                    <Text style={{ fontSize: 10, color: colors.textMuted, marginLeft: 4 }} numberOfLines={1}>
+                                        {item.memo}
+                                    </Text>
                                 </View>
                             )}
                         </View>
@@ -157,8 +194,52 @@ export default function AccountHistoryScreen() {
                 keyExtractor={(item, index) => item.type === 'header' ? `header-${item.date}-${index}` : `item-${item.id}-${index}`}
                 //estimatedItemSize={80}
                 ListHeaderComponent={() => (
-                    <View style={{ padding: 24, paddingBottom: 8 }}>
-                        <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>取引履歴</Text>
+                    <View style={{ paddingTop: 24, paddingBottom: 8 }}>
+                        <View style={{ paddingHorizontal: 24, marginBottom: 16 }}>
+                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>取引履歴</Text>
+                        </View>
+                        
+                        {availableCategories.length > 0 && (
+                            <ScrollView 
+                                horizontal 
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={{ paddingHorizontal: 24, gap: 8, paddingBottom: 8 }}
+                            >
+                                <TouchableOpacity
+                                    onPress={() => setSelectedCategoryId(null)}
+                                    style={{
+                                        paddingHorizontal: 16,
+                                        paddingVertical: 8,
+                                        borderRadius: 20,
+                                        backgroundColor: selectedCategoryId === null ? colors.indigo : colors.card,
+                                        borderWidth: 1,
+                                        borderColor: selectedCategoryId === null ? colors.indigo : colors.border
+                                    }}
+                                >
+                                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: selectedCategoryId === null ? 'white' : colors.textMuted }}>
+                                        すべて
+                                    </Text>
+                                </TouchableOpacity>
+                                {availableCategories.map(cat => (
+                                    <TouchableOpacity
+                                        key={cat.id}
+                                        onPress={() => setSelectedCategoryId(cat.id)}
+                                        style={{
+                                            paddingHorizontal: 16,
+                                            paddingVertical: 8,
+                                            borderRadius: 20,
+                                            backgroundColor: selectedCategoryId === cat.id ? colors.indigo : colors.card,
+                                            borderWidth: 1,
+                                            borderColor: selectedCategoryId === cat.id ? colors.indigo : colors.border
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: selectedCategoryId === cat.id ? 'white' : colors.textMuted }}>
+                                            {cat.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        )}
                     </View>
                 )}
                 ListEmptyComponent={() => (
