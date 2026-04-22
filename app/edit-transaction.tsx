@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRouter } from 'expo-router';
-import { ArrowDownCircle, ArrowUpCircle, Calendar, ChevronLeft, CircleEllipsis, ExternalLink, FileUp, Store, Trash2, Wallet, ZapOff } from 'lucide-react-native';
+import { ArrowDownCircle, ArrowUpCircle, Calendar, CircleEllipsis, ExternalLink, FileUp, Store, Trash2, Wallet, ZapOff } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Alert, InputAccessoryView, Keyboard, KeyboardAvoidingView, Linking, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -281,7 +281,7 @@ export default function EditTransactionScreen() {
         style={{ flex: 1 }}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
       >
-        <ScrollView style={{ flex: 1, padding: 16, paddingTop: 60 }} showsVerticalScrollIndicator={false}>
+        <ScrollView style={{ flex: 1, padding: 16, paddingTop: 24 }} showsVerticalScrollIndicator={false}>
           {/* CSV Import Section */}
           {!editingTransaction && accounts.some(acc => acc.cardType && acc.cardType !== 'none') && (
             <View style={{ marginBottom: 24 }}>
@@ -331,14 +331,6 @@ export default function EditTransactionScreen() {
           <View style={{ backgroundColor: colors.card, padding: 24, borderRadius: 24, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {editingTransaction && (
-                  <TouchableOpacity
-                    onPress={handleCancel} style={{ marginRight: 12 }}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <ChevronLeft size={24} color={colors.text} />
-                  </TouchableOpacity>
-                )}
                 <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>
                   {editingTransaction ? '取引を編集' : '新規入力'}
                 </Text>

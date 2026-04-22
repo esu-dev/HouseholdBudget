@@ -55,17 +55,17 @@ const TransactionItem = React.memo(({
 
             <View className="flex-1 ml-4">
                 <View className="flex-row justify-between items-center">
-                    <View>
-                        <Text className="text-base font-bold text-slate-900 dark:text-white">
+                    <View className="flex-1 mr-2">
+                        <Text className="text-base font-bold text-slate-900 dark:text-white" numberOfLines={1}>
                             {item.category_id === 'transfer' && toAccount
                                 ? `${item.amount > 0 ? '←' : '→'} ${toAccount.name}`
                                 : label}
                         </Text>
-                        <Text className="text-[10px] text-slate-400">
+                        <Text className="text-[10px] text-slate-400" numberOfLines={1}>
                             {majorCategory?.label}
                         </Text>
                     </View>
-                    <Text className={`text-lg font-bold ${item.amount > 0 ? 'text-green-500' : 'text-slate-900 dark:text-white'}`}>
+                    <Text className={`text-lg font-bold ${item.amount > 0 ? 'text-green-500' : 'text-slate-900 dark:text-white'}`} style={{ minWidth: 80, textAlign: 'right' }}>
                         {item.amount > 0 ? '+' : ''}¥{item.amount.toLocaleString()}
                     </Text>
                 </View>

@@ -1,7 +1,8 @@
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Stack, useRouter } from 'expo-router';
-import { Building2, Check, ChevronDown, ChevronLeft, ChevronUp, CreditCard, Edit2, Plus, RefreshCw, Trash2, Wallet } from 'lucide-react-native';
+import { Building2, Calendar, Check, ChevronDown, ChevronLeft, ChevronUp, CreditCard, Edit2, Plus, RefreshCw, Trash2, Wallet } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { useTransactionStore } from '../../store/useTransactionStore';
@@ -36,6 +37,8 @@ export default function AccountManagementScreen() {
     const [closingDay, setClosingDay] = useState('');
     const [withdrawalDay, setWithdrawalDay] = useState('');
     const [withdrawalAccountId, setWithdrawalAccountId] = useState<string | undefined>(undefined);
+    const [billingStartDate, setBillingStartDate] = useState('');
+    const [showBillingMonthPicker, setShowBillingMonthPicker] = useState(false);
 
     const colors = {
         background: isDark ? '#0f172a' : '#f8fafc',
@@ -79,6 +82,7 @@ export default function AccountManagementScreen() {
                     closingDay: closingDayNum,
                     withdrawalDay: withdrawalDayNum,
                     withdrawalAccountId: accountType === 'card' ? withdrawalAccountId : undefined,
+                    billingStartDate: accountType === 'card' ? billingStartDate : undefined,
                     displayOrder: editingAccount.displayOrder ?? 0
                 });
             } else {
@@ -91,6 +95,7 @@ export default function AccountManagementScreen() {
                     closingDay: closingDayNum,
                     withdrawalDay: withdrawalDayNum,
                     withdrawalAccountId: accountType === 'card' ? withdrawalAccountId : undefined,
+                    billingStartDate: accountType === 'card' ? billingStartDate : undefined,
                     displayOrder: accounts.length
                 });
             }
@@ -101,7 +106,9 @@ export default function AccountManagementScreen() {
             setClosingDay('');
             setWithdrawalDay('');
             setWithdrawalAccountId(undefined);
+            setBillingStartDate('');
             setEditingAccount(null);
+            setModalVisible(false);
         } catch (e) {
             Alert.alert('エラー', '保存に失敗しました');
         }
@@ -196,6 +203,7 @@ export default function AccountManagementScreen() {
                                         {account.type === 'card' && (account.closingDay !== undefined || account.withdrawalDay !== undefined) && (
                                             <Text style={{ fontSize: 11, color: colors.textMuted }}>
                                                 （〆:{formatDayLabel(account.closingDay) || '-'} / 引:{formatDayLabel(account.withdrawalDay) || '-'}）
+                                                {account.billingStartDate ? ` [始:${account.billingStartDate}]` : ''}
                                             </Text>
                                         )}
                                         {account.type === 'card' && account.withdrawalAccountId && (
@@ -209,6 +217,7 @@ export default function AccountManagementScreen() {
                                     </View>
                                 </View>
                                 <View style={{ flexDirection: 'row', gap: 4 }}>
+                                    {/* 並び替えボタン */}
                                     {isOther && (
                                         <View style={{ flexDirection: 'column', marginRight: 4 }}>
                                             <TouchableOpacity
@@ -238,6 +247,7 @@ export default function AccountManagementScreen() {
                                             <RefreshCw size={20} color={colors.indigo} />
                                         </TouchableOpacity>
                                     )}
+                                    {/* 編集ボタン */}
                                     <TouchableOpacity
                                         onPress={() => {
                                             setEditingAccount(account);
@@ -248,16 +258,17 @@ export default function AccountManagementScreen() {
                                             setClosingDay(account.closingDay !== undefined ? account.closingDay?.toString() : '');
                                             setWithdrawalDay(account.withdrawalDay !== undefined ? account.withdrawalDay?.toString() : '');
                                             setWithdrawalAccountId(account.withdrawalAccountId);
+                                            setBillingStartDate(account.billingStartDate || '');
                                             setModalVisible(true);
                                         }}
-                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                        hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
                                         style={{ padding: 8 }}
                                     >
                                         <Edit2 size={20} color={colors.textMuted} />
                                     </TouchableOpacity>
                                     {account.id !== 'cash' && (
-                                        <TouchableOpacity 
-                                            onPress={() => handleDelete(account.id)} 
+                                        <TouchableOpacity
+                                            onPress={() => handleDelete(account.id)}
                                             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                             style={{ padding: 8 }}
                                         >
@@ -285,6 +296,7 @@ export default function AccountManagementScreen() {
                         setClosingDay('');
                         setWithdrawalDay('');
                         setWithdrawalAccountId(undefined);
+                        setBillingStartDate('');
                         setModalVisible(true);
                     }}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -313,7 +325,7 @@ export default function AccountManagementScreen() {
                 animationType="slide"
                 onRequestClose={() => setModalVisible(false)}
             >
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+                <View style={{ paddingTop: 24, flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
                     <ScrollView bounces={false} style={{ flexGrow: 0 }}>
                         <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 40 }}>
                             <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 24 }}>
@@ -411,6 +423,49 @@ export default function AccountManagementScreen() {
                                             />
                                             <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 4 }}>※末日の場合は0</Text>
                                         </View>
+                                    </View>
+
+                                    <View style={{ marginBottom: 20 }}>
+                                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 8 }}>自動振替の開始月</Text>
+                                        <TouchableOpacity
+                                            onPress={() => setShowBillingMonthPicker(true)}
+                                            style={{
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                backgroundColor: colors.inputBg,
+                                                padding: 16,
+                                                borderRadius: 16,
+                                            }}
+                                        >
+                                            <Calendar size={20} color={colors.textMuted} />
+                                            <Text style={{ marginLeft: 12, fontSize: 16, color: billingStartDate ? colors.text : colors.textMuted }}>
+                                                {billingStartDate || '選択してください'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                        {showBillingMonthPicker && (
+                                            <View>
+                                                {Platform.OS === 'ios' && (
+                                                    <TouchableOpacity onPress={() => setShowBillingMonthPicker(false)} style={{ alignItems: 'flex-end', padding: 8 }}>
+                                                        <Text style={{ color: colors.indigo, fontWeight: 'bold' }}>完了</Text>
+                                                    </TouchableOpacity>
+                                                )}
+                                                <DateTimePicker
+                                                    value={billingStartDate ? new Date(billingStartDate + '-01') : new Date()}
+                                                    mode="date"
+                                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                                    locale="ja-JP"
+                                                    onChange={(event, date) => {
+                                                        if (Platform.OS === 'android') setShowBillingMonthPicker(false);
+                                                        if (date) {
+                                                            const y = date.getFullYear();
+                                                            const m = String(date.getMonth() + 1).padStart(2, '0');
+                                                            setBillingStartDate(`${y}-${m}`);
+                                                        }
+                                                    }}
+                                                />
+                                            </View>
+                                        )}
+                                        <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 4 }}>※この月以降のサイクル分（締め日基準）を自動計算します。</Text>
                                     </View>
 
                                     <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12 }}>引き落とし口座</Text>

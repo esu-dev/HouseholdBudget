@@ -4,125 +4,176 @@ export const creditCardPaymentService = {
   /**
    * クレジットカードの取引月に基づいて、翌月の引き落とし日の振替を更新する
    */
-  async updateTransferForDate(accountId: string, transactionDateStr: string): Promise<void> {
+  /**
+   * クレジットカードの取引日に基づいて、締め日を考慮したサイクル月を特定し、
+   * その翌月の引き落とし日の振替を更新する
+   */
+  async updateTransferForDate(accountId: string, _dateStr?: string): Promise<void> {
     const accounts = await databaseService.getAllAccounts();
     const cardAccount = accounts.find(a => a.id === accountId);
 
-    if (!cardAccount) {
+    if (!cardAccount || cardAccount.type !== 'card' || !cardAccount.withdrawalAccountId || cardAccount.withdrawalDay == null) {
       return;
     }
 
-    // withdrawalDay が null または undefined の場合のチェック
-    if (cardAccount.type !== 'card' || !cardAccount.withdrawalAccountId || cardAccount.withdrawalDay == null) {
-      return;
-    }
-
-    const date = new Date(transactionDateStr);
-    const year = date.getFullYear();
-    const month = date.getMonth(); // 0-indexed (0:1月, 3:4月)
-
-    // 対象となる月の文字列 (YYYY-MM)
-    const targetMonthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
-
-    // 引き落とし日を計算 (翌月の指定日)
-    let withdrawalYear = year;
-    let withdrawalMonth = month + 1; // 翌月
-    if (withdrawalMonth > 11) {
-      withdrawalYear++;
-      withdrawalMonth = 0;
-    }
+    const userId = '1'; // Placeholder or get from context if multiple users
+    const closingDay = cardAccount.closingDay || 0;
     
-    // 指定日が0の場合は末日
-    let day = cardAccount.withdrawalDay;
-    if (day === 0) {
-      day = new Date(withdrawalYear, withdrawalMonth + 1, 0).getDate();
-    }
-    
-    const withdrawalDateStr = `${withdrawalYear}-${String(withdrawalMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00.000Z`;
+    // 開始日を YYYY-MM 形式に正規化
+    const normalizeYearMonth = (str: string | undefined) => {
+      if (!str) return undefined;
+      const match = str.match(/(\d{4})[-/年](\d{1,2})/);
+      if (match) {
+        return `${match[1]}-${match[2].padStart(2, '0')}`;
+      }
+      return str;
+    };
+    const billingStartDate = normalizeYearMonth(cardAccount.billingStartDate);
 
-    // 取引月内の全取引を取得
     const allTransactions = await databaseService.getAllTransactions();
-    const monthlyTransactions = allTransactions.filter(t => {
-      const tDate = new Date(t.date);
-      const tYear = tDate.getFullYear();
-      const tMonth = tDate.getMonth();
-      const tMonthStr = `${tYear}-${String(tMonth + 1).padStart(2, '0')}`;
-      
-      return t.account_id === accountId && 
-             tMonthStr === targetMonthStr &&
-             t.category_id !== 'transfer'; // 振替自体は除外
-    });
-
-    // 合計金額を計算 (支出は負数なので、絶対値の合計が入金額になる)
-    const totalAmount = Math.abs(monthlyTransactions.reduce((sum, t) => sum + t.amount, 0));
-
-    // 既存の自動振替を検索
-    const memoPattern = `カード引落: ${cardAccount.name}`;
-    const monthTag = `(${year}/${month + 1}分)`;
-    const existingTransferTx = allTransactions.find(t => 
-      t.account_id === accountId && 
-      t.category_id === 'transfer' && 
-      t.memo?.includes(memoPattern) &&
-      t.memo?.includes(monthTag)
+    
+    // 1. 該当アカウントの「通常の取引（振替以外）」のみを抽出
+    const cardTransactions = allTransactions.filter(t => 
+      t.account_id === accountId && t.category_id !== 'transfer'
     );
 
-    if (totalAmount === 0) {
-      if (existingTransferTx && existingTransferTx.transfer_id) {
-        await databaseService.deleteTransaction(existingTransferTx.id);
-      }
-      return;
-    }
+    // 2. 取引から「存在するサイクル（YYYY-MM）」を特定
+    const memoPattern = `カード引落: ${cardAccount.name}`;
+    const cycles = new Map<string, { year: number, month: number, total: number }>();
 
-    const withdrawalAccount = accounts.find(a => a.id === cardAccount.withdrawalAccountId);
-    const withdrawalAccountName = withdrawalAccount?.name || '不明な口座';
+    // 取引がある月をサイクルとして登録
+    cardTransactions.forEach(t => {
+      const tDate = new Date(t.date);
+      let tYear = tDate.getFullYear();
+      let tMonth = tDate.getMonth();
+      const tDay = tDate.getDate();
 
-    if (existingTransferTx && existingTransferTx.transfer_id) {
-      const transferId = existingTransferTx.transfer_id;
-      const relatedTxs = allTransactions.filter(t => t.transfer_id === transferId);
-
-      for (const tx of relatedTxs) {
-        if (tx.account_id === accountId) {
-          await databaseService.updateTransaction({
-            ...tx,
-            amount: totalAmount,
-            date: withdrawalDateStr,
-            payee: null,
-            to_account_id: cardAccount.withdrawalAccountId
-          });
-        } else if (tx.account_id === cardAccount.withdrawalAccountId) {
-          await databaseService.updateTransaction({
-            ...tx,
-            amount: -totalAmount,
-            date: withdrawalDateStr,
-            payee: null,
-            to_account_id: accountId
-          });
+      if (closingDay > 0 && tDay > closingDay) {
+        tMonth++;
+        if (tMonth > 11) {
+          tMonth = 0;
+          tYear++;
         }
       }
-    } else {
-      const transferId = Date.now();
-      
-      await databaseService.addTransaction({
-        amount: -totalAmount,
-        category_id: 'transfer',
-        account_id: cardAccount.withdrawalAccountId,
-        to_account_id: accountId,
-        date: withdrawalDateStr,
-        memo: `${memoPattern} ${monthTag}`,
-        payee: null,
-        transfer_id: transferId
-      });
 
-      await databaseService.addTransaction({
-        amount: totalAmount,
-        category_id: 'transfer',
-        account_id: accountId,
-        to_account_id: cardAccount.withdrawalAccountId,
-        date: withdrawalDateStr,
-        memo: `${memoPattern} ${monthTag}`,
-        payee: null,
-        transfer_id: transferId
-      });
+      const cycleKey = `${tYear}-${String(tMonth + 1).padStart(2, '0')}`;
+      
+      // 開始日設定がある場合、それより前のサイクルは無視
+      if (billingStartDate && cycleKey < billingStartDate) {
+        return;
+      }
+
+      if (!cycles.has(cycleKey)) {
+        cycles.set(cycleKey, { year: tYear, month: tMonth, total: 0 });
+      }
+      // 支出（負）をプラス、収入（正）をマイナスとして合計
+      cycles.get(cycleKey)!.total -= t.amount;
+    });
+
+    // 3. 既存の振替取引からもサイクルを特定
+    const existingTransfers = allTransactions.filter(t => 
+      t.account_id === accountId && 
+      t.category_id === 'transfer' && 
+      t.memo?.includes(memoPattern)
+    );
+
+    existingTransfers.forEach(t => {
+      const match = t.memo?.match(/\((\d{4})\/(\d{1,2})分\)/);
+      if (match) {
+        const y = parseInt(match[1]);
+        const m = parseInt(match[2]) - 1;
+        const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+        
+        // 開始日設定がある場合、それより前のサイクルは無視
+        if (billingStartDate && key < billingStartDate) {
+          return;
+        }
+
+        if (!cycles.has(key)) {
+          cycles.set(key, { year: y, month: m, total: 0 });
+        }
+      }
+    });
+
+    // 4. 各サイクルについて振替を更新（または削除）
+    for (const [cycleKey, data] of cycles.entries()) {
+      const { year, month, total } = data;
+      const monthTag = `(${year}/${month + 1}分)`;
+      
+      const existingTransferTx = existingTransfers.find(t => t.memo?.includes(monthTag));
+
+      // 合計が0以下（収入過多など）の場合は振替不要
+      if (total <= 0) {
+        if (existingTransferTx && existingTransferTx.transfer_id) {
+          await databaseService.deleteTransaction(existingTransferTx.id);
+        }
+        continue;
+      }
+
+      // 引き落とし日を計算 (サイクル月の翌月)
+      let withdrawalYear = year;
+      let withdrawalMonth = month + 1;
+      if (withdrawalMonth > 11) {
+        withdrawalYear++;
+        withdrawalMonth = 0;
+      }
+
+      let wDay = cardAccount.withdrawalDay;
+      if (wDay === 0) {
+        wDay = new Date(withdrawalYear, withdrawalMonth + 1, 0).getDate();
+      }
+
+      const withdrawalDateStr = `${withdrawalYear}-${String(withdrawalMonth + 1).padStart(2, '0')}-${String(wDay).padStart(2, '0')}T00:00:00.000Z`;
+
+      if (existingTransferTx && existingTransferTx.transfer_id) {
+        const transferId = existingTransferTx.transfer_id;
+        const relatedTxs = allTransactions.filter(t => t.transfer_id === transferId);
+
+        for (const tx of relatedTxs) {
+          if (tx.account_id === accountId) {
+            await databaseService.updateTransaction({
+              ...tx,
+              amount: total,
+              date: withdrawalDateStr,
+              payee: null,
+              to_account_id: cardAccount.withdrawalAccountId
+            });
+          } else if (tx.account_id === cardAccount.withdrawalAccountId) {
+            await databaseService.updateTransaction({
+              ...tx,
+              amount: -total,
+              date: withdrawalDateStr,
+              payee: null,
+              to_account_id: accountId
+            });
+          }
+        }
+      } else {
+        // 時刻を含めたユニークなIDを作成
+        const transferId = Date.now() + Math.floor(Math.random() * 1000); 
+        
+        await databaseService.addTransaction({
+          amount: -total,
+          category_id: 'transfer',
+          account_id: cardAccount.withdrawalAccountId,
+          to_account_id: accountId,
+          date: withdrawalDateStr,
+          memo: `${memoPattern} ${monthTag}`,
+          payee: null,
+          transfer_id: transferId
+        });
+
+        await databaseService.addTransaction({
+          amount: total,
+          category_id: 'transfer',
+          account_id: accountId,
+          to_account_id: cardAccount.withdrawalAccountId,
+          date: withdrawalDateStr,
+          memo: `${memoPattern} ${monthTag}`,
+          payee: null,
+          transfer_id: transferId
+        });
+      }
     }
   }
 };

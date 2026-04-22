@@ -159,6 +159,11 @@ export const initDatabase = async () => {
     await db.execAsync('ALTER TABLE transactions ADD COLUMN import_hash TEXT');
     await db.execAsync('CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_import_hash ON transactions(import_hash)');
   } catch (e) {}
+
+  // Migration: Add billing_start_date to accounts if it doesn't exist
+  try {
+    await db.execAsync('ALTER TABLE accounts ADD COLUMN billing_start_date TEXT');
+  } catch (e) {}
   
   // Insert default accounts if empty
   const accountCount = await db.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM accounts');
@@ -359,7 +364,8 @@ export const databaseService = {
       closingDay: row.closing_day,
       withdrawalDay: row.withdrawal_day,
       withdrawalAccountId: row.withdrawal_account_id,
-      displayOrder: row.display_order
+      displayOrder: row.display_order,
+      billingStartDate: row.billing_start_date
     }));
   },
 
@@ -383,7 +389,7 @@ export const databaseService = {
   async addAccount(account: Omit<Account, 'balance'>): Promise<void> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     await db.runAsync(
-      'INSERT INTO accounts (id, name, type, card_type, login_url, closing_day, withdrawal_day, withdrawal_account_id, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO accounts (id, name, type, card_type, login_url, closing_day, withdrawal_day, withdrawal_account_id, display_order, billing_start_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       account.id,
       account.name,
       account.type,
@@ -392,14 +398,15 @@ export const databaseService = {
       account.closingDay ?? null,
       account.withdrawalDay ?? null,
       account.withdrawalAccountId ?? null,
-      account.displayOrder ?? 0
+      account.displayOrder ?? 0,
+      account.billingStartDate ?? null
     );
   },
 
   async updateAccount(account: Omit<Account, 'balance'>): Promise<void> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     await db.runAsync(
-      'UPDATE accounts SET name = ?, type = ?, card_type = ?, login_url = ?, closing_day = ?, withdrawal_day = ?, withdrawal_account_id = ?, display_order = ? WHERE id = ?',
+      'UPDATE accounts SET name = ?, type = ?, card_type = ?, login_url = ?, closing_day = ?, withdrawal_day = ?, withdrawal_account_id = ?, display_order = ?, billing_start_date = ? WHERE id = ?',
       account.name,
       account.type,
       account.cardType ?? 'none',
@@ -408,6 +415,7 @@ export const databaseService = {
       account.withdrawalDay ?? null,
       account.withdrawalAccountId ?? null,
       account.displayOrder ?? 0,
+      account.billingStartDate ?? null,
       account.id
     );
   },

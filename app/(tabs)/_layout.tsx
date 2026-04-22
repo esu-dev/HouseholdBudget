@@ -16,10 +16,15 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
-        tabBarButton: HapticTab,
+        tabBarButton: (props) => (
+          <HapticTab
+            {...props}
+            // ここでタップ判定を上下左右に広げる（単位はポイント）
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          />
+        ),
         tabBarStyle: {
           backgroundColor: colorScheme === 'dark' ? '#0f172a' : '#ffffff',
-          paddingBottom: 10,
         },
       }}>
       <Tabs.Screen

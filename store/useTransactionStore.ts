@@ -143,14 +143,10 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
       for (const t of transactions) {
         await databaseService.addTransaction(t);
       }
-      // 全て追加した後に、関係する全ての月/口座の振替を更新
-      const uniqueUpdates = new Set<string>();
-      for (const t of transactions) {
-        const dateKey = `${t.account_id}_${t.date.substring(0, 7)}`; // YYYY-MM
-        if (!uniqueUpdates.has(dateKey)) {
-          await creditCardPaymentService.updateTransferForDate(t.account_id, t.date);
-          uniqueUpdates.add(dateKey);
-        }
+      // 全て追加した後に、関係する全ての口座の振替を一括更新
+      const affectedAccountIds = new Set(transactions.map(t => t.account_id));
+      for (const accountId of affectedAccountIds) {
+        await creditCardPaymentService.updateTransferForDate(accountId);
       }
       await get().fetchData();
     } catch (error) {
@@ -163,14 +159,14 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
       const oldTx = get().transactions.find(t => t.id === transaction.id);
       await databaseService.updateTransaction(transaction);
       
-      // クレジットカード振替の更新 (変更前後の日付と口座に対して)
+      // クレジットカード振替の更新 (変更前後の口座に対して)
       if (oldTx) {
-        await creditCardPaymentService.updateTransferForDate(oldTx.account_id, oldTx.date);
-        if (oldTx.account_id !== transaction.account_id || oldTx.date.substring(0, 7) !== transaction.date.substring(0, 7)) {
-          await creditCardPaymentService.updateTransferForDate(transaction.account_id, transaction.date);
+        await creditCardPaymentService.updateTransferForDate(oldTx.account_id);
+        if (oldTx.account_id !== transaction.account_id) {
+          await creditCardPaymentService.updateTransferForDate(transaction.account_id);
         }
       } else {
-        await creditCardPaymentService.updateTransferForDate(transaction.account_id, transaction.date);
+        await creditCardPaymentService.updateTransferForDate(transaction.account_id);
       }
       
       await get().fetchData();
@@ -260,14 +256,9 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
     try {
       await databaseService.updateAccount(account);
       
-      // アカウント情報（引き落とし日など）が変更された可能性があるため、
-      // 全取引の振替を再計算（または最近の取引のみ）
-      // ここでは簡略化のため、当月と前月、翌月の振替を更新
-      const now = new Date();
-      await creditCardPaymentService.updateTransferForDate(account.id, now.toISOString());
-      
-      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      await creditCardPaymentService.updateTransferForDate(account.id, lastMonth.toISOString());
+      // アカウント情報（締め日や引き落とし口座など）が変更された可能性があるため、
+      // 全取引の振替を最新の設定で再計算・一括同期する
+      await creditCardPaymentService.updateTransferForDate(account.id);
 
       await get().fetchData();
     } catch (error) {

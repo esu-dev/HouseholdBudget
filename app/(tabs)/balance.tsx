@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { ArrowDownCircle, ArrowUpCircle, Wallet } from 'lucide-react-native';
 import React, { useEffect, useMemo } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
@@ -35,10 +35,10 @@ export default function BalanceScreen() {
     const monthlyStats = useMemo(() => {
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        
+
         let income = 0;
         let expenses = 0;
-        
+
         transactions.forEach(t => {
             const d = new Date(t.date);
             if (d >= startOfMonth) {
@@ -46,13 +46,15 @@ export default function BalanceScreen() {
                 else expenses += Math.abs(t.amount);
             }
         });
-        
+
         return { income, expenses, balance: income - expenses };
     }, [transactions]);
 
     return (
         <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
-            <View style={{ padding: 20, paddingTop: 30 }}>
+            <Stack.Screen options={{ headerShown: true }} />
+
+            <View style={{ padding: 20, paddingTop: 10 }}>
                 <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.text, marginBottom: 20, paddingTop: 10 }}>資産状況</Text>
 
                 {/* 純資産カード */}
@@ -76,19 +78,19 @@ export default function BalanceScreen() {
 
                 {/* 口座別残高一覧 */}
                 <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 }}>口座別残高</Text>
-                
+
                 {accounts.map((account) => {
                     const balance = accountBalances[account.id] || 0;
                     return (
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             key={account.id}
                             onPress={() => router.push(`/accounts/${account.id}`)}
-                            style={{ 
-                                backgroundColor: colors.card, 
-                                padding: 18, 
-                                borderRadius: 24, 
-                                marginBottom: 12, 
-                                flexDirection: 'row', 
+                            style={{
+                                backgroundColor: colors.card,
+                                padding: 18,
+                                borderRadius: 24,
+                                marginBottom: 12,
+                                flexDirection: 'row',
                                 alignItems: 'center',
                                 shadowColor: '#000',
                                 shadowOffset: { width: 0, height: 1 },
@@ -100,20 +102,20 @@ export default function BalanceScreen() {
                             <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: colors.indigo + '15', alignItems: 'center', justifyContent: 'center' }}>
                                 <Wallet size={20} color={colors.indigo} />
                             </View>
-                            <View style={{ flex: 1, marginLeft: 16 }}>
-                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>{account.name}</Text>
+                            <View style={{ flex: 1, marginLeft: 16, marginRight: 8 }}>
+                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }} numberOfLines={1}>{account.name}</Text>
                                 <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
                                     {account.type === 'cash' ? '現金' : account.type === 'bank' ? '銀行口座' : 'クレジットカード'}
                                 </Text>
                             </View>
-                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>¥{balance.toLocaleString()}</Text>
+                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, minWidth: 100, textAlign: 'right' }}>¥{balance.toLocaleString()}</Text>
                         </TouchableOpacity>
                     );
                 })}
 
                 {/* 今月のサマリー詳細 */}
                 <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginTop: 12, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 }}>今月の動き</Text>
-                
+
                 <View style={{ flexDirection: 'row', gap: 12, marginBottom: 40 }}>
                     <View style={{ flex: 1, backgroundColor: colors.card, padding: 16, borderRadius: 24, borderLeftWidth: 4, borderLeftColor: '#22c55e' }}>
                         <ArrowUpCircle size={16} color="#22c55e" />

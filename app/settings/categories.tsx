@@ -129,14 +129,14 @@ export default function CategoryManagementScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 60, backgroundColor: colors.card }}>
                 <TouchableOpacity
                     onPress={() => router.back()}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
                 >
                     <ChevronLeft size={24} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, flex: 1, textAlign: 'center', marginRight: 24 }}>カテゴリ設定</Text>
             </View>
 
-            {/* Type Toggle */}
+            {/* 支出と収入の切り替えボタン */}
             <View style={{ flexDirection: 'row', padding: 16, gap: 12 }}>
                 <TouchableOpacity
                     onPress={() => setType('expense')}
@@ -307,6 +307,7 @@ export default function CategoryManagementScreen() {
                                             marginRight: 10,
                                             borderWidth: 2, borderColor: isSelected ? colors.indigo : 'transparent'
                                         }}
+                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                     >
                                         <Icon size={22} color={isSelected ? 'white' : colors.textMuted} />
                                     </TouchableOpacity>

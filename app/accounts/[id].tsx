@@ -32,11 +32,6 @@ export default function AccountHistoryScreen() {
         const accountTxs = transactions.filter(t => t.account_id === id);
         const catIds = new Set(accountTxs.map(t => t.category_id));
         const cats: { id: string, label: string }[] = [];
-        
-        // 特殊な「振替」カテゴリをチェック
-        if (catIds.has('transfer')) {
-            cats.push({ id: 'transfer', label: '振替' });
-        }
 
         majorCategories.forEach(maj => {
             maj.subCategories.forEach(min => {
@@ -142,8 +137,8 @@ export default function AccountHistoryScreen() {
 
                 <View style={{ flex: 1, marginLeft: 16 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <View>
-                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }} numberOfLines={1}>
                                 {item.category_id === 'transfer' && toAccount
                                     ? `${item.amount > 0 ? '←' : '→'} ${toAccount.name}`
                                     : label}
@@ -151,7 +146,7 @@ export default function AccountHistoryScreen() {
                             {item.payee && (
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                                     <Store size={10} color={colors.textMuted} />
-                                    <Text style={{ fontSize: 11, color: colors.textMuted, marginLeft: 4 }}>{item.payee}</Text>
+                                    <Text style={{ fontSize: 11, color: colors.textMuted, marginLeft: 4 }} numberOfLines={1}>{item.payee}</Text>
                                 </View>
                             )}
                             {item.memo && (
@@ -163,7 +158,7 @@ export default function AccountHistoryScreen() {
                                 </View>
                             )}
                         </View>
-                        <Text style={{ fontSize: 16, fontWeight: 'bold', color: amount > 0 ? '#22c55e' : colors.text }}>
+                        <Text style={{ fontSize: 16, fontWeight: 'bold', color: amount > 0 ? '#22c55e' : colors.text, minWidth: 80, textAlign: 'right' }}>
                             {amount > 0 ? '+' : ''}¥{amount.toLocaleString()}
                         </Text>
                     </View>
@@ -198,10 +193,10 @@ export default function AccountHistoryScreen() {
                         <View style={{ paddingHorizontal: 24, marginBottom: 16 }}>
                             <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>取引履歴</Text>
                         </View>
-                        
+
                         {availableCategories.length > 0 && (
-                            <ScrollView 
-                                horizontal 
+                            <ScrollView
+                                horizontal
                                 showsHorizontalScrollIndicator={false}
                                 contentContainerStyle={{ paddingHorizontal: 24, gap: 8, paddingBottom: 8 }}
                             >

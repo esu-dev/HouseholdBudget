@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { Bell, ChevronRight, FileDown, FileUp, ListTree, Palette, PieChart, PiggyBank, Save, Shield, Trash2, Wallet, ZapOff } from 'lucide-react-native';
 import React from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
@@ -113,9 +113,9 @@ export default function SettingsScreen() {
 
     return (
         <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
-            <View style={{ padding: 20, paddingTop: 30 }}>
-                <Text style={{ fontSize: 28, fontWeight: 'bold', color: colors.text, marginBottom: 24 }}>設定</Text>
+            <Stack.Screen options={{ headerShown: true }} />
 
+            <View style={{ padding: 20, paddingTop: 30 }}>
                 <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 }}>家計簿の設定</Text>
 
                 <MenuItem
@@ -218,7 +218,7 @@ export default function SettingsScreen() {
                 />
 
                 <View style={{ alignItems: 'center', marginTop: 32, marginBottom: 60 }}>
-                    <Text style={{ fontSize: 12, color: colors.textMuted }}>Household Budget v1.0.3</Text>
+                    <Text style={{ fontSize: 12, color: colors.textMuted }}>Household Budget v1.0.6</Text>
                 </View>
             </View>
         </ScrollView>
