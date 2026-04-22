@@ -124,6 +124,17 @@ export const creditCardPaymentService = {
       }
 
       const withdrawalDateStr = `${withdrawalYear}-${String(withdrawalMonth + 1).padStart(2, '0')}-${String(wDay).padStart(2, '0')}T00:00:00.000Z`;
+      const withdrawalDate = new Date(withdrawalYear, withdrawalMonth, wDay);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      // 未来の日付の引き落としは作成しない
+      if (withdrawalDate > today) {
+        if (existingTransferTx && existingTransferTx.transfer_id) {
+          await databaseService.deleteTransaction(existingTransferTx.id);
+        }
+        continue;
+      }
 
       if (existingTransferTx && existingTransferTx.transfer_id) {
         const transferId = existingTransferTx.transfer_id;

@@ -20,7 +20,7 @@ export default function TabLayout() {
           <HapticTab
             {...props}
             // ここでタップ判定を上下左右に広げる（単位はポイント）
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            hitSlop={{ top: 20, bottom: 0, left: 10, right: 10 }}
           />
         ),
         tabBarStyle: {
