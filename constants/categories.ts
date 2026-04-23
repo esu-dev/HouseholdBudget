@@ -1,5 +1,6 @@
 import {
   Banknote,
+  BookOpen,
   Briefcase,
   Car,
   CircleEllipsis,
@@ -7,6 +8,7 @@ import {
   CreditCard,
   Gamepad2,
   Gift,
+  GraduationCap,
   Heart,
   Home,
   Lightbulb,
@@ -57,17 +59,17 @@ export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   hobbies: Tv,
   health: Heart,
   beauty: Scissors,
-  medical: Heart, // Reusing heart for now or find MedicineBox if possible
   communication: Smartphone,
   social: Users,
   salary: Briefcase,
   bonus: TrendingUp,
   gift: Gift,
   side_income: Banknote,
-  investment: TrendingUp,
   others: CircleEllipsis,
   wallet: Wallet,
   card: CreditCard,
+  education: GraduationCap,
+  culture: BookOpen,
 };
 
 export const CATEGORIES: MajorCategory[] = [

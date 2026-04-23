@@ -307,7 +307,7 @@ export default function CategoryManagementScreen() {
                                             marginRight: 10,
                                             borderWidth: 2, borderColor: isSelected ? colors.indigo : 'transparent'
                                         }}
-                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                        hitSlop={{ top: 20, bottom: 10, left: 10, right: 10 }}
                                     >
                                         <Icon size={22} color={isSelected ? 'white' : colors.textMuted} />
                                     </TouchableOpacity>

@@ -1,20 +1,20 @@
 import { Stack, useRouter } from 'expo-router';
-import { ChevronLeft, Trash2, Tag, Wallet, Edit2, Check } from 'lucide-react-native';
-import React, { useState, useEffect } from 'react';
-import { ScrollView, Text, TouchableOpacity, View, ActivityIndicator, Alert, Modal } from 'react-native';
+import { Check, ChevronLeft, Edit2, Tag, Trash2, Wallet } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { databaseService } from '../../services/database';
 import { useTransactionStore } from '../../store/useTransactionStore';
-import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 
 export default function CsvMappingListScreen() {
     const router = useRouter();
     const colorScheme = useAppColorScheme();
     const { accounts, majorCategories } = useTransactionStore();
-    
+
     const [isLoading, setIsLoading] = useState(true);
     const [categoryMappings, setCategoryMappings] = useState<Record<string, string>>({});
     const [accountMappings, setAccountMappings] = useState<Record<string, string>>({});
-    
+
     // Modal state
     const [editingItem, setEditingItem] = useState<{ type: 'category' | 'account', externalName: string, internalId: string } | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
@@ -51,9 +51,9 @@ export default function CsvMappingListScreen() {
             `「${externalName}」の対応関係を削除しますか？`,
             [
                 { text: 'キャンセル', style: 'cancel' },
-                { 
-                    text: '削除', 
-                    style: 'destructive', 
+                {
+                    text: '削除',
+                    style: 'destructive',
                     onPress: async () => {
                         if (type === 'category') {
                             await databaseService.deleteCsvCategoryMapping(externalName);
@@ -61,7 +61,7 @@ export default function CsvMappingListScreen() {
                             await databaseService.deleteCsvAccountMapping(externalName);
                         }
                         loadData();
-                    } 
+                    }
                 }
             ]
         );
@@ -69,12 +69,12 @@ export default function CsvMappingListScreen() {
 
     const handleEdit = (type: 'category' | 'account', externalName: string, internalId: string) => {
         setEditingItem({ type, externalName, internalId });
-        
+
         if (type === 'category') {
             const major = majorCategories.find(m => m.subCategories.some(s => s.id === internalId));
             setModalCategoryType(major?.type || 'expense');
         }
-        
+
         setModalVisible(true);
     };
 
@@ -86,7 +86,7 @@ export default function CsvMappingListScreen() {
         } else {
             await databaseService.updateCsvAccountMapping(editingItem.externalName, newInternalId);
         }
-        
+
         setModalVisible(false);
         setEditingItem(null);
         loadData();
@@ -130,10 +130,16 @@ export default function CsvMappingListScreen() {
                                                 </View>
                                             </View>
                                             <View style={{ flexDirection: 'row', gap: 12 }}>
-                                                <TouchableOpacity onPress={() => handleEdit('category', ext, int)}>
+                                                <TouchableOpacity
+                                                    onPress={() => handleEdit('category', ext, int)}
+                                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                                >
                                                     <Edit2 size={20} color={colors.textMuted} />
                                                 </TouchableOpacity>
-                                                <TouchableOpacity onPress={() => handleDelete('category', ext)}>
+                                                <TouchableOpacity
+                                                    onPress={() => handleDelete('category', ext)}
+                                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                                >
                                                     <Trash2 size={20} color={colors.danger} />
                                                 </TouchableOpacity>
                                             </View>
@@ -212,7 +218,7 @@ export default function CsvMappingListScreen() {
                 <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
                     <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 32, borderTopRightRadius: 32, height: '70%', padding: 24 }}>
                         <View style={{ width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
-                        
+
                         <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 8 }}>対応関係の編集</Text>
                         <Text style={{ fontSize: 14, color: colors.textMuted, marginBottom: 24 }}>
                             CSV項目「{editingItem?.externalName}」の紐付け先を選択してください。
@@ -223,13 +229,13 @@ export default function CsvMappingListScreen() {
                                 <View>
                                     {/* Type Switcher */}
                                     <View style={{ flexDirection: 'row', backgroundColor: colors.card, padding: 4, borderRadius: 12, marginBottom: 16 }}>
-                                        <TouchableOpacity 
+                                        <TouchableOpacity
                                             onPress={() => setModalCategoryType('expense')}
                                             style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8, backgroundColor: modalCategoryType === 'expense' ? colors.indigo : 'transparent' }}
                                         >
                                             <Text style={{ fontSize: 13, fontWeight: 'bold', color: modalCategoryType === 'expense' ? 'white' : colors.textMuted }}>支出</Text>
                                         </TouchableOpacity>
-                                        <TouchableOpacity 
+                                        <TouchableOpacity
                                             onPress={() => setModalCategoryType('income')}
                                             style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8, backgroundColor: modalCategoryType === 'income' ? colors.indigo : 'transparent' }}
                                         >
@@ -244,15 +250,15 @@ export default function CsvMappingListScreen() {
                                             .map(minor => {
                                                 const isSelected = editingItem.internalId === minor.id;
                                                 return (
-                                                    <TouchableOpacity 
+                                                    <TouchableOpacity
                                                         key={minor.id}
                                                         onPress={() => saveMapping(minor.id)}
-                                                        style={{ 
-                                                            flexDirection: 'row', 
-                                                            alignItems: 'center', 
+                                                        style={{
+                                                            flexDirection: 'row',
+                                                            alignItems: 'center',
                                                             justifyContent: 'space-between',
-                                                            padding: 16, 
-                                                            borderRadius: 16, 
+                                                            padding: 16,
+                                                            borderRadius: 16,
                                                             backgroundColor: isSelected ? colors.indigo : colors.card,
                                                             borderWidth: 1,
                                                             borderColor: isSelected ? colors.indigo : colors.border
@@ -270,15 +276,15 @@ export default function CsvMappingListScreen() {
                                     {accounts.map(acc => {
                                         const isSelected = editingItem?.internalId === acc.id;
                                         return (
-                                            <TouchableOpacity 
+                                            <TouchableOpacity
                                                 key={acc.id}
                                                 onPress={() => saveMapping(acc.id)}
-                                                style={{ 
-                                                    flexDirection: 'row', 
-                                                    alignItems: 'center', 
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
                                                     justifyContent: 'space-between',
-                                                    padding: 16, 
-                                                    borderRadius: 16, 
+                                                    padding: 16,
+                                                    borderRadius: 16,
                                                     backgroundColor: isSelected ? colors.indigo : colors.card,
                                                     borderWidth: 1,
                                                     borderColor: isSelected ? colors.indigo : colors.border
@@ -293,7 +299,7 @@ export default function CsvMappingListScreen() {
                             )}
                         </ScrollView>
 
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             onPress={() => setModalVisible(false)}
                             style={{ marginTop: 16, padding: 16, borderRadius: 16, backgroundColor: colors.inputBg, alignItems: 'center' }}
                         >

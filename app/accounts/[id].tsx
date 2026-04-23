@@ -172,8 +172,12 @@ export default function AccountHistoryScreen() {
             <Stack.Screen options={{ headerShown: false }} />
 
             {/* Header Area */}
-            <View style={{ backgroundColor: colors.indigo, paddingHorizontal: 20, paddingTop: 30, paddingBottom: 32, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 }}>
-                <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 20 }}>
+            <View style={{ backgroundColor: colors.indigo, paddingHorizontal: 20, paddingTop: 30, paddingBottom: 20, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 }}>
+                <TouchableOpacity
+                    onPress={() => router.back()}
+                    style={{ marginBottom: 20 }}
+                    hitSlop={{ top: 10, bottom: 10, left: 20, right: 10 }}
+                >
                     <ArrowLeft size={24} color="white" />
                 </TouchableOpacity>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>

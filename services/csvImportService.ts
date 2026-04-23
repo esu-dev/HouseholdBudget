@@ -93,14 +93,31 @@ export const csvImportService = {
 
     // Check if the first row is a header or metadata
     let startIndex = 0;
-    let amountIdx = 2; // Default for jp_bank
+    let amountIdx = 2; // Default for jp_bank v1
+    let jpBankFormat: 'v1' | 'v2' = 'v1';
 
     if (cardType === 'jp_bank') {
-      // JP BANK CSV has personal info in the first row
-      startIndex = 1;
-      amountIdx = 2;
+      // JP BANK CSV check
+      const firstRow = data[0];
+      if (firstRow && firstRow.length >= 7) {
+        // New format: at least 7 columns
+        jpBankFormat = 'v2';
+        amountIdx = 6;
+        // Check if the first row is already data
+        if (this.normalizeDate(firstRow[0])) {
+          startIndex = 0;
+        } else {
+          startIndex = 1;
+        }
+      } else {
+        // Existing format: metadata on first row
+        jpBankFormat = 'v1';
+        startIndex = 1;
+        amountIdx = 2;
+      }
     } else if (cardType === 'jcb') {
       amountIdx = 4;
+      startIndex = 0;
     }
 
     if (data.length > startIndex) {
@@ -122,10 +139,17 @@ export const csvImportService = {
       let amountStr = '';
 
       if (cardType === 'jp_bank') {
-        // JP BANK: 1:Date, 2:Payee, 3:Amount
-        date = this.normalizeDate(row[0]);
-        payee = (row[1] || '').trim();
-        amountStr = row[2] || '0';
+        if (jpBankFormat === 'v1') {
+          // JP BANK v1: 1:Date, 2:Payee, 3:Amount
+          date = this.normalizeDate(row[0]);
+          payee = (row[1] || '').trim();
+          amountStr = row[2] || '0';
+        } else {
+          // JP BANK v2: 1:Date, 2:Payee, 7:Amount
+          date = this.normalizeDate(row[0]);
+          payee = (row[1] || '').trim();
+          amountStr = row[6] || '0';
+        }
       } else if (cardType === 'jcb') {
         // JCB: 3:利用日, 4:利用先, 5:利用金額 (0-indexed: 2, 3, 4)
         date = this.normalizeDate(row[2].slice(1));

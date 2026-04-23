@@ -14,7 +14,10 @@ export default function CsvImportScreen() {
 
     const [isLoading, setIsLoading] = useState(false);
     const [importResult, setImportResult] = useState<ImportResult | null>(null);
-    const [missingMappings, setMissingMappings] = useState<{ categories: string[], accounts: string[] }>({ categories: [], accounts: [] });
+    const [missingMappings, setMissingMappings] = useState<{ 
+        categories: { name: string, type: 'expense' | 'income' }[], 
+        accounts: string[] 
+    }>({ categories: [], accounts: [] });
     const [categoryMappings, setCategoryMappings] = useState<Record<string, string>>({});
     const [accountMappings, setAccountMappings] = useState<Record<string, string>>({});
     const [savedCategoryMappings, setSavedCategoryMappings] = useState<Record<string, string>>({});
@@ -95,7 +98,12 @@ export default function CsvImportScreen() {
             if (type === 'income_expense') {
                 const extCat = normalize(row[1]);
                 const extAcc = normalize(row[6]);
-                if (extCat && !categoryMappings[extCat] && !missingCats.includes(extCat)) missingCats.push(extCat);
+                const classification = row[9]?.trim() || ''; // "収" or "支"
+                const catType: 'expense' | 'income' = classification === '収' ? 'income' : 'expense';
+
+                if (extCat && !categoryMappings[extCat] && !missingCats.find(c => c.name === extCat)) {
+                    missingCats.push({ name: extCat, type: catType });
+                }
                 if (extAcc && !accountMappings[extAcc] && !missingAccs.includes(extAcc)) missingAccs.push(extAcc);
             } else {
                 const extFrom = normalize(row[1]);
@@ -110,7 +118,13 @@ export default function CsvImportScreen() {
             setMappingModalVisible(true);
         } else if (hasUnsavedMappings) {
             // No missing but has unsaved, show modal for review
-            setMissingMappings({ categories: unsavedCategoryKeys, accounts: unsavedAccountKeys });
+            setMissingMappings({ 
+                categories: unsavedCategoryKeys.map(key => ({
+                    name: key,
+                    type: majorCategories.find(m => m.subCategories.some(s => s.id === categoryMappings[key]))?.type || 'expense'
+                })), 
+                accounts: unsavedAccountKeys 
+            });
             setMappingModalVisible(true);
         } else {
             // All mapped and saved, ready to import
@@ -267,7 +281,10 @@ export default function CsvImportScreen() {
                             <TouchableOpacity
                                 onPress={() => {
                                     setMissingMappings({
-                                        categories: unsavedCategoryKeys,
+                                        categories: unsavedCategoryKeys.map(key => ({
+                                            name: key,
+                                            type: majorCategories.find(m => m.subCategories.some(s => s.id === categoryMappings[key]))?.type || 'expense'
+                                        })),
                                         accounts: unsavedAccountKeys
                                     });
                                     setMappingModalVisible(true);
@@ -362,77 +379,46 @@ export default function CsvImportScreen() {
                                 <View style={{ marginBottom: 24 }}>
                                     <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12, textTransform: 'uppercase' }}>カテゴリの紐付け</Text>
                                     {missingMappings.categories.map(extCat => (
-                                        <View key={extCat} style={{ marginBottom: 12, backgroundColor: colors.card, padding: 16, borderRadius: 16 }}>
-                                            <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.text, marginBottom: 8 }}>{extCat}</Text>
-                                            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                                                <TouchableOpacity
-                                                    onPress={() => {
-                                                        // Toggle filter if needed, but here we just show both for now or filter.
-                                                        // Given the space, maybe just group them with labels is better in horizontal scroll.
-                                                    }}
-                                                    style={{ paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, backgroundColor: colors.indigo + '20' }}
-                                                >
-                                                    <Text style={{ fontSize: 10, color: colors.indigo, fontWeight: 'bold' }}>支出</Text>
-                                                </TouchableOpacity>
+                                        <View key={extCat.name} style={{ marginBottom: 12, backgroundColor: colors.card, padding: 16, borderRadius: 16 }}>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                                <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.text }}>{extCat.name}</Text>
+                                                <View style={{ paddingHorizontal: 10, paddingVertical: 2, borderRadius: 10, backgroundColor: extCat.type === 'income' ? colors.success + '20' : colors.danger + '20' }}>
+                                                    <Text style={{ fontSize: 10, color: extCat.type === 'income' ? colors.success : colors.danger, fontWeight: 'bold' }}>
+                                                        {extCat.type === 'income' ? '収入' : '支出'}
+                                                    </Text>
+                                                </View>
                                             </View>
+                                            
                                             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
-                                                {majorCategories.filter(m => m.type === 'expense').flatMap(major => major.subCategories).map(minor => (
-                                                    <TouchableOpacity
-                                                        key={minor.id}
-                                                        onPress={() => {
-                                                            const normalized = extCat.trim().replace(/\s+/g, ' ');
-                                                            setCategoryMappings(prev => ({ ...prev, [normalized]: minor.id }));
-                                                        }}
-                                                        hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-                                                        style={{
-                                                            paddingHorizontal: 12,
-                                                            paddingVertical: 8,
-                                                            borderRadius: 12,
-                                                            marginRight: 8,
-                                                            backgroundColor: categoryMappings[extCat.trim().replace(/\s+/g, ' ')] === minor.id ? colors.indigo : colors.inputBg,
-                                                            borderWidth: 1,
-                                                            borderColor: categoryMappings[extCat.trim().replace(/\s+/g, ' ')] === minor.id ? colors.indigo : colors.border
-                                                        }}
-                                                    >
-                                                        <Text style={{ fontSize: 12, color: categoryMappings[extCat.trim().replace(/\s+/g, ' ')] === minor.id ? 'white' : colors.text, fontWeight: categoryMappings[extCat.trim().replace(/\s+/g, ' ')] === minor.id ? 'bold' : 'normal' }}>
-                                                            {minor.label}
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                ))}
-                                            </ScrollView>
-                                            <View style={{ height: 12 }} />
-                                            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                                                <TouchableOpacity style={{ paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, backgroundColor: colors.warning + '20' }}>
-                                                    <Text style={{ fontSize: 10, color: colors.warning, fontWeight: 'bold' }}>収入</Text>
-                                                </TouchableOpacity>
-                                            </View>
-                                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
-                                                {majorCategories.filter(m => m.type === 'income').flatMap(major => major.subCategories).map(minor => (
-                                                    <TouchableOpacity
-                                                        key={minor.id}
-                                                        onPress={() => {
-                                                            const normalized = extCat.trim().replace(/\s+/g, ' ');
-                                                            setCategoryMappings(prev => ({ ...prev, [normalized]: minor.id }));
-                                                        }}
-                                                        hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-                                                        style={{
-                                                            paddingHorizontal: 12,
-                                                            paddingVertical: 8,
-                                                            borderRadius: 12,
-                                                            marginRight: 8,
-                                                            backgroundColor: categoryMappings[extCat.trim().replace(/\s+/g, ' ')] === minor.id ? colors.indigo : colors.inputBg,
-                                                            borderWidth: 1,
-                                                            borderColor: categoryMappings[extCat.trim().replace(/\s+/g, ' ')] === minor.id ? colors.indigo : colors.border
-                                                        }}
-                                                    >
-                                                        <Text style={{ fontSize: 12, color: categoryMappings[extCat.trim().replace(/\s+/g, ' ')] === minor.id ? 'white' : colors.text, fontWeight: categoryMappings[extCat.trim().replace(/\s+/g, ' ')] === minor.id ? 'bold' : 'normal' }}>
-                                                            {minor.label}
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                ))}
-                                            </ScrollView>
-                                        </View>
-                                    ))}
+                                                {majorCategories
+                                                    .filter(m => m.type === extCat.type)
+                                                    .flatMap(major => major.subCategories)
+                                                    .map(minor => (
+                                                     <TouchableOpacity
+                                                         key={minor.id}
+                                                         onPress={() => {
+                                                             const normalized = extCat.name.trim().replace(/\s+/g, ' ');
+                                                             setCategoryMappings(prev => ({ ...prev, [normalized]: minor.id }));
+                                                         }}
+                                                         hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                                                         style={{
+                                                             paddingHorizontal: 12,
+                                                             paddingVertical: 8,
+                                                             borderRadius: 12,
+                                                             marginRight: 8,
+                                                             backgroundColor: categoryMappings[extCat.name.trim().replace(/\s+/g, ' ')] === minor.id ? colors.indigo : colors.inputBg,
+                                                             borderWidth: 1,
+                                                             borderColor: categoryMappings[extCat.name.trim().replace(/\s+/g, ' ')] === minor.id ? colors.indigo : colors.border
+                                                         }}
+                                                     >
+                                                         <Text style={{ fontSize: 12, color: categoryMappings[extCat.name.trim().replace(/\s+/g, ' ')] === minor.id ? 'white' : colors.text, fontWeight: categoryMappings[extCat.name.trim().replace(/\s+/g, ' ')] === minor.id ? 'bold' : 'normal' }}>
+                                                             {minor.label}
+                                                         </Text>
+                                                     </TouchableOpacity>
+                                                 ))}
+                                             </ScrollView>
+                                         </View>
+                                     ))}
                                 </View>
                             )}
 

@@ -338,7 +338,7 @@ export default function EditTransactionScreen() {
               {editingTransaction && (
                 <TouchableOpacity
                   onPress={handleDelete}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  hitSlop={{ top: 20, bottom: 10, left: 10, right: 10 }}
                 >
                   <Trash2 size={22} color={colors.danger} />
                 </TouchableOpacity>

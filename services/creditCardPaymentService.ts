@@ -123,8 +123,16 @@ export const creditCardPaymentService = {
         wDay = new Date(withdrawalYear, withdrawalMonth + 1, 0).getDate();
       }
 
-      const withdrawalDateStr = `${withdrawalYear}-${String(withdrawalMonth + 1).padStart(2, '0')}-${String(wDay).padStart(2, '0')}T00:00:00.000Z`;
-      const withdrawalDate = new Date(withdrawalYear, withdrawalMonth, wDay);
+      let withdrawalDate = new Date(withdrawalYear, withdrawalMonth, wDay);
+
+      // 土日の場合は翌月曜日に調整
+      if (withdrawalDate.getDay() === 0) { // 日曜日
+        withdrawalDate.setDate(withdrawalDate.getDate() + 1);
+      } else if (withdrawalDate.getDay() === 6) { // 土曜日
+        withdrawalDate.setDate(withdrawalDate.getDate() + 2);
+      }
+
+      const withdrawalDateStr = `${withdrawalDate.getFullYear()}-${String(withdrawalDate.getMonth() + 1).padStart(2, '0')}-${String(withdrawalDate.getDate()).padStart(2, '0')}T00:00:00.000Z`;
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 

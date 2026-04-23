@@ -167,7 +167,7 @@ export default function AccountManagementScreen() {
 
             {/* Header */}
             <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.card }}>
-                <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+                <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 15, bottom: 15, left: 30, right: 15 }}>
                     <ChevronLeft size={28} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={{ flex: 1, textAlign: 'center', fontSize: 18, fontWeight: 'bold', color: colors.text, marginRight: 28 }}>
@@ -261,7 +261,7 @@ export default function AccountManagementScreen() {
                                             setBillingStartDate(account.billingStartDate || '');
                                             setModalVisible(true);
                                         }}
-                                        hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+                                        hitSlop={{ top: 30, bottom: 10, left: 10, right: 10 }}
                                         style={{ padding: 8 }}
                                     >
                                         <Edit2 size={20} color={colors.textMuted} />
