@@ -27,6 +27,7 @@ import { databaseService } from '../../services/database';
 import { emailImportService } from '../../services/emailImportService';
 import { gmailService } from '../../services/gmailService';
 import { useTransactionStore } from '../../store/useTransactionStore';
+import { useDeveloperStore } from '../../store/useDeveloperStore';
 
 
 // TODO: 本番環境では正しいクライアントIDを設定してください
@@ -41,6 +42,8 @@ export default function GmailImportScreen() {
     const [isLoading, setIsLoading] = useState(false);
     const [token, setToken] = useState<string | null>(null);
     const [importResult, setImportResult] = useState<any>(null);
+    const { isDeveloperMode, logs, clearLogs } = useDeveloperStore();
+    const [showLogs, setShowLogs] = useState(false);
 
     useEffect(() => {
         if (!isExpoGo && GoogleSignin) {
@@ -370,6 +373,55 @@ export default function GmailImportScreen() {
                         ※メールの形式が変更された場合、正しく解析できないことがあります。
                     </Text>
                 </View>
+
+                {isDeveloperMode && (
+                    <View style={{ marginBottom: 40 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>デバッグログ</Text>
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                <TouchableOpacity
+                                    onPress={() => setShowLogs(!showLogs)}
+                                    style={{ paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, backgroundColor: colors.card }}
+                                >
+                                    <Text style={{ fontSize: 12, color: colors.indigo }}>{showLogs ? '閉じる' : '表示'}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={clearLogs}
+                                    style={{ paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, backgroundColor: colors.card }}
+                                >
+                                    <Text style={{ fontSize: 12, color: '#ef4444' }}>クリア</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {showLogs && (
+                            <View style={{ backgroundColor: '#000', borderRadius: 16, padding: 12, minHeight: 200, maxHeight: 400 }}>
+                                <ScrollView nestedScrollEnabled>
+                                    {logs.length === 0 ? (
+                                        <Text style={{ color: '#666', fontSize: 12, fontFamily: 'monospace' }}>ログはありません</Text>
+                                    ) : (
+                                        logs.map((log, i) => (
+                                            <View key={i} style={{ marginBottom: 4 }}>
+                                                <Text style={{ fontSize: 10, color: '#666' }}>
+                                                    {new Date(log.timestamp).toLocaleTimeString()} [{log.level.toUpperCase()}]
+                                                </Text>
+                                                <Text style={{
+                                                    fontSize: 12,
+                                                    color: log.level === 'error' ? '#ff4d4f' :
+                                                        log.level === 'warn' ? '#faad14' :
+                                                            log.level === 'success' ? '#52c41a' : '#ddd',
+                                                    fontFamily: 'monospace'
+                                                }}>
+                                                    {log.message}
+                                                </Text>
+                                            </View>
+                                        ))
+                                    )}
+                                </ScrollView>
+                            </View>
+                        )}
+                    </View>
+                )}
             </ScrollView>
         </SafeAreaView>
     );

@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import * as base64 from 'base64-js';
+import { useDeveloperStore } from '../store/useDeveloperStore';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -30,6 +31,8 @@ export const gmailService = {
   },
 
   async listMessages(token: string, query: string) {
+    const logger = useDeveloperStore.getState();
+    logger.addLog('debug', `Gmail API Request: listMessages (query: ${query})`);
     const response = await fetch(
       `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}`,
       {
@@ -38,6 +41,7 @@ export const gmailService = {
     );
 
     if (!response.ok) {
+      logger.addLog('error', `Gmail API Error (listMessages): ${response.status} ${response.statusText}`);
       if (response.status === 401) {
         await this.removeToken();
         throw new Error('Unauthorized');
@@ -46,10 +50,13 @@ export const gmailService = {
     }
 
     const data = await response.json();
+    logger.addLog('debug', `Gmail API Response: Found ${data.messages?.length || 0} messages`);
     return data.messages || [];
   },
 
   async getMessage(token: string, messageId: string): Promise<GmailMessage> {
+    const logger = useDeveloperStore.getState();
+    logger.addLog('debug', `Gmail API Request: getMessage (id: ${messageId})`);
     const response = await fetch(
       `https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}`,
       {
@@ -57,7 +64,10 @@ export const gmailService = {
       }
     );
 
-    if (!response.ok) throw new Error('Failed to fetch message details');
+    if (!response.ok) {
+      logger.addLog('error', `Gmail API Error (getMessage): ${response.status} ${response.statusText}`);
+      throw new Error('Failed to fetch message details');
+    }
 
     const data = await response.json();
     const headers = data.payload.headers;

@@ -4,6 +4,7 @@ import React from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { dataManagementService } from '../../services/dataManagementService';
+import { useDeveloperStore } from '../../store/useDeveloperStore';
 import { useTransactionStore } from '../../store/useTransactionStore';
 
 export default function SettingsScreen() {
@@ -11,6 +12,19 @@ export default function SettingsScreen() {
     const colorScheme = useAppColorScheme();
     const isDark = colorScheme === 'dark';
     const { deleteAllData, fetchData } = useTransactionStore();
+    const { isDeveloperMode, setDeveloperMode } = useDeveloperStore();
+    const [tapCount, setTapCount] = React.useState(0);
+
+    const handleVersionPress = () => {
+        if (isDeveloperMode) return;
+        const newCount = tapCount + 1;
+        setTapCount(newCount);
+        if (newCount >= 7) {
+            setDeveloperMode(true);
+            Alert.alert('開発者モード', '開発者モードが有効になりました');
+            setTapCount(0);
+        }
+    };
 
     const colors = {
         background: isDark ? '#0f172a' : '#f8fafc',
@@ -231,9 +245,33 @@ export default function SettingsScreen() {
                     iconBgColor={isDark ? '#451a1a' : '#fef2f2'}
                 />
 
-                <View style={{ alignItems: 'center', marginTop: 32, marginBottom: 60 }}>
+                {isDeveloperMode && (
+                    <>
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginTop: 12, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 }}>開発者設定</Text>
+                        <MenuItem
+                            icon={Shield}
+                            title="開発者モードを無効化"
+                            subtitle="ログ表示などの機能をオフにします"
+                            onPress={() => {
+                                Alert.alert('確認', '開発者モードを無効化しますか？', [
+                                    { text: 'キャンセル', style: 'cancel' },
+                                    { text: '無効化', onPress: () => setDeveloperMode(false) }
+                                ]);
+                            }}
+                            iconColor={colors.textMuted}
+                            iconBgColor={isDark ? '#334155' : '#f1f5f9'}
+                        />
+                    </>
+                )}
+
+                <TouchableOpacity
+                    onPress={handleVersionPress}
+                    activeOpacity={1}
+                    style={{ alignItems: 'center', marginTop: 32, marginBottom: 60 }}
+                    hitSlop={{ top: 20, bottom: 20, right: 20, left: 20 }}
+                >
                     <Text style={{ fontSize: 12, color: colors.textMuted }}>Household Budget v1.1.1</Text>
-                </View>
+                </TouchableOpacity>
             </View>
         </ScrollView>
     );

@@ -1,3 +1,5 @@
+import { useDeveloperStore } from '../store/useDeveloperStore';
+
 export interface ParsedEmailTransaction {
   amount: number;
   date: string;
@@ -62,11 +64,8 @@ class JCBCardWParser implements EmailParser {
     const dateMatch = body.match(/【ご利用日時\(日本時間\)】\s*(\d{4}\/\d{2}\/\d{2})/);
     const merchantMatch = body.match(/【ご利用先】\s*(.*)/);
 
-    console.log('JCB Regex Matches:', {
-      amount: !!amountMatch,
-      date: !!dateMatch,
-      merchant: !!merchantMatch
-    });
+    const logger = useDeveloperStore.getState();
+    logger.addLog('debug', `JCB Regex Matches: amount:${!!amountMatch}, date:${!!dateMatch}, merchant:${!!merchantMatch}`);
 
     if (amountMatch && dateMatch && merchantMatch) {
       try {
@@ -97,20 +96,21 @@ export const emailParserService = {
   ] as EmailParser[],
 
   parseEmail(from: string, body: string, messageId: string): ParsedEmailTransaction | null {
-    console.log(`Searching parser for: ${from}`);
+    const logger = useDeveloperStore.getState();
+    logger.addLog('debug', `Searching parser for: ${from}`);
     const parser = this.parsers.find(p => from.includes(p.fromAddress));
     if (parser) {
-      console.log(`Using parser: ${parser.name}`);
+      logger.addLog('debug', `Using parser: ${parser.name}`);
       try {
         const result = parser.parse(body, messageId);
-        console.log(`Parser result:`, result);
+        logger.addLog('debug', `Parser result for ${parser.name}: ${result ? 'SUCCESS' : 'FAILED'}`);
         return result;
-      } catch (e) {
-        console.error(`Parser error in ${parser.name}:`, e);
+      } catch (e: any) {
+        logger.addLog('error', `Parser error in ${parser.name}: ${e.message}`);
         return null;
       }
     }
-    console.log('No matching parser found');
+    logger.addLog('warn', `No matching parser found for sender: ${from}`);
     return null;
   },
 };

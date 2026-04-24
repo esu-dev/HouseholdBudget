@@ -2,10 +2,13 @@ import { databaseService } from '../services/database';
 import { useTransactionStore } from '../store/useTransactionStore';
 import { emailParserService } from './emailParserService';
 import { gmailService } from './gmailService';
+import { useDeveloperStore } from '../store/useDeveloperStore';
 
 export const emailImportService = {
   async importFromGmail(token: string) {
     if (token === 'mock_token') {
+      const logger = useDeveloperStore.getState();
+      logger.addLog('info', 'Mock mode started');
       // 開発者用シミュレーションモード
       await new Promise(resolve => setTimeout(resolve, 1500));
 
@@ -27,25 +30,25 @@ JCBカードのご利用がありましたのでご連絡します。
       const from = 'mail@qa.jcb.co.jp';
       const msgId = 'mock_msg_jcb_123';
 
-      console.log('Mock mode started');
+      logger.addLog('debug', `Parsing mock email from ${from}`);
       const parsed = emailParserService.parseEmail(from, mockEmailBody, msgId);
-      console.log('Parsed result:', parsed);
+      logger.addLog('debug', `Parsed result: ${JSON.stringify(parsed)}`);
       const store = useTransactionStore.getState();
 
       if (parsed) {
-        console.log('Adding transaction for mock...');
+        logger.addLog('info', 'Adding transaction for mock...');
         // モックモードでは重複チェックをスルーして毎回追加できるようにする（テスト用）
         let accountId = 'card';
         const accounts = store.accounts;
         const mappedId = await databaseService.getSetting('gmail_account_id_jcb');
-        console.log('Mapped Account ID for JCB:', mappedId);
+        logger.addLog('debug', `Mapped Account ID for JCB: ${mappedId}`);
 
         if (mappedId && accounts.some(a => a.id === mappedId)) {
           accountId = mappedId;
         } else {
           accountId = accounts.find(a => a.name.includes('JCB'))?.id || 'card';
         }
-        console.log('Target Account ID:', accountId);
+        logger.addLog('debug', `Target Account ID: ${accountId}`);
 
         await store.addTransaction({
           amount: parsed.amount,
@@ -56,13 +59,16 @@ JCBカードのご利用がありましたのでご連絡します。
           memo: 'Gmail自動インポート(Mock)',
           import_hash: `mock_${Date.now()}`, // 重複回避のため毎回変える
         });
-        console.log('Mock transaction added successfully');
+        logger.addLog('info', 'Mock transaction added successfully');
 
         return { total: 1, imported: 1, skipped: 0, failed: 0 };
       }
-      console.log('Parsing failed for mock email');
+      logger.addLog('error', 'Parsing failed for mock email');
       return { total: 1, imported: 0, skipped: 0, failed: 1 };
     }
+
+    const logger = useDeveloperStore.getState();
+    logger.addLog('info', 'Starting Gmail import...');
 
     const results = {
       total: 0,
@@ -82,7 +88,9 @@ JCBカードのご利用がありましたのでご連絡します。
 
     for (const query of queries) {
       try {
+        logger.addLog('debug', `Searching Gmail with query: ${query}`);
         const messages = await gmailService.listMessages(token, query);
+        logger.addLog('info', `Found ${messages.length} messages for query: ${query}`);
         results.total += messages.length;
 
         for (const msg of messages) {
@@ -90,17 +98,21 @@ JCBカードのご利用がありましたのでご連絡します。
             // 重複チェック (import_hash = gmail_message_id)
             const exists = await databaseService.isImportHashExists(msg.id);
             if (exists) {
+              logger.addLog('debug', `Skipping message ${msg.id} (already imported)`);
               results.skipped++;
               continue;
             }
 
             // メッセージ本文取得
+            logger.addLog('debug', `Fetching message details for ${msg.id}...`);
             const fullMsg = await gmailService.getMessage(token, msg.id);
+            logger.addLog('debug', `Message from: ${fullMsg.from}`);
 
             // パース実行
             const parsed = emailParserService.parseEmail(fullMsg.from, fullMsg.body, fullMsg.id);
 
             if (parsed) {
+              logger.addLog('info', `Parsed transaction: ${parsed.payee}, ${parsed.amount}円`);
               // 取引を追加
               // 口座IDは暫定的に「card」グループのものを探すか、
               // カード会社ごとに紐付ける設定が必要
@@ -123,6 +135,7 @@ JCBカードのご利用がありましたのでご連絡します。
 
               if (mappedId && accounts.some(a => a.id === mappedId)) {
                 accountId = mappedId;
+                logger.addLog('debug', `Using mapped account ID: ${accountId}`);
               } else {
                 // マッピングがない場合は名前で推測（フォールバック）
                 if (fullMsg.from.includes('rakuten-card')) {
@@ -132,6 +145,7 @@ JCBカードのご利用がありましたのでご連絡します。
                 } else if (fullMsg.from.includes('jcb.co.jp')) {
                   accountId = accounts.find(a => a.name.includes('JCB'))?.id || 'card';
                 }
+                logger.addLog('debug', `Using fallback account ID: ${accountId}`);
               }
 
               await store.addTransaction({
@@ -145,19 +159,22 @@ JCBカードのご利用がありましたのでご連絡します。
               });
 
               results.imported++;
+              logger.addLog('success', `Imported: ${parsed.payee}`);
             } else {
+              logger.addLog('warn', `Failed to parse message from ${fullMsg.from}`);
               results.failed++;
             }
-          } catch (e) {
-            console.error(`Failed to process message ${msg.id}:`, e);
+          } catch (e: any) {
+            logger.addLog('error', `Failed to process message ${msg.id}: ${e.message}`);
             results.failed++;
           }
         }
-      } catch (e) {
-        console.error(`Failed to list messages for query "${query}":`, e);
+      } catch (e: any) {
+        logger.addLog('error', `Failed to list messages for query "${query}": ${e.message}`);
       }
     }
 
+    logger.addLog('info', `Import process finished. Results: ${JSON.stringify(results)}`);
     return results;
   }
 };
