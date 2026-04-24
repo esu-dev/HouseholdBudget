@@ -1,8 +1,10 @@
-import { Stack, useRouter } from 'expo-router';
-import { ArrowDownCircle, ArrowUpCircle, Building2, CreditCard, EyeOff, Wallet } from 'lucide-react-native';
-import React, { useEffect, useMemo } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { ArrowDownCircle, ArrowUpCircle, Building2, CreditCard, EyeOff, Mail, Wallet } from 'lucide-react-native';
+import React, { useCallback, useMemo } from 'react';
+import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
+import { emailImportService } from '../../services/emailImportService';
+import { gmailService } from '../../services/gmailService';
 import { useTransactionStore } from '../../store/useTransactionStore';
 
 const ACCOUNT_TYPE_INFO: Record<string, { label: string; icon: any; color: string }> = {
@@ -17,10 +19,46 @@ export default function BalanceScreen() {
     const colorScheme = useAppColorScheme();
     const isDark = colorScheme === 'dark';
     const { transactions, accounts, accountBalances, fetchData } = useTransactionStore();
+    const [gmailToken, setGmailToken] = React.useState<string | null>(null);
+    const [isImporting, setIsImporting] = React.useState(false);
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    const checkGmailStatus = async () => {
+        const token = await gmailService.getStoredToken();
+        setGmailToken(token);
+    };
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchData();
+            checkGmailStatus();
+        }, [])
+    );
+
+    const handleQuickImport = async () => {
+        if (!gmailToken || isImporting) return;
+
+        setIsImporting(true);
+        try {
+            const result = await emailImportService.importFromGmail(gmailToken);
+            if (result.imported > 0) {
+                await fetchData();
+                Alert.alert('インポート完了', `${result.imported}件の取引を新しく追加しました。`);
+            } else if (result.failed > 0) {
+                Alert.alert('完了', `新着取引はありませんでした。（解析失敗: ${result.failed}件）`);
+            } else {
+                Alert.alert('完了', '新着取引はありませんでした。');
+            }
+        } catch (e: any) {
+            if (e.message === 'Unauthorized') {
+                setGmailToken(null);
+                Alert.alert('認証エラー', 'Gmailのセッションが切れました。設定画面から再度ログインしてください。');
+            } else {
+                Alert.alert('エラー', 'メールの取得中に問題が発生しました。');
+            }
+        } finally {
+            setIsImporting(false);
+        }
+    };
 
     const colors = {
         background: isDark ? '#0f172a' : '#f8fafc',
@@ -60,10 +98,40 @@ export default function BalanceScreen() {
 
     return (
         <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
-            <Stack.Screen options={{ headerShown: true }} />
+            <Stack.Screen options={{
+                headerShown: true
+            }} />
 
             <View style={{ padding: 20, paddingTop: 10 }}>
-                <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.text, marginBottom: 20, paddingTop: 10 }}>資産状況</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingTop: 10 }}>
+                    <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.text }}>資産状況</Text>
+                    {gmailToken && (
+                        <TouchableOpacity
+                            onPress={handleQuickImport}
+                            disabled={isImporting}
+                            style={{
+                                paddingVertical: 6,
+                                paddingHorizontal: 12,
+                                borderRadius: 12,
+                                backgroundColor: isDark ? 'rgba(99, 102, 241, 0.1)' : '#eef2ff',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                                borderWidth: 1,
+                                borderColor: colors.indigo + '30'
+                            }}
+                        >
+                            {isImporting ? (
+                                <ActivityIndicator size="small" color={colors.indigo} />
+                            ) : (
+                                <Mail size={16} color={colors.indigo} />
+                            )}
+                            <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.indigo }}>
+                                {isImporting ? '読込中' : 'メール読込'}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
 
                 {/* 純資産カード */}
                 <View style={{ backgroundColor: colors.indigo, padding: 24, borderRadius: 32, marginBottom: 24, shadowColor: colors.indigo, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}>
