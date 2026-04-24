@@ -1,6 +1,23 @@
-import * as Google from 'expo-auth-session/providers/google';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Stack, useRouter } from 'expo-router';
+
+// Expo Goで実行されているかどうかを判別
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+// @react-native-google-signin/google-signin はネイティブモジュールのため、Expo Goでは利用不可
+// ビルド後（Development Buildを含む）のみインポートするようにする
+let GoogleSignin: any = null;
+let statusCodes: any = null;
+
+if (!isExpoGo) {
+    try {
+        const GoogleSigninModule = require('@react-native-google-signin/google-signin');
+        GoogleSignin = GoogleSigninModule.GoogleSignin;
+        statusCodes = GoogleSigninModule.statusCodes;
+    } catch (e) {
+        console.warn('GoogleSignin module could not be loaded', e);
+    }
+}
 import { AlertCircle, CheckCircle2, ChevronLeft, Info, LogOut, Mail, RefreshCw, Terminal } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
@@ -11,8 +28,6 @@ import { emailImportService } from '../../services/emailImportService';
 import { gmailService } from '../../services/gmailService';
 import { useTransactionStore } from '../../store/useTransactionStore';
 
-// Expo Goで実行されているかどうかを判別
-const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 // TODO: 本番環境では正しいクライアントIDを設定してください
 const IOS_CLIENT_ID = '707898512731-491f9ltfgsoq46j1sff1pb8gqs4bnrqs.apps.googleusercontent.com';
@@ -27,13 +42,17 @@ export default function GmailImportScreen() {
     const [token, setToken] = useState<string | null>(null);
     const [importResult, setImportResult] = useState<any>(null);
 
-    const [request, response, promptAsync] = Google.useAuthRequest({
-        iosClientId: IOS_CLIENT_ID,
-        androidClientId: ANDROID_CLIENT_ID,
-        webClientId: WEB_CLIENT_ID,
-        scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
-        useProxy: false,
-    });
+    useEffect(() => {
+        if (!isExpoGo && GoogleSignin) {
+            GoogleSignin.configure({
+                scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
+                iosClientId: IOS_CLIENT_ID,
+                // androidClientId: ANDROID_CLIENT_ID,
+            });
+        }
+        checkToken();
+        loadMappings();
+    }, []);
 
     const colors = {
         background: isDark ? '#0f172a' : '#f8fafc',
@@ -114,15 +133,32 @@ export default function GmailImportScreen() {
         );
     };
 
-    useEffect(() => {
-        if (response?.type === 'success') {
-            const { authentication } = response;
-            if (authentication?.accessToken) {
-                setToken(authentication.accessToken);
-                gmailService.saveToken(authentication.accessToken);
+    const handleLogin = async () => {
+        if (isExpoGo || !GoogleSignin) {
+            Alert.alert('機能制限', 'Googleログインはビルドされたアプリでのみ利用可能です。');
+            return;
+        }
+        try {
+            await GoogleSignin.hasPlayServices();
+            const userInfo = await GoogleSignin.signIn();
+            const tokens = await GoogleSignin.getTokens();
+            
+            if (tokens.accessToken) {
+                setToken(tokens.accessToken);
+                gmailService.saveToken(tokens.accessToken);
+            }
+        } catch (error: any) {
+            if (statusCodes && error.code === statusCodes.SIGN_IN_CANCELLED) {
+                // キャンセルされた
+            } else if (statusCodes && error.code === statusCodes.IN_PROGRESS) {
+                // すでに進行中
+            } else if (statusCodes && error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+                Alert.alert('エラー', 'Google Play Servicesが利用できません。');
+            } else {
+                Alert.alert('ログインエラー', error.message);
             }
         }
-    }, [response]);
+    };
 
     const checkToken = async () => {
         const storedToken = await gmailService.getStoredToken();
@@ -151,6 +187,11 @@ export default function GmailImportScreen() {
     };
 
     const handleLogout = async () => {
+        try {
+            if (!isExpoGo && GoogleSignin) {
+                await GoogleSignin.signOut();
+            }
+        } catch (e) {}
         await gmailService.removeToken();
         setToken(null);
         setImportResult(null);
@@ -196,16 +237,14 @@ export default function GmailImportScreen() {
                     {!token ? (
                         <View style={{ gap: 12 }}>
                             <TouchableOpacity
-                                disabled={!request}
-                                onPress={() => promptAsync()}
+                                onPress={handleLogin}
                                 style={{
                                     backgroundColor: colors.indigo,
                                     padding: 18,
                                     borderRadius: 20,
                                     alignItems: 'center',
                                     flexDirection: 'row',
-                                    justifyContent: 'center',
-                                    opacity: !request ? 0.5 : 1
+                                    justifyContent: 'center'
                                 }}
                             >
                                 <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>Googleでログインして開始</Text>

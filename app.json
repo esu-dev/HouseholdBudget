@@ -2,7 +2,7 @@
   "expo": {
     "name": "my-app",
     "slug": "my-app",
-    "version": "1.0.6",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/images/appicon.png",
     "scheme": "myapp",
@@ -45,7 +45,13 @@
       ],
       "expo-sqlite",
       "@react-native-community/datetimepicker",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.707898512731-491f9ltfgsoq46j1sff1pb8gqs4bnrqs"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

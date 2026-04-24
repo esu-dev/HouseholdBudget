@@ -1,4 +1,3 @@
-import * as Google from 'expo-auth-session/providers/google';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import * as base64 from 'base64-js';

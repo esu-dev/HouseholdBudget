@@ -29,7 +29,8 @@ jobs:
         run: |
           # 開発用クライアントを含めないように、--no-install を付けて
           # 純粋なプロダクション（配布用）に近い状態で prebuild します
-          npx expo prebuild --platform ios --no-install
+          # --clean: iosディレクトリを削除してから再作成
+          npx expo prebuild --platform ios --no-install --clean
 
           # その後、必要な Pods だけをインストール
           cd ios && pod install && cd ..
