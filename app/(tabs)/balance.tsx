@@ -1,9 +1,16 @@
 import { Stack, useRouter } from 'expo-router';
-import { ArrowDownCircle, ArrowUpCircle, Wallet } from 'lucide-react-native';
+import { ArrowDownCircle, ArrowUpCircle, Building2, CreditCard, EyeOff, Wallet } from 'lucide-react-native';
 import React, { useEffect, useMemo } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { useTransactionStore } from '../../store/useTransactionStore';
+
+const ACCOUNT_TYPE_INFO: Record<string, { label: string; icon: any; color: string }> = {
+    cash: { label: '現金', icon: Wallet, color: '#f59e0b' },
+    bank: { label: '銀行口座', icon: Building2, color: '#3b82f6' },
+    card: { label: 'クレジットカード', icon: CreditCard, color: '#ef4444' },
+    others: { label: 'その他', icon: Wallet, color: '#64748b' },
+};
 
 export default function BalanceScreen() {
     const router = useRouter();
@@ -27,6 +34,7 @@ export default function BalanceScreen() {
     // 合計資産（純資産）を計算
     const netWorth = useMemo(() => {
         return accounts.reduce((sum, account) => {
+            if (account.excludeFromNetWorth) return sum;
             return sum + (accountBalances[account.id] || 0);
         }, 0);
     }, [accountBalances, accounts]);
@@ -71,7 +79,7 @@ export default function BalanceScreen() {
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
                             <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>アカウント数</Text>
-                            <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold', marginTop: 4 }}>{accounts.length} 口座</Text>
+                            <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold', marginTop: 4 }}>{accounts.filter(a => !a.isHidden).length} 口座</Text>
                         </View>
                     </View>
                 </View>
@@ -79,8 +87,11 @@ export default function BalanceScreen() {
                 {/* 口座別残高一覧 */}
                 <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 }}>口座別残高</Text>
 
-                {accounts.map((account) => {
+                {accounts.filter(a => !a.isHidden).map((account) => {
                     const balance = accountBalances[account.id] || 0;
+                    const typeInfo = ACCOUNT_TYPE_INFO[account.type] || ACCOUNT_TYPE_INFO.others;
+                    const IconComp = typeInfo.icon;
+
                     return (
                         <TouchableOpacity
                             key={account.id}
@@ -99,14 +110,22 @@ export default function BalanceScreen() {
                                 elevation: 1
                             }}
                         >
-                            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: colors.indigo + '15', alignItems: 'center', justifyContent: 'center' }}>
-                                <Wallet size={20} color={colors.indigo} />
+                            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: typeInfo.color + '15', alignItems: 'center', justifyContent: 'center' }}>
+                                <IconComp size={20} color={typeInfo.color} />
                             </View>
                             <View style={{ flex: 1, marginLeft: 16, marginRight: 8 }}>
                                 <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }} numberOfLines={1}>{account.name}</Text>
-                                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
-                                    {account.type === 'cash' ? '現金' : account.type === 'bank' ? '銀行口座' : 'クレジットカード'}
-                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                    <Text style={{ fontSize: 12, color: colors.textMuted }}>
+                                        {typeInfo.label}
+                                    </Text>
+                                    {account.excludeFromNetWorth && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                            <EyeOff size={10} color="#f43f5e" />
+                                            <Text style={{ fontSize: 10, color: '#f43f5e', fontWeight: 'bold' }}>非計上</Text>
+                                        </View>
+                                    )}
+                                </View>
                             </View>
                             <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, minWidth: 100, textAlign: 'right' }}>¥{balance.toLocaleString()}</Text>
                         </TouchableOpacity>

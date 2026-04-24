@@ -56,6 +56,7 @@ export const initDatabase = async () => {
       transfer_id INTEGER,
       fee INTEGER DEFAULT 0,
       import_hash TEXT UNIQUE,
+      is_deferred INTEGER DEFAULT 0,
       FOREIGN KEY (account_id) REFERENCES accounts(id)
     );
 
@@ -160,9 +161,24 @@ export const initDatabase = async () => {
     await db.execAsync('CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_import_hash ON transactions(import_hash)');
   } catch (e) {}
 
+  // Migration: Add is_deferred to transactions if it doesn't exist
+  try {
+    await db.execAsync('ALTER TABLE transactions ADD COLUMN is_deferred INTEGER DEFAULT 0');
+  } catch (e) {}
+
   // Migration: Add billing_start_date to accounts if it doesn't exist
   try {
     await db.execAsync('ALTER TABLE accounts ADD COLUMN billing_start_date TEXT');
+  } catch (e) {}
+
+  // Migration: Add exclude_from_net_worth to accounts if it doesn't exist
+  try {
+    await db.execAsync('ALTER TABLE accounts ADD COLUMN exclude_from_net_worth INTEGER DEFAULT 0');
+  } catch (e) {}
+
+  // Migration: Add is_hidden to accounts if it doesn't exist
+  try {
+    await db.execAsync('ALTER TABLE accounts ADD COLUMN is_hidden INTEGER DEFAULT 0');
   } catch (e) {}
   
   // Insert default accounts if empty
@@ -233,6 +249,11 @@ export const databaseService = {
     return mapping;
   },
 
+  async deletePayeeCategoryMapping(payee: string): Promise<void> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    await db.runAsync('DELETE FROM payee_category_mappings WHERE payee = ?', payee);
+  },
+
   async getIgnoredPayees(): Promise<string[]> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     const rows = await db.getAllAsync<{payee: string}>(
@@ -279,7 +300,7 @@ export const databaseService = {
   async addTransaction(transaction: CreateTransactionInput): Promise<number> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     const result = await db.runAsync(
-      'INSERT INTO transactions (amount, category_id, account_id, to_account_id, date, memo, payee, transfer_id, fee, import_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO transactions (amount, category_id, account_id, to_account_id, date, memo, payee, transfer_id, fee, import_hash, is_deferred) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       transaction.amount,
       transaction.category_id,
       transaction.account_id,
@@ -289,7 +310,8 @@ export const databaseService = {
       transaction.payee ?? null,
       transaction.transfer_id ?? null,
       transaction.fee ?? 0,
-      transaction.import_hash ?? null
+      transaction.import_hash ?? null,
+      transaction.is_deferred ? 1 : 0
     );
 
     if (transaction.payee) {
@@ -305,7 +327,7 @@ export const databaseService = {
   async updateTransaction(transaction: Transaction): Promise<void> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     await db.runAsync(
-      'UPDATE transactions SET amount = ?, category_id = ?, account_id = ?, to_account_id = ?, date = ?, memo = ?, payee = ?, transfer_id = ?, fee = ?, import_hash = ? WHERE id = ?',
+      'UPDATE transactions SET amount = ?, category_id = ?, account_id = ?, to_account_id = ?, date = ?, memo = ?, payee = ?, transfer_id = ?, fee = ?, import_hash = ?, is_deferred = ? WHERE id = ?',
       transaction.amount,
       transaction.category_id,
       transaction.account_id,
@@ -316,6 +338,7 @@ export const databaseService = {
       transaction.transfer_id ?? null,
       transaction.fee ?? 0,
       transaction.import_hash ?? null,
+      transaction.is_deferred ? 1 : 0,
       transaction.id
     );
 
@@ -329,9 +352,13 @@ export const databaseService = {
 
   async getAllTransactions(): Promise<Transaction[]> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
-    return await db.getAllAsync<Transaction>(
+    const rows = await db.getAllAsync<any>(
       'SELECT t.* FROM transactions t JOIN accounts a ON t.account_id = a.id ORDER BY t.date DESC'
     );
+    return rows.map(row => ({
+      ...row,
+      is_deferred: row.is_deferred === 1
+    }));
   },
 
   async deleteTransaction(id: number): Promise<void> {
@@ -365,7 +392,9 @@ export const databaseService = {
       withdrawalDay: row.withdrawal_day,
       withdrawalAccountId: row.withdrawal_account_id,
       displayOrder: row.display_order,
-      billingStartDate: row.billing_start_date
+      billingStartDate: row.billing_start_date,
+      excludeFromNetWorth: row.exclude_from_net_worth === 1,
+      isHidden: row.is_hidden === 1
     }));
   },
 
@@ -389,7 +418,7 @@ export const databaseService = {
   async addAccount(account: Omit<Account, 'balance'>): Promise<void> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     await db.runAsync(
-      'INSERT INTO accounts (id, name, type, card_type, login_url, closing_day, withdrawal_day, withdrawal_account_id, display_order, billing_start_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO accounts (id, name, type, card_type, login_url, closing_day, withdrawal_day, withdrawal_account_id, display_order, billing_start_date, exclude_from_net_worth, is_hidden) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       account.id,
       account.name,
       account.type,
@@ -399,14 +428,16 @@ export const databaseService = {
       account.withdrawalDay ?? null,
       account.withdrawalAccountId ?? null,
       account.displayOrder ?? 0,
-      account.billingStartDate ?? null
+      account.billingStartDate ?? null,
+      account.excludeFromNetWorth ? 1 : 0,
+      account.isHidden ? 1 : 0
     );
   },
 
   async updateAccount(account: Omit<Account, 'balance'>): Promise<void> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     await db.runAsync(
-      'UPDATE accounts SET name = ?, type = ?, card_type = ?, login_url = ?, closing_day = ?, withdrawal_day = ?, withdrawal_account_id = ?, display_order = ?, billing_start_date = ? WHERE id = ?',
+      'UPDATE accounts SET name = ?, type = ?, card_type = ?, login_url = ?, closing_day = ?, withdrawal_day = ?, withdrawal_account_id = ?, display_order = ?, billing_start_date = ?, exclude_from_net_worth = ?, is_hidden = ? WHERE id = ?',
       account.name,
       account.type,
       account.cardType ?? 'none',
@@ -416,6 +447,8 @@ export const databaseService = {
       account.withdrawalAccountId ?? null,
       account.displayOrder ?? 0,
       account.billingStartDate ?? null,
+      account.excludeFromNetWorth ? 1 : 0,
+      account.isHidden ? 1 : 0,
       account.id
     );
   },

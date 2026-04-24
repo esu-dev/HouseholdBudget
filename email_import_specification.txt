@@ -1,0 +1,56 @@
+specification_content = """# クレジットカード利用明細自動インポート機能 仕様書
+
+## 1. 概要
+ユーザーが所有するクレジットカードの利用通知メールをGmailから取得し、その内容を解析してSQLiteデータベースに取引データとして自動保存する機能である。手動入力の手間を省き、入力漏れや誤入力を防止することを目的とする。
+
+## 2. システムフロー (シーケンス概念図)
+[ユーザー] -> (取得ボタン) -> [アプリ]
+    |
+    +--> (OAuth 2.0 認証 / APIコール) -> [Gmail API]
+    |                                     |
+    +<-- (メール本文取得) <---------------+
+    |
+    +--> (正規表現によるパース) -> [解析処理]
+    |
+    +--> (重複チェック: gmail_message_id) -> [SQLite]
+    |                                     |
+    +<-- (保存完了) <---------------------+
+
+## 3. 機能要件
+
+### 3.1. Gmail API 連携
+- 権限: https://www.googleapis.com/auth/gmail.readonly
+- 検索条件: カード会社ごとに検索クエリ（例: from:member@example.com）を保持・設定可能とする。
+
+### 3.2. データ解析 (Parsing)
+- 実装パターン: ストラテジーパターンを採用し、カード会社ごとにパーサーを分離。
+- 抽出項目:
+    - amount (数値): カンマなどを除去して数値化
+    - date (ISO 8601): 日付文字列を変換
+    - merchant (文字列): 店舗名
+    - gmail_message_id (文字列): 重複排除用の一意なID
+
+### 3.3. データ保存 (SQLite)
+- テーブル定義:
+  CREATE TABLE IF NOT EXISTS transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      gmail_message_id TEXT UNIQUE,
+      amount INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      merchant TEXT,
+      category_id INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+## 4. エラーハンドリング
+- 解析失敗: マッチしない場合はログ出力し、UIでユーザーへエラー内容を通知。
+- ネットワーク異常: 通信失敗時は再試行ロジックを実装。
+- 重複データ: UNIQUE制約違反時は処理をスキップ。
+
+## 5. セキュリティ
+- トークン管理: OAuthトークンは expo-secure-store を使用してデバイスに安全に保存。
+- 権限制限: Gmail全体ではなく、必要なメールのみに絞ったスコープを使用。
+"""
+
+with open("email_import_specification.txt", "w", encoding="utf-8") as f:
+    f.write(specification_content)

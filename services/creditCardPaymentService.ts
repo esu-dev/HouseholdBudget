@@ -48,6 +48,15 @@ export const creditCardPaymentService = {
       let tMonth = tDate.getMonth();
       const tDay = tDate.getDate();
 
+      // 繰り越し設定がある場合、まず1ヶ月先にずらす
+      if (t.is_deferred) {
+        tMonth++;
+        if (tMonth > 11) {
+          tMonth = 0;
+          tYear++;
+        }
+      }
+
       if (closingDay > 0 && tDay > closingDay) {
         tMonth++;
         if (tMonth > 11) {

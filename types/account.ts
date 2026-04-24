@@ -13,6 +13,8 @@ export type Account = {
   withdrawalAccountId?: string;
   displayOrder: number;
   billingStartDate?: string;
+  excludeFromNetWorth?: boolean;
+  isHidden?: boolean;
 };
 
 // バランス計算用のヘルパー型

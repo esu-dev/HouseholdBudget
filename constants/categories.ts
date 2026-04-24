@@ -189,6 +189,7 @@ export const CATEGORIES: MajorCategory[] = [
     subCategories: [
       { id: 'others', label: 'その他', displayOrder: 0 },
       { id: 'transfer', label: '振替', displayOrder: 1 },
+      { id: 'adjustment', label: '残高調整', displayOrder: 2 },
     ]
   },
 ];

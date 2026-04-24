@@ -1,5 +1,5 @@
 import { CategoryDonutChart } from '@/components/CategoryDonutChart';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { CalendarIcon, ChevronLeft, ChevronRight, CircleEllipsis, List, MessageSquare, Store, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
@@ -106,15 +106,188 @@ const TransactionItem = React.memo(({
     );
 });
 
+const HeaderContent = React.memo(({
+    totalBudget,
+    totals,
+    monthTransactions,
+    selectedMajorId,
+    setSelectedMajorId,
+    selectedMinorId,
+    setSelectedMinorId,
+    availableMajors,
+    availableMinors,
+    setIsBudgetModalVisible
+}: any) => {
+    const remainingBudget = totalBudget - totals.expense;
+    const progress = totalBudget > 0 ? Math.min(totals.expense / totalBudget, 1) : 0;
+    const progressColor = progress > 0.9 ? 'bg-rose-500' : progress > 0.7 ? 'bg-amber-500' : 'bg-indigo-500';
+
+    return (
+        <View className="p-4">
+            {/* 予算サマリーカード */}
+            {totalBudget > 0 && (
+                <TouchableOpacity
+                    onPress={() => setIsBudgetModalVisible(true)}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    className="bg-white dark:bg-slate-800 p-6 rounded-[32px] shadow-sm mb-6"
+                >
+                    <View className="flex-row justify-between items-center mb-4">
+                        <View>
+                            <Text className="text-slate-400 text-xs font-bold mb-1">残り予算</Text>
+                            <Text className={`text-2xl font-black ${remainingBudget < 0 ? 'text-rose-600' : 'text-slate-900 dark:text-white'}`}>
+                                ¥{remainingBudget.toLocaleString()}
+                            </Text>
+                        </View>
+                        <View className="items-end">
+                            <Text className="text-slate-400 text-xs font-bold mb-1">予算合計</Text>
+                            <Text className="text-slate-600 dark:text-slate-300 font-bold">
+                                ¥{totalBudget.toLocaleString()}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* プログレスバー */}
+                    <View className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <View
+                            className={`h-full ${progressColor}`}
+                            style={{ width: `${progress * 100}%` }}
+                        />
+                    </View>
+                    <View className="flex-row justify-between mt-2">
+                        <Text className="text-[10px] text-slate-400 font-medium">支出: ¥{totals.expense.toLocaleString()}</Text>
+                        <Text className="text-[10px] text-slate-400 font-medium">{Math.round(progress * 100)}%</Text>
+                    </View>
+
+                    <View className="flex-row items-center justify-center mt-4">
+                        <Text className="text-[10px] text-indigo-500 font-bold mr-1">カテゴリ別の詳細を表示</Text>
+                        <ChevronRight size={10} color="#6366f1" />
+                    </View>
+                </TouchableOpacity>
+            )}
+
+            {/* 収支サマリーカード */}
+            <View className="bg-white dark:bg-slate-800 p-6 rounded-[32px] shadow-sm mb-6">
+                <View className="flex-row justify-between mb-4">
+                    <View>
+                        <View className="flex-row items-center mb-1">
+                            <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
+                            <Text className="text-slate-400 text-xs font-bold">収入</Text>
+                        </View>
+                        <Text className="text-green-500 text-xl font-black">
+                            ¥{totals.income.toLocaleString()}
+                        </Text>
+                    </View>
+                    <View className="items-end">
+                        <View className="flex-row items-center mb-1">
+                            <Text className="text-slate-400 text-xs font-bold mr-2">支出</Text>
+                            <View className="w-2 h-2 rounded-full bg-rose-500" />
+                        </View>
+                        <Text className="text-rose-500 text-xl font-black">
+                            ¥{totals.expense.toLocaleString()}
+                        </Text>
+                    </View>
+                </View>
+
+                <View className="h-[1px] bg-slate-100 dark:bg-slate-700 w-full mb-4" />
+
+                <View className="flex-row justify-between items-center">
+                    <Text className="text-slate-500 dark:text-slate-400 font-bold">今月の収支</Text>
+                    <Text className={`text-2xl font-black ${totals.balance >= 0 ? 'text-slate-900 dark:text-white' : 'text-rose-600'}`}>
+                        {totals.balance >= 0 ? '+' : ''}¥{totals.balance.toLocaleString()}
+                    </Text>
+                </View>
+            </View>
+
+            <CategoryDonutChart transactions={monthTransactions} />
+
+            <View className="flex-row justify-between items-end mt-4 mb-2 ml-2">
+                <Text className="text-xl font-bold text-slate-900 dark:text-white">
+                    最近の履歴
+                </Text>
+            </View>
+
+            {/* カテゴリフィルタリング（大カテゴリ） */}
+            {availableMajors.length > 0 && (
+                <View className="mb-2">
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ paddingHorizontal: 8, gap: 8, paddingBottom: 4 }}
+                    >
+                        <TouchableOpacity
+                            onPress={() => {
+                                setSelectedMajorId(null);
+                                setSelectedMinorId(null);
+                            }}
+                            className={`px-4 py-2 rounded-full border ${selectedMajorId === null ? 'bg-indigo-500 border-indigo-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}
+                        >
+                            <Text className={`text-xs font-bold ${selectedMajorId === null ? 'text-white' : 'text-slate-400'}`}>
+                                すべて
+                            </Text>
+                        </TouchableOpacity>
+                        {availableMajors
+                            .map((maj: any) => (
+                                <TouchableOpacity
+                                    key={maj.id}
+                                    onPress={() => {
+                                        setSelectedMajorId(maj.id);
+                                        setSelectedMinorId(null);
+                                    }}
+                                    className={`px-4 py-2 rounded-full border ${selectedMajorId === maj.id ? 'bg-indigo-500 border-indigo-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}
+                                >
+                                    <Text className={`text-xs font-bold ${selectedMajorId === maj.id ? 'text-white' : 'text-slate-400'}`}>
+                                        {maj.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                    </ScrollView>
+
+                    {/* カテゴリフィルタリング（小カテゴリ） */}
+                    {availableMinors.length > 0 && (
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={{ paddingHorizontal: 8, gap: 8, paddingTop: 4, paddingBottom: 8 }}
+                        >
+                            <TouchableOpacity
+                                onPress={() => setSelectedMinorId(null)}
+                                className={`px-3 py-1.5 rounded-2xl border ${selectedMinorId === null ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}
+                            >
+                                <Text className={`text-[11px] ${selectedMinorId === null ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'text-slate-400'}`}>
+                                    すべて
+                                </Text>
+                            </TouchableOpacity>
+                            {availableMinors.map((min: any) => (
+                                <TouchableOpacity
+                                    key={min.id}
+                                    onPress={() => setSelectedMinorId(min.id)}
+                                    className={`px-3 py-1.5 rounded-2xl border ${selectedMinorId === min.id ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}
+                                >
+                                    <Text className={`text-[11px] ${selectedMinorId === min.id ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'text-slate-400'}`}>
+                                        {min.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    )}
+                </View>
+            )}
+        </View>
+    );
+});
+
 export default function HomeScreen() {
+    const router = useRouter();
     const colorScheme = useAppColorScheme();
     const isDark = colorScheme === 'dark';
     const { transactions, accounts, fetchData, fetchBudgets, budgets, setEditingTransaction, majorCategories } = useTransactionStore();
     const [selectedMonth, setSelectedMonth] = useState(new Date());
     const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
     const [selectedDay, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
-    const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
     const [isBudgetModalVisible, setIsBudgetModalVisible] = useState(false);
+    const [selectedMajorId, setSelectedMajorId] = useState<string | null>(null);
+    const [selectedMinorId, setSelectedMinorId] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
@@ -136,24 +309,72 @@ export default function HomeScreen() {
         });
     }, [transactions, selectedMonth]);
 
+    const availableMajors = useMemo(() => {
+        const catIds = new Set(monthTransactions.map(t => t.category_id));
+        const hasTransfer = catIds.has('transfer');
+
+        const majors = majorCategories.filter(maj =>
+            maj.subCategories.some(min => catIds.has(min.id))
+        ).map(maj => ({
+            id: maj.id,
+            label: maj.label,
+            color: maj.color,
+            type: maj.type
+        }));
+
+        if (hasTransfer) {
+            majors.push({ id: 'transfer', label: '振替', color: '#6366f1', type: 'all' as any });
+        }
+
+        return majors;
+    }, [monthTransactions, majorCategories]);
+
+    const availableMinors = useMemo(() => {
+        if (!selectedMajorId || selectedMajorId === 'transfer') return [];
+        const catIds = new Set(monthTransactions.map(t => t.category_id));
+        const major = majorCategories.find(m => m.id === selectedMajorId);
+        if (!major) return [];
+        return major.subCategories.filter(min => catIds.has(min.id));
+    }, [monthTransactions, majorCategories, selectedMajorId]);
+
     const filteredTransactions = useMemo(() => {
         return monthTransactions.filter(t => {
-            if (filterType === 'income') return t.amount > 0;
-            if (filterType === 'expense') return t.amount < 0;
+            // Category filter
+            if (selectedMajorId === 'transfer') {
+                if (t.category_id !== 'transfer') return false;
+            } else if (selectedMajorId) {
+                if (selectedMinorId) {
+                    if (t.category_id !== selectedMinorId) return false;
+                } else {
+                    const major = majorCategories.find(m => m.id === selectedMajorId);
+                    if (!major?.subCategories.some(min => min.id === t.category_id)) return false;
+                }
+            }
+
             return true;
         });
-    }, [monthTransactions, filterType]);
+    }, [monthTransactions, selectedMajorId, selectedMinorId, majorCategories]);
 
     const dayTransactions = useMemo(() => {
         return transactions.filter(t => {
             const matchesDay = t.date.split('T')[0] === selectedDay;
             if (!matchesDay) return false;
 
-            if (filterType === 'income') return t.amount > 0;
-            if (filterType === 'expense') return t.amount < 0;
+            // Category filter
+            if (selectedMajorId === 'transfer') {
+                if (t.category_id !== 'transfer') return false;
+            } else if (selectedMajorId) {
+                if (selectedMinorId) {
+                    if (t.category_id !== selectedMinorId) return false;
+                } else {
+                    const major = majorCategories.find(m => m.id === selectedMajorId);
+                    if (!major?.subCategories.some(min => min.id === t.category_id)) return false;
+                }
+            }
+
             return true;
         });
-    }, [transactions, selectedDay, filterType]);
+    }, [transactions, selectedDay, selectedMajorId, selectedMinorId, majorCategories]);
 
     const markedDates = useMemo(() => {
         const marks: any = {};
@@ -183,7 +404,7 @@ export default function HomeScreen() {
         let income = 0;
         let expense = 0;
         monthTransactions.forEach(t => {
-            if (t.category_id === 'transfer') return; // 振替は収支に計上しない
+            if (t.category_id === 'transfer' || t.category_id === 'adjustment') return; // 振替・調整は収支に計上しない
             if (t.amount > 0) {
                 income += t.amount;
             } else {
@@ -225,7 +446,7 @@ export default function HomeScreen() {
 
         // 実際の支出を合算
         monthTransactions.forEach(t => {
-            if (t.amount < 0 && t.category_id !== 'transfer') {
+            if (t.amount < 0 && t.category_id !== 'transfer' && t.category_id !== 'adjustment') {
                 // 小カテゴリから親の大カテゴリを探す
                 let parentMajId = null;
                 for (const maj of majorCategories) {
@@ -279,12 +500,17 @@ export default function HomeScreen() {
         const next = new Date(selectedMonth);
         next.setMonth(next.getMonth() + offset);
         setSelectedMonth(next);
+        
+        // カレンダーの日付選択も切り替え後の月の1日に合わせる
+        const year = next.getFullYear();
+        const month = String(next.getMonth() + 1).padStart(2, '0');
+        setSelectedDate(`${year}-${month}-01`);
     };
 
     const handleTransactionPress = useCallback((item: any) => {
         setEditingTransaction(item);
         router.push('/edit-transaction');
-    }, [setEditingTransaction]);
+    }, [setEditingTransaction, router]);
 
     const renderItem = useCallback(({ item }: { item: any }) => {
         if (item.type === 'header') {
@@ -332,135 +558,11 @@ export default function HomeScreen() {
         textDayHeaderFontSize: 12
     }), [isDark]);
 
-    const renderHeaderContent = () => {
-        const remainingBudget = totalBudget - totals.expense;
-        const progress = totalBudget > 0 ? Math.min(totals.expense / totalBudget, 1) : 0;
-        const progressColor = progress > 0.9 ? 'bg-rose-500' : progress > 0.7 ? 'bg-amber-500' : 'bg-indigo-500';
-
-        return (
-            <View className="p-4">
-                {/* 予算サマリーカード */}
-                {totalBudget > 0 && (
-                    <TouchableOpacity
-                        onPress={() => setIsBudgetModalVisible(true)}
-                        activeOpacity={0.7}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        className="bg-white dark:bg-slate-800 p-6 rounded-[32px] shadow-sm mb-6"
-                    >
-                        <View className="flex-row justify-between items-center mb-4">
-                            <View>
-                                <Text className="text-slate-400 text-xs font-bold mb-1">残り予算</Text>
-                                <Text className={`text-2xl font-black ${remainingBudget < 0 ? 'text-rose-600' : 'text-slate-900 dark:text-white'}`}>
-                                    ¥{remainingBudget.toLocaleString()}
-                                </Text>
-                            </View>
-                            <View className="items-end">
-                                <Text className="text-slate-400 text-xs font-bold mb-1">予算合計</Text>
-                                <Text className="text-slate-600 dark:text-slate-300 font-bold">
-                                    ¥{totalBudget.toLocaleString()}
-                                </Text>
-                            </View>
-                        </View>
-
-                        {/* プログレスバー */}
-                        <View className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                            <View
-                                className={`h-full ${progressColor}`}
-                                style={{ width: `${progress * 100}%` }}
-                            />
-                        </View>
-                        <View className="flex-row justify-between mt-2">
-                            <Text className="text-[10px] text-slate-400 font-medium">支出: ¥{totals.expense.toLocaleString()}</Text>
-                            <Text className="text-[10px] text-slate-400 font-medium">{Math.round(progress * 100)}%</Text>
-                        </View>
-
-                        <View className="flex-row items-center justify-center mt-4">
-                            <Text className="text-[10px] text-indigo-500 font-bold mr-1">カテゴリ別の詳細を表示</Text>
-                            <ChevronRight size={10} color="#6366f1" />
-                        </View>
-                    </TouchableOpacity>
-                )}
-
-                {/* 収支サマリーカード */}
-                <View className="bg-white dark:bg-slate-800 p-6 rounded-[32px] shadow-sm mb-6">
-                    <View className="flex-row justify-between mb-4">
-                        <View>
-                            <View className="flex-row items-center mb-1">
-                                <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
-                                <Text className="text-slate-400 text-xs font-bold">収入</Text>
-                            </View>
-                            <Text className="text-green-500 text-xl font-black">
-                                ¥{totals.income.toLocaleString()}
-                            </Text>
-                        </View>
-                        <View className="items-end">
-                            <View className="flex-row items-center mb-1">
-                                <Text className="text-slate-400 text-xs font-bold mr-2">支出</Text>
-                                <View className="w-2 h-2 rounded-full bg-rose-500" />
-                            </View>
-                            <Text className="text-rose-500 text-xl font-black">
-                                ¥{totals.expense.toLocaleString()}
-                            </Text>
-                        </View>
-                    </View>
-
-                    <View className="h-[1px] bg-slate-100 dark:bg-slate-700 w-full mb-4" />
-
-                    <View className="flex-row justify-between items-center">
-                        <Text className="text-slate-500 dark:text-slate-400 font-bold">今月の収支</Text>
-                        <Text className={`text-2xl font-black ${totals.balance >= 0 ? 'text-slate-900 dark:text-white' : 'text-rose-600'}`}>
-                            {totals.balance >= 0 ? '+' : ''}¥{totals.balance.toLocaleString()}
-                        </Text>
-                    </View>
-                </View>
-
-                <CategoryDonutChart transactions={monthTransactions} />
-
-                <View className="flex-row justify-between items-end mt-4 mb-2 ml-2">
-                    <Text className="text-xl font-bold text-slate-900 dark:text-white">
-                        最近の履歴
-                    </Text>
-
-                    {/* フィルタリングチップ */}
-                    <View className="flex-row bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
-                        <TouchableOpacity
-                            onPress={() => setFilterType('all')}
-                            hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
-                            className={`px-3 py-1.5 rounded-lg ${filterType === 'all' ? 'bg-white dark:bg-slate-600 shadow-sm' : ''}`}
-                        >
-                            <Text className={`text-xs font-bold ${filterType === 'all' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`}>
-                                すべて
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => setFilterType('income')}
-                            hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
-                            className={`px-3 py-1.5 rounded-lg ${filterType === 'income' ? 'bg-white dark:bg-slate-600 shadow-sm' : ''}`}
-                        >
-                            <Text className={`text-xs font-bold ${filterType === 'income' ? 'text-green-600 dark:text-green-400' : 'text-slate-400'}`}>
-                                収入
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => setFilterType('expense')}
-                            hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
-                            className={`px-3 py-1.5 rounded-lg ${filterType === 'expense' ? 'bg-white dark:bg-slate-600 shadow-sm' : ''}`}
-                        >
-                            <Text className={`text-xs font-bold ${filterType === 'expense' ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'}`}>
-                                支出
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </View>
-        );
-    };
-
     return (
         <View className="flex-1 bg-slate-50 dark:bg-slate-900">
             <View className="bg-white dark:bg-slate-800 px-4 pt-[30px] pb-4 flex-row justify-between items-center shadow-sm z-10">
                 <View className="flex-row items-center">
-                    <TouchableOpacity onPress={() => changeMonth(-1)} className="p-2" hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+                    <TouchableOpacity onPress={() => changeMonth(-1)} className="p-2" hitSlop={{ top: 30, bottom: 15, left: 30, right: 30 }}>
                         <ChevronLeft size={24} color="#6366f1" />
                     </TouchableOpacity>
 
@@ -468,7 +570,7 @@ export default function HomeScreen() {
                         {monthLabel}
                     </Text>
 
-                    <TouchableOpacity onPress={() => changeMonth(1)} className="p-2" hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+                    <TouchableOpacity onPress={() => changeMonth(1)} className="p-2" hitSlop={{ top: 30, bottom: 15, left: 30, right: 30 }}>
                         <ChevronRight size={24} color="#6366f1" />
                     </TouchableOpacity>
                 </View>
@@ -510,7 +612,18 @@ export default function HomeScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-                {renderHeaderContent()}
+                <HeaderContent
+                    totalBudget={totalBudget}
+                    totals={totals}
+                    monthTransactions={monthTransactions}
+                    selectedMajorId={selectedMajorId}
+                    setSelectedMajorId={setSelectedMajorId}
+                    selectedMinorId={selectedMinorId}
+                    setSelectedMinorId={setSelectedMinorId}
+                    availableMajors={availableMajors}
+                    availableMinors={availableMinors}
+                    setIsBudgetModalVisible={setIsBudgetModalVisible}
+                />
 
                 {viewMode === 'list' ? (
                     <View style={{ paddingBottom: 40 }}>
@@ -524,6 +637,7 @@ export default function HomeScreen() {
                     <>
                         <View className="mx-4 mb-6 rounded-3xl overflow-hidden shadow-sm">
                             <Calendar
+                                key={selectedMonth.getFullYear() + '-' + selectedMonth.getMonth()}
                                 current={selectedMonth.toISOString().split('T')[0]}
                                 onDayPress={day => setSelectedDate(day.dateString)}
                                 markedDates={markedDates}

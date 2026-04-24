@@ -1,6 +1,6 @@
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { ChevronLeft, FileUp, Info, Tag, Wallet } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { databaseService } from '../../services/database';
@@ -14,9 +14,9 @@ export default function CsvImportScreen() {
 
     const [isLoading, setIsLoading] = useState(false);
     const [importResult, setImportResult] = useState<ImportResult | null>(null);
-    const [missingMappings, setMissingMappings] = useState<{ 
-        categories: { name: string, type: 'expense' | 'income' }[], 
-        accounts: string[] 
+    const [missingMappings, setMissingMappings] = useState<{
+        categories: { name: string, type: 'expense' | 'income' }[],
+        accounts: string[]
     }>({ categories: [], accounts: [] });
     const [categoryMappings, setCategoryMappings] = useState<Record<string, string>>({});
     const [accountMappings, setAccountMappings] = useState<Record<string, string>>({});
@@ -25,6 +25,12 @@ export default function CsvImportScreen() {
 
     const [mappingModalVisible, setMappingModalVisible] = useState(false);
     const [pendingCsvData, setPendingCsvData] = useState<{ data: string[][], type: ExternalCsvType } | null>(null);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            loadMappings();
+        }, [])
+    );
 
     const isDark = colorScheme === 'dark';
     const colors = {
@@ -48,14 +54,11 @@ export default function CsvImportScreen() {
     );
     const hasUnsavedMappings = unsavedCategoryKeys.length > 0 || unsavedAccountKeys.length > 0;
 
-    useEffect(() => {
-        loadMappings();
-    }, []);
 
     const loadMappings = async () => {
         const catMap = await databaseService.getCsvCategoryMappings();
         const accMap = await databaseService.getCsvAccountMappings();
-        
+
         // Normalize keys from DB to match session normalization
         const normalize = (val: string) => val ? val.trim().replace(/\s+/g, ' ') : '';
         const normalizedCats: Record<string, string> = {};
@@ -118,12 +121,12 @@ export default function CsvImportScreen() {
             setMappingModalVisible(true);
         } else if (hasUnsavedMappings) {
             // No missing but has unsaved, show modal for review
-            setMissingMappings({ 
+            setMissingMappings({
                 categories: unsavedCategoryKeys.map(key => ({
                     name: key,
                     type: majorCategories.find(m => m.subCategories.some(s => s.id === categoryMappings[key]))?.type || 'expense'
-                })), 
-                accounts: unsavedAccountKeys 
+                })),
+                accounts: unsavedAccountKeys
             });
             setMappingModalVisible(true);
         } else {
@@ -146,7 +149,7 @@ export default function CsvImportScreen() {
         for (const key of accKeys) {
             await databaseService.updateCsvAccountMapping(key, currentAccMap[key]);
         }
-        
+
         setSavedCategoryMappings({ ...currentCatMap });
         setSavedAccountMappings({ ...currentAccMap });
     };
@@ -156,7 +159,7 @@ export default function CsvImportScreen() {
         try {
             // Ensure mappings are saved to DB when importing
             await saveMappingsToDb(catMap, accMap);
-            
+
             const result = await externalCsvImportService.processImport(data, type, catMap, accMap);
             setImportResult(result);
             await fetchData();
@@ -388,37 +391,37 @@ export default function CsvImportScreen() {
                                                     </Text>
                                                 </View>
                                             </View>
-                                            
+
                                             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
                                                 {majorCategories
                                                     .filter(m => m.type === extCat.type)
                                                     .flatMap(major => major.subCategories)
                                                     .map(minor => (
-                                                     <TouchableOpacity
-                                                         key={minor.id}
-                                                         onPress={() => {
-                                                             const normalized = extCat.name.trim().replace(/\s+/g, ' ');
-                                                             setCategoryMappings(prev => ({ ...prev, [normalized]: minor.id }));
-                                                         }}
-                                                         hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-                                                         style={{
-                                                             paddingHorizontal: 12,
-                                                             paddingVertical: 8,
-                                                             borderRadius: 12,
-                                                             marginRight: 8,
-                                                             backgroundColor: categoryMappings[extCat.name.trim().replace(/\s+/g, ' ')] === minor.id ? colors.indigo : colors.inputBg,
-                                                             borderWidth: 1,
-                                                             borderColor: categoryMappings[extCat.name.trim().replace(/\s+/g, ' ')] === minor.id ? colors.indigo : colors.border
-                                                         }}
-                                                     >
-                                                         <Text style={{ fontSize: 12, color: categoryMappings[extCat.name.trim().replace(/\s+/g, ' ')] === minor.id ? 'white' : colors.text, fontWeight: categoryMappings[extCat.name.trim().replace(/\s+/g, ' ')] === minor.id ? 'bold' : 'normal' }}>
-                                                             {minor.label}
-                                                         </Text>
-                                                     </TouchableOpacity>
-                                                 ))}
-                                             </ScrollView>
-                                         </View>
-                                     ))}
+                                                        <TouchableOpacity
+                                                            key={minor.id}
+                                                            onPress={() => {
+                                                                const normalized = extCat.name.trim().replace(/\s+/g, ' ');
+                                                                setCategoryMappings(prev => ({ ...prev, [normalized]: minor.id }));
+                                                            }}
+                                                            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                                                            style={{
+                                                                paddingHorizontal: 12,
+                                                                paddingVertical: 8,
+                                                                borderRadius: 12,
+                                                                marginRight: 8,
+                                                                backgroundColor: categoryMappings[extCat.name.trim().replace(/\s+/g, ' ')] === minor.id ? colors.indigo : colors.inputBg,
+                                                                borderWidth: 1,
+                                                                borderColor: categoryMappings[extCat.name.trim().replace(/\s+/g, ' ')] === minor.id ? colors.indigo : colors.border
+                                                            }}
+                                                        >
+                                                            <Text style={{ fontSize: 12, color: categoryMappings[extCat.name.trim().replace(/\s+/g, ' ')] === minor.id ? 'white' : colors.text, fontWeight: categoryMappings[extCat.name.trim().replace(/\s+/g, ' ')] === minor.id ? 'bold' : 'normal' }}>
+                                                                {minor.label}
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    ))}
+                                            </ScrollView>
+                                        </View>
+                                    ))}
                                 </View>
                             )}
 

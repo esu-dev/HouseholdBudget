@@ -1,6 +1,6 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Stack, useRouter } from 'expo-router';
-import { Building2, Calendar, Check, ChevronDown, ChevronLeft, ChevronUp, CreditCard, Edit2, Plus, RefreshCw, Trash2, Wallet } from 'lucide-react-native';
+import { Building2, Calendar, Check, ChevronDown, ChevronLeft, ChevronUp, CreditCard, Edit2, EyeOff, Plus, RefreshCw, Trash2, Wallet, Eye } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Alert, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -38,6 +38,8 @@ export default function AccountManagementScreen() {
     const [withdrawalDay, setWithdrawalDay] = useState('');
     const [withdrawalAccountId, setWithdrawalAccountId] = useState<string | undefined>(undefined);
     const [billingStartDate, setBillingStartDate] = useState('');
+    const [excludeFromNetWorth, setExcludeFromNetWorth] = useState(false);
+    const [isHidden, setIsHidden] = useState(false);
     const [showBillingMonthPicker, setShowBillingMonthPicker] = useState(false);
 
     const colors = {
@@ -83,7 +85,9 @@ export default function AccountManagementScreen() {
                     withdrawalDay: withdrawalDayNum,
                     withdrawalAccountId: accountType === 'card' ? withdrawalAccountId : undefined,
                     billingStartDate: accountType === 'card' ? billingStartDate : undefined,
-                    displayOrder: editingAccount.displayOrder ?? 0
+                    displayOrder: editingAccount.displayOrder ?? 0,
+                    excludeFromNetWorth: excludeFromNetWorth,
+                    isHidden: isHidden
                 });
             } else {
                 await addAccount({
@@ -96,7 +100,9 @@ export default function AccountManagementScreen() {
                     withdrawalDay: withdrawalDayNum,
                     withdrawalAccountId: accountType === 'card' ? withdrawalAccountId : undefined,
                     billingStartDate: accountType === 'card' ? billingStartDate : undefined,
-                    displayOrder: accounts.length
+                    displayOrder: accounts.length,
+                    excludeFromNetWorth: excludeFromNetWorth,
+                    isHidden: isHidden
                 });
             }
             setModalVisible(false);
@@ -107,6 +113,8 @@ export default function AccountManagementScreen() {
             setWithdrawalDay('');
             setWithdrawalAccountId(undefined);
             setBillingStartDate('');
+            setExcludeFromNetWorth(false);
+            setIsHidden(false);
             setEditingAccount(null);
             setModalVisible(false);
         } catch (e) {
@@ -214,6 +222,18 @@ export default function AccountManagementScreen() {
                                                 </Text>
                                             </View>
                                         )}
+                                        {account.excludeFromNetWorth && (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                                <EyeOff size={10} color="#f43f5e" />
+                                                <Text style={{ fontSize: 10, color: '#f43f5e', fontWeight: 'bold' }}>純資産非計上</Text>
+                                            </View>
+                                        )}
+                                        {account.isHidden && (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                                <Eye size={10} color={colors.textMuted} />
+                                                <Text style={{ fontSize: 10, color: colors.textMuted, fontWeight: 'bold' }}>非表示</Text>
+                                            </View>
+                                        )}
                                     </View>
                                 </View>
                                 <View style={{ flexDirection: 'row', gap: 4 }}>
@@ -259,6 +279,8 @@ export default function AccountManagementScreen() {
                                             setWithdrawalDay(account.withdrawalDay !== undefined ? account.withdrawalDay?.toString() : '');
                                             setWithdrawalAccountId(account.withdrawalAccountId);
                                             setBillingStartDate(account.billingStartDate || '');
+                                            setExcludeFromNetWorth(!!account.excludeFromNetWorth);
+                                            setIsHidden(!!account.isHidden);
                                             setModalVisible(true);
                                         }}
                                         hitSlop={{ top: 30, bottom: 10, left: 10, right: 10 }}
@@ -297,6 +319,8 @@ export default function AccountManagementScreen() {
                         setWithdrawalDay('');
                         setWithdrawalAccountId(undefined);
                         setBillingStartDate('');
+                        setExcludeFromNetWorth(false);
+                        setIsHidden(false);
                         setModalVisible(true);
                     }}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -365,6 +389,54 @@ export default function AccountManagementScreen() {
                                 autoCapitalize="none"
                                 keyboardType="url"
                             />
+
+                            <View style={{ marginBottom: 24 }}>
+                                <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12 }}>その他の設定</Text>
+                                <TouchableOpacity
+                                    onPress={() => setExcludeFromNetWorth(!excludeFromNetWorth)}
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        padding: 16,
+                                        borderRadius: 16,
+                                        backgroundColor: colors.inputBg,
+                                        borderWidth: 2,
+                                        borderColor: excludeFromNetWorth ? '#f43f5e' : 'transparent'
+                                    }}
+                                >
+                                    <EyeOff size={18} color={excludeFromNetWorth ? '#f43f5e' : colors.textMuted} />
+                                    <View style={{ flex: 1, marginLeft: 12 }}>
+                                        <Text style={{ fontWeight: 'bold', color: excludeFromNetWorth ? '#f43f5e' : colors.text }}>純資産に計上しない</Text>
+                                        <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>合計純資産の計算からこの口座を除外します</Text>
+                                    </View>
+                                    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: excludeFromNetWorth ? '#f43f5e' : colors.border, alignItems: 'center', justifyContent: 'center' }}>
+                                        {excludeFromNetWorth && <Check size={14} color="white" />}
+                                    </View>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={() => setIsHidden(!isHidden)}
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        padding: 16,
+                                        borderRadius: 16,
+                                        backgroundColor: colors.inputBg,
+                                        borderWidth: 2,
+                                        borderColor: isHidden ? colors.indigo : 'transparent',
+                                        marginTop: 12
+                                    }}
+                                >
+                                    <Eye size={18} color={isHidden ? colors.indigo : colors.textMuted} />
+                                    <View style={{ flex: 1, marginLeft: 12 }}>
+                                        <Text style={{ fontWeight: 'bold', color: isHidden ? colors.indigo : colors.text }}>口座を非表示にする</Text>
+                                        <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>残高画面の一覧に表示されないようになります</Text>
+                                    </View>
+                                    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: isHidden ? colors.indigo : colors.border, alignItems: 'center', justifyContent: 'center' }}>
+                                        {isHidden && <Check size={14} color="white" />}
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
 
                             <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12 }}>種類</Text>
                             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>

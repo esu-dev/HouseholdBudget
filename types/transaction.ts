@@ -10,6 +10,7 @@ export type Transaction = {
   transfer_id: number | null;
   fee: number;
   import_hash: string | null;
+  is_deferred: boolean;
 };
 
 export type CreateTransactionInput = {
@@ -23,4 +24,5 @@ export type CreateTransactionInput = {
   transfer_id?: number | null;
   fee?: number;
   import_hash?: string | null;
+  is_deferred?: boolean;
 };

@@ -1,10 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRouter } from 'expo-router';
-import { ArrowDownCircle, ArrowUpCircle, Calendar, ChevronLeft, CircleEllipsis, ExternalLink, FileUp, Store, Trash2, Wallet, ZapOff } from 'lucide-react-native';
+import { ArrowDownCircle, ArrowUpCircle, Calendar, ChevronLeft, CircleEllipsis, Clock3, ExternalLink, FileUp, Plus, Store, Trash2, Wallet, X, ZapOff } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Alert, InputAccessoryView, Keyboard, KeyboardAvoidingView, Linking, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, InputAccessoryView, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as z from 'zod';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
@@ -25,6 +25,7 @@ const schema = z.object({
   memo: z.string().optional(),
   fee: z.string().optional(),
   ignore_learning: z.boolean().optional(),
+  is_deferred: z.boolean().optional(),
 }).refine(data => {
   if (data.type === 'transfer') return !!data.to_account_id && data.account_id !== data.to_account_id;
   return !!data.category_id;
@@ -41,10 +42,15 @@ export default function InputScreen() {
   const colorScheme = useAppColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const { addTransaction, addTransactions, updateTransaction, deleteTransaction, accounts, fetchData, editingTransaction, setEditingTransaction, majorCategories, addTransfer } = useTransactionStore();
+  const { addTransaction, addTransactions, updateTransaction, deleteTransaction, accounts, fetchData, editingTransaction, setEditingTransaction, majorCategories, addTransfer, addMinorCategory, addMajorCategory } = useTransactionStore();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedMajorId, setSelectedMajorId] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isNewCategoryModalVisible, setIsNewCategoryModalVisible] = useState(false);
+  const [isNewMajorModalVisible, setIsNewMajorModalVisible] = useState(false);
+  const [newCategoryLabel, setNewCategoryLabel] = useState('');
+  const [newMajorLabel, setNewMajorLabel] = useState('');
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
 
   // 最後に反映した取引IDを保持して、不必要なリセットを防ぐ
   const lastResolvedId = useRef<number | string | null | undefined>(undefined);
@@ -76,6 +82,7 @@ export default function InputScreen() {
       memo: '',
       fee: '',
       ignore_learning: false,
+      is_deferred: false,
     },
   });
 
@@ -85,6 +92,10 @@ export default function InputScreen() {
   const selectedToAccountId = watch('to_account_id');
   const selectedDate = watch('date');
   const payee = watch('payee');
+  const isDeferred = watch('is_deferred');
+
+  const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+  const isCardAccount = selectedAccount?.type === 'card';
 
   const currentMajorCategories = React.useMemo(() =>
     majorCategories.filter(c => c.type === transactionType)
@@ -139,6 +150,7 @@ export default function InputScreen() {
       setValue('payee', editingTransaction.payee || '');
       setValue('memo', editingTransaction.memo || '');
       setValue('fee', editingTransaction.fee ? editingTransaction.fee.toString() : '');
+      setValue('is_deferred', editingTransaction.is_deferred || false);
 
       if (editingTransaction.transfer_id) {
         setValue('type', 'transfer');
@@ -157,6 +169,7 @@ export default function InputScreen() {
         payee: '',
         memo: '',
         fee: '',
+        is_deferred: false,
       });
       setSelectedMajorId(null);
     }
@@ -224,7 +237,8 @@ export default function InputScreen() {
           payee: data.payee || null,
           memo: data.memo || null,
           transfer_id: null,
-          fee: feeNum
+          fee: feeNum,
+          is_deferred: !!data.is_deferred
         });
       }
     } else {
@@ -238,7 +252,8 @@ export default function InputScreen() {
           date: data.date.toISOString(),
           payee: data.payee || null,
           memo: data.memo || null,
-          fee: feeNum
+          fee: feeNum,
+          is_deferred: !!data.is_deferred
         });
       }
     }
@@ -264,6 +279,52 @@ export default function InputScreen() {
         }
       }
     ]);
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategoryLabel.trim() || !selectedMajorId) return;
+
+    setIsAddingCategory(true);
+    try {
+      const newId = `custom_${Date.now()}`;
+      await addMinorCategory({
+        id: newId,
+        parent_id: selectedMajorId,
+        label: newCategoryLabel.trim(),
+        displayOrder: (selectedMajor?.subCategories.length || 0) + 1
+      });
+      setValue('category_id', newId);
+      setNewCategoryLabel('');
+      setIsNewCategoryModalVisible(false);
+    } catch (error) {
+      Alert.alert('エラー', 'カテゴリの追加に失敗しました');
+    } finally {
+      setIsAddingCategory(false);
+    }
+  };
+
+  const handleAddMajorCategory = async () => {
+    if (!newMajorLabel.trim()) return;
+
+    setIsAddingCategory(true);
+    try {
+      const newId = `major_${Date.now()}`;
+      await addMajorCategory({
+        id: newId,
+        label: newMajorLabel.trim(),
+        icon: 'others',
+        color: '#6366f1',
+        type: transactionType as 'expense' | 'income',
+        displayOrder: currentMajorCategories.length
+      });
+      setSelectedMajorId(newId);
+      setNewMajorLabel('');
+      setIsNewMajorModalVisible(false);
+    } catch (error) {
+      Alert.alert('エラー', '大カテゴリの追加に失敗しました');
+    } finally {
+      setIsAddingCategory(false);
+    }
   };
 
   const amountAccessoryID = 'amountDoneButton';
@@ -444,6 +505,23 @@ export default function InputScreen() {
                       </TouchableOpacity>
                     );
                   })}
+                  
+                  {/* 大カテゴリ追加ボタン */}
+                  <TouchableOpacity
+                    onPress={() => setIsNewMajorModalVisible(true)}
+                    style={{
+                      padding: 12, borderRadius: 16, alignItems: 'center', marginRight: 10, minWidth: 80,
+                      backgroundColor: colors.inputBg,
+                      borderWidth: 2, borderColor: 'transparent'
+                    }}
+                  >
+                    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: isDark ? '#334155' : '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}>
+                      <Plus size={16} color={colors.textMuted} />
+                    </View>
+                    <Text style={{ fontSize: 12, marginTop: 4, fontWeight: '500', color: colors.textMuted }}>
+                      追加
+                    </Text>
+                  </TouchableOpacity>
                 </ScrollView>
 
                 {selectedMajor ? (
@@ -468,6 +546,22 @@ export default function InputScreen() {
                           </TouchableOpacity>
                         );
                       })}
+                      
+                      {/* カテゴリ追加ボタン */}
+                      <TouchableOpacity
+                        onPress={() => setIsNewCategoryModalVisible(true)}
+                        style={{
+                          paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginRight: 8, marginBottom: 8,
+                          backgroundColor: isDark ? '#1e293b' : '#e2e8f0',
+                          borderWidth: 1, borderColor: colors.border,
+                          flexDirection: 'row', alignItems: 'center'
+                        }}
+                      >
+                        <Plus size={14} color={colors.textMuted} />
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginLeft: 4 }}>
+                          追加
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
                 ) : (
@@ -483,7 +577,7 @@ export default function InputScreen() {
 
             <Text style={{ color: colors.textMuted, marginTop: 16, marginBottom: 12, fontWeight: '500' }}>{transactionType === 'transfer' ? '振替元アカウント' : 'アカウント'}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-              {accounts.map((account) => {
+              {accounts.filter(acc => !acc.isHidden || acc.id === selectedAccountId).map((account) => {
                 const isAccSelected = selectedAccountId === account.id;
                 return (
                   <TouchableOpacity
@@ -513,7 +607,7 @@ export default function InputScreen() {
               <>
                 <Text style={{ color: colors.textMuted, marginTop: 16, marginBottom: 12, fontWeight: '500' }}>振替先アカウント</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                  {accounts.filter(a => a.id !== selectedAccountId).map((account) => {
+                  {accounts.filter(a => a.id !== selectedAccountId && (!a.isHidden || a.id === selectedToAccountId)).map((account) => {
                     const isAccSelected = selectedToAccountId === account.id;
                     return (
                       <TouchableOpacity
@@ -625,6 +719,43 @@ export default function InputScreen() {
                     </View>
                   )}
                 />
+
+                {isCardAccount && transactionType === 'expense' && (
+                  <Controller
+                    control={control}
+                    name="is_deferred"
+                    render={({ field: { onChange, value } }) => (
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        backgroundColor: colors.inputBg,
+                        padding: 12,
+                        borderRadius: 12,
+                        marginTop: 8
+                      }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                          <Clock3 size={16} color={value ? colors.primary : colors.textMuted} />
+                          <View style={{ marginLeft: 12, flex: 1 }}>
+                            <Text style={{ fontSize: 13, fontWeight: 'bold', color: value ? colors.primary : colors.text }}>
+                              引き落としを翌月に繰り越す
+                            </Text>
+                            <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>
+                              ETC等の請求タイミングがずれる支払いに使用します
+                            </Text>
+                          </View>
+                        </View>
+                        <Switch
+                          value={value}
+                          onValueChange={onChange}
+                          trackColor={{ false: isDark ? '#334155' : '#e2e8f0', true: colors.primary + '80' }}
+                          thumbColor={value ? colors.primary : '#f4f3f4'}
+                          ios_backgroundColor={isDark ? '#334155' : '#e2e8f0'}
+                        />
+                      </View>
+                    )}
+                  />
+                )}
               </>
             )}
 
@@ -687,6 +818,116 @@ export default function InputScreen() {
           </InputAccessoryView>
         </>
       )}
+
+      {/* 新規カテゴリ追加モーダル */}
+      <Modal
+        visible={isNewCategoryModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setIsNewCategoryModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ width: '100%', maxWidth: 400 }}
+          >
+            <View style={{ backgroundColor: colors.card, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>新しいカテゴリを追加</Text>
+                <TouchableOpacity onPress={() => setIsNewCategoryModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <X size={20} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={{ fontSize: 12, color: colors.textMuted, marginBottom: 12 }}>
+                「{selectedMajor?.label}」に新しい項目を追加します
+              </Text>
+
+              <TextInput
+                autoFocus
+                style={{ backgroundColor: colors.inputBg, padding: 16, borderRadius: 12, fontSize: 18, color: colors.text, marginBottom: 20, borderWidth: 1, borderColor: colors.border }}
+                placeholder="カテゴリ名（例: ランチ、おやつ）"
+                placeholderTextColor={colors.textMuted}
+                value={newCategoryLabel}
+                onChangeText={setNewCategoryLabel}
+                returnKeyType="done"
+                onSubmitEditing={handleAddCategory}
+              />
+
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity
+                  onPress={() => setIsNewCategoryModalVisible(false)}
+                  style={{ flex: 1, padding: 16, borderRadius: 12, alignItems: 'center', backgroundColor: colors.inputBg }}
+                >
+                  <Text style={{ color: colors.textMuted, fontWeight: 'bold' }}>キャンセル</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleAddCategory}
+                  disabled={!newCategoryLabel.trim() || isAddingCategory}
+                  style={{ flex: 2, padding: 16, borderRadius: 12, alignItems: 'center', backgroundColor: colors.primary, opacity: (!newCategoryLabel.trim() || isAddingCategory) ? 0.6 : 1 }}
+                >
+                  <Text style={{ color: 'white', fontWeight: 'bold' }}>追加して選択</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* 新規大カテゴリ追加モーダル */}
+      <Modal
+        visible={isNewMajorModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setIsNewMajorModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ width: '100%', maxWidth: 400 }}
+          >
+            <View style={{ backgroundColor: colors.card, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>新しい大カテゴリを追加</Text>
+                <TouchableOpacity onPress={() => setIsNewMajorModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <X size={20} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={{ fontSize: 12, color: colors.textMuted, marginBottom: 12 }}>
+                {transactionType === 'expense' ? '支出' : '収入'}の大カテゴリを作成します
+              </Text>
+
+              <TextInput
+                autoFocus
+                style={{ backgroundColor: colors.inputBg, padding: 16, borderRadius: 12, fontSize: 18, color: colors.text, marginBottom: 20, borderWidth: 1, borderColor: colors.border }}
+                placeholder="大カテゴリ名（例: 食費、趣味）"
+                placeholderTextColor={colors.textMuted}
+                value={newMajorLabel}
+                onChangeText={setNewMajorLabel}
+                returnKeyType="done"
+                onSubmitEditing={handleAddMajorCategory}
+              />
+
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity
+                  onPress={() => setIsNewMajorModalVisible(false)}
+                  style={{ flex: 1, padding: 16, borderRadius: 12, alignItems: 'center', backgroundColor: colors.inputBg }}
+                >
+                  <Text style={{ color: colors.textMuted, fontWeight: 'bold' }}>キャンセル</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleAddMajorCategory}
+                  disabled={!newMajorLabel.trim() || isAddingCategory}
+                  style={{ flex: 2, padding: 16, borderRadius: 12, alignItems: 'center', backgroundColor: colors.primary, opacity: (!newMajorLabel.trim() || isAddingCategory) ? 0.6 : 1 }}
+                >
+                  <Text style={{ color: 'white', fontWeight: 'bold' }}>追加して選択</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </View>
   );
 }

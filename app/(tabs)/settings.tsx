@@ -154,10 +154,24 @@ export default function SettingsScreen() {
                 />
 
                 <MenuItem
+                    icon={PieChart}
+                    title="Gmail自動インポート"
+                    subtitle="利用通知メールから取引を自動生成"
+                    onPress={() => router.push('/settings/gmail-import')}
+                />
+
+                <MenuItem
                     icon={ZapOff}
                     title="自動学習の除外設定"
                     subtitle="カテゴリを自動設定しない支払先"
                     onPress={() => router.push('/settings/ignored-payees')}
+                />
+
+                <MenuItem
+                    icon={Save}
+                    title="支払先ごとのカテゴリ設定"
+                    subtitle="学習済みの支払先とカテゴリの対応"
+                    onPress={() => router.push('/settings/payee-mappings')}
                 />
 
                 <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginTop: 12, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 }}>アプリ設定</Text>
