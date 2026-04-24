@@ -1,6 +1,3 @@
-import { databaseService } from '../../services/database';
-import { useTransactionStore } from '../../store/useTransactionStore';
-import * as AuthSession from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Stack, useRouter } from 'expo-router';
@@ -9,8 +6,10 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
+import { databaseService } from '../../services/database';
 import { emailImportService } from '../../services/emailImportService';
 import { gmailService } from '../../services/gmailService';
+import { useTransactionStore } from '../../store/useTransactionStore';
 
 // Expo Goで実行されているかどうかを判別
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -32,11 +31,8 @@ export default function GmailImportScreen() {
         iosClientId: IOS_CLIENT_ID,
         androidClientId: ANDROID_CLIENT_ID,
         webClientId: WEB_CLIENT_ID,
-        redirectUri: AuthSession.makeRedirectUri(),
         scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
-        extraParams: {
-            prompt: 'select_account',
-        },
+        useProxy: false,
     });
 
     const colors = {
