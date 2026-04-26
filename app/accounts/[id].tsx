@@ -2,7 +2,7 @@ import { FlashList } from '@shopify/flash-list';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Calendar, CircleEllipsis, EyeOff, MessageSquare, Plus, RotateCcw, Store, Wallet, X } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View, Keyboard, Platform, InputAccessoryView } from 'react-native';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { useTransactionStore } from '../../store/useTransactionStore';
@@ -418,12 +418,30 @@ export default function AccountHistoryScreen() {
                                 <TextInput
                                     autoFocus
                                     keyboardType="numeric"
+                                    inputAccessoryViewID="balanceAdjustAccessory"
                                     style={{ flex: 1, fontSize: 24, fontWeight: 'bold', color: colors.text, marginLeft: 8 }}
                                     value={newActualBalance}
                                     onChangeText={setNewActualBalance}
                                     placeholder="0"
                                     placeholderTextColor={colors.textMuted}
                                 />
+                                {Platform.OS === 'ios' && (
+                                    <InputAccessoryView nativeID="balanceAdjustAccessory">
+                                        <View style={{
+                                            backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+                                            padding: 12,
+                                            borderTopWidth: 1,
+                                            borderTopColor: colors.border,
+                                            flexDirection: 'row',
+                                            justifyContent: 'flex-end',
+                                            alignItems: 'center'
+                                        }}>
+                                            <TouchableOpacity onPress={() => Keyboard.dismiss()} hitSlop={{ top: 10, bottom: 10, left: 20, right: 20 }}>
+                                                <Text style={{ color: colors.indigo, fontSize: 16, fontWeight: 'bold' }}>完了</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </InputAccessoryView>
+                                )}
                             </View>
                         </View>
 
@@ -442,6 +460,8 @@ export default function AccountHistoryScreen() {
                             </TouchableOpacity>
                         </View>
                     </View>
+
+
                 </View>
             </Modal>
         </View>

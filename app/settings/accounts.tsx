@@ -1,6 +1,6 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Stack, useRouter } from 'expo-router';
-import { Building2, Calendar, Check, ChevronDown, ChevronLeft, ChevronUp, CreditCard, Edit2, EyeOff, Plus, RefreshCw, Trash2, Wallet, Eye } from 'lucide-react-native';
+import { Building2, Calendar, Check, ChevronDown, ChevronLeft, ChevronUp, CreditCard, Edit2, Eye, EyeOff, Plus, RefreshCw, Smartphone, Trash2, Wallet } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Alert, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ const ACCOUNT_TYPES = [
     { id: 'cash', label: '現金', icon: Wallet, color: '#f59e0b' },
     { id: 'bank', label: '銀行口座', icon: Building2, color: '#3b82f6' },
     { id: 'card', label: 'クレジットカード', icon: CreditCard, color: '#ef4444' },
+    { id: 'emoney', label: '電子マネー', icon: Smartphone, color: '#10b981' },
     { id: 'others', label: 'その他', icon: Wallet, color: '#64748b' },
 ];
 
@@ -19,6 +20,7 @@ const CARD_TYPES: { id: CardType; label: string }[] = [
     { id: 'none', label: '設定なし' },
     { id: 'jp_bank', label: 'JP BANKカード' },
     { id: 'jcb', label: 'JCBカード' },
+    { id: 'paypay', label: 'PayPay' },
 ];
 
 export default function AccountManagementScreen() {
@@ -26,7 +28,7 @@ export default function AccountManagementScreen() {
     const colorScheme = useAppColorScheme();
     const isDark = colorScheme === 'dark';
 
-    const { accounts, addAccount, updateAccount, deleteAccount, syncCardTransfers, reorderAccounts, isLoading } = useTransactionStore();
+    const { accounts, addAccount, updateAccount, deleteAccount, syncCardTransfers, reorderAccounts, deleteAllTransactionsForAccount, csvAccountMappings, setCsvAccountMapping, isLoading } = useTransactionStore();
 
     const [modalVisible, setModalVisible] = useState(false);
     const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -41,6 +43,9 @@ export default function AccountManagementScreen() {
     const [excludeFromNetWorth, setExcludeFromNetWorth] = useState(false);
     const [isHidden, setIsHidden] = useState(false);
     const [showBillingMonthPicker, setShowBillingMonthPicker] = useState(false);
+    const [mappingModalVisible, setMappingModalVisible] = useState(false);
+    const [editingMappingName, setEditingMappingName] = useState('');
+    const [selectedMappingAccountId, setSelectedMappingAccountId] = useState<string>('');
 
     const colors = {
         background: isDark ? '#0f172a' : '#f8fafc',
@@ -79,7 +84,7 @@ export default function AccountManagementScreen() {
                     id: editingAccount.id,
                     name: accountName,
                     type: accountType as any,
-                    cardType: accountType === 'card' ? cardType : 'none',
+                    cardType: (accountType === 'card' || accountType === 'emoney') ? cardType : 'none',
                     loginUrl: formattedUrl || undefined,
                     closingDay: closingDayNum,
                     withdrawalDay: withdrawalDayNum,
@@ -94,7 +99,7 @@ export default function AccountManagementScreen() {
                     id: Date.now().toString(),
                     name: accountName,
                     type: accountType as any,
-                    cardType: accountType === 'card' ? cardType : 'none',
+                    cardType: (accountType === 'card' || accountType === 'emoney') ? cardType : 'none',
                     loginUrl: formattedUrl || undefined,
                     closingDay: closingDayNum,
                     withdrawalDay: withdrawalDayNum,
@@ -143,6 +148,59 @@ export default function AccountManagementScreen() {
         } catch (e) {
             Alert.alert('エラー', '振替の同期に失敗しました');
         }
+    };
+
+    const handleDeleteAllTransactions = () => {
+        if (!editingAccount) return;
+
+        Alert.alert(
+            '最終確認',
+            `${editingAccount.name} のすべての取引履歴を削除しますか？\nこの操作は取り消せません。`,
+            [
+                { text: 'キャンセル', style: 'cancel' },
+                {
+                    text: 'すべての取引を削除',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await deleteAllTransactionsForAccount(editingAccount.id);
+                        Alert.alert('完了', '取引履歴をすべて削除しました。');
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleSaveMapping = async () => {
+        if (!editingMappingName.trim()) {
+            Alert.alert('エラー', '外部口座名を入力してください');
+            return;
+        }
+        if (!selectedMappingAccountId) {
+            Alert.alert('エラー', '紐付け先の口座を選択してください');
+            return;
+        }
+
+        try {
+            await setCsvAccountMapping(editingMappingName.trim(), selectedMappingAccountId);
+            setMappingModalVisible(false);
+            setEditingMappingName('');
+            setSelectedMappingAccountId('');
+        } catch (e) {
+            Alert.alert('エラー', '保存に失敗しました');
+        }
+    };
+
+    const handleDeleteMapping = async (name: string) => {
+        Alert.alert('確認', `「${name}」の紐付けを削除しますか？`, [
+            { text: 'キャンセル', style: 'cancel' },
+            {
+                text: '削除',
+                style: 'destructive',
+                onPress: async () => {
+                    await setCsvAccountMapping(name, '');
+                }
+            }
+        ]);
     };
 
     const handleDelete = (id: string) => {
@@ -340,6 +398,66 @@ export default function AccountManagementScreen() {
                     <Plus size={20} color={colors.indigo} />
                     <Text style={{ marginLeft: 8, fontWeight: 'bold', color: colors.indigo }}>新しいアカウントを追加</Text>
                 </TouchableOpacity>
+                {/* 外部口座紐付けセクション */}
+                <View style={{ marginTop: 24, marginBottom: 40 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 }}>
+                            CSV取引口座の紐付け設定
+                        </Text>
+                        <TouchableOpacity 
+                            onPress={() => {
+                                setEditingMappingName('');
+                                setSelectedMappingAccountId('');
+                                setMappingModalVisible(true);
+                            }}
+                            style={{ padding: 4 }}
+                        >
+                            <Plus size={20} color={colors.indigo} />
+                        </TouchableOpacity>
+                    </View>
+
+                    {Object.entries(csvAccountMappings).length === 0 ? (
+                        <View style={{ backgroundColor: colors.card, padding: 20, borderRadius: 20, alignItems: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: colors.border }}>
+                            <Text style={{ color: colors.textMuted, fontSize: 13 }}>紐付け設定はありません</Text>
+                        </View>
+                    ) : (
+                        Object.entries(csvAccountMappings).map(([externalName, internalId]) => {
+                            const account = accounts.find(a => a.id === internalId);
+                            return (
+                                <View key={externalName} style={{ backgroundColor: colors.card, padding: 16, borderRadius: 20, marginBottom: 12, flexDirection: 'row', alignItems: 'center' }}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.text }}>{externalName}</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                            <Building2 size={12} color={colors.indigo} />
+                                            <Text style={{ fontSize: 12, color: colors.textMuted }}>{account?.name || '不明な口座'}</Text>
+                                        </View>
+                                    </View>
+                                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                                        <TouchableOpacity 
+                                            onPress={() => {
+                                                setEditingMappingName(externalName);
+                                                setSelectedMappingAccountId(internalId);
+                                                setMappingModalVisible(true);
+                                            }}
+                                            style={{ padding: 8 }}
+                                        >
+                                            <Edit2 size={18} color={colors.textMuted} />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity 
+                                            onPress={() => handleDeleteMapping(externalName)}
+                                            style={{ padding: 8 }}
+                                        >
+                                            <Trash2 size={18} color="#ef4444" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            );
+                        })
+                    )}
+                    <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 8, marginHorizontal: 4 }}>
+                        ※PayPay等のCSVで「チャージ」の元となる口座名をアプリ内の口座と紐付けます。
+                    </Text>
+                </View>
             </ScrollView>
 
             {/* Modal for Add/Edit */}
@@ -351,7 +469,7 @@ export default function AccountManagementScreen() {
             >
                 <View style={{ paddingTop: 24, flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
                     <ScrollView bounces={false} style={{ flexGrow: 0 }}>
-                        <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 40 }}>
+                        <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 30 }}>
                             <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 24 }}>
                                 {editingAccount ? 'アカウントを編集' : 'アカウントを追加'}
                             </Text>
@@ -572,10 +690,22 @@ export default function AccountManagementScreen() {
                                             </TouchableOpacity>
                                         ))}
                                     </View>
+                                </View>
+                            )}
 
-                                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12 }}>CSV形式設定（カードの種類）</Text>
-                                    <View style={{ gap: 8 }}>
-                                        {CARD_TYPES.map((ct) => {
+                            {(accountType === 'card' || accountType === 'emoney') && (
+                                <View style={{ marginBottom: 24 }}>
+                                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12 }}>CSV形式設定</Text>
+                                    <View style={{ gap: 8, marginBottom: 0 }}>
+                                        {CARD_TYPES.filter(ct => {
+                                            if (accountType === 'emoney') {
+                                                return ct.id === 'paypay' || ct.id === 'none';
+                                            }
+                                            if (accountType === 'card') {
+                                                return ct.id === 'jp_bank' || ct.id === 'jcb' || ct.id === 'none';
+                                            }
+                                            return true;
+                                        }).map((ct) => {
                                             const isSelected = cardType === ct.id;
                                             return (
                                                 <TouchableOpacity
@@ -603,7 +733,28 @@ export default function AccountManagementScreen() {
                                 </View>
                             )}
 
-                            <View style={{ flexDirection: 'row', gap: 12 }}>
+                            {editingAccount && (
+                                <TouchableOpacity
+                                    onPress={handleDeleteAllTransactions}
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        padding: 16,
+                                        borderRadius: 16,
+                                        backgroundColor: isDark ? '#451a1a' : '#fee2e2',
+                                        marginBottom: 24,
+                                        gap: 8,
+                                        borderWidth: 1,
+                                        borderColor: '#ef4444' + '40'
+                                    }}
+                                >
+                                    <Trash2 size={18} color="#ef4444" />
+                                    <Text style={{ fontWeight: 'bold', color: '#ef4444' }}>この口座の全取引を削除</Text>
+                                </TouchableOpacity>
+                            )}
+
+                            <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
                                 <TouchableOpacity
                                     onPress={() => setModalVisible(false)}
                                     style={{ flex: 1, padding: 16, borderRadius: 16, backgroundColor: isDark ? '#334155' : '#f1f5f9', alignItems: 'center' }}
@@ -621,6 +772,74 @@ export default function AccountManagementScreen() {
                             </View>
                         </View>
                     </ScrollView>
+                </View>
+            </Modal>
+
+            {/* 紐付け設定モーダル */}
+            <Modal
+                animationType="fade"
+                transparent={true}
+                visible={mappingModalVisible}
+                onRequestClose={() => setMappingModalVisible(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
+                    <View style={{ backgroundColor: colors.card, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 5 }}>
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 20 }}>紐付け設定を追加・編集</Text>
+                        
+                        <View style={{ marginBottom: 20 }}>
+                            <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 8 }}>CSV上の口座名</Text>
+                            <TextInput
+                                value={editingMappingName}
+                                onChangeText={setEditingMappingName}
+                                placeholder="例: ＳＭＢＣ"
+                                placeholderTextColor={colors.textMuted}
+                                style={{
+                                    backgroundColor: colors.inputBg,
+                                    padding: 16,
+                                    borderRadius: 16,
+                                    color: colors.text,
+                                    fontSize: 16,
+                                }}
+                            />
+                        </View>
+
+                        <View style={{ marginBottom: 24 }}>
+                            <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12 }}>紐付け先の口座</Text>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                                {accounts.filter(a => a.type === 'bank' || a.type === 'cash').map(acc => (
+                                    <TouchableOpacity
+                                        key={acc.id}
+                                        onPress={() => setSelectedMappingAccountId(acc.id)}
+                                        style={{
+                                            paddingHorizontal: 16,
+                                            paddingVertical: 10,
+                                            borderRadius: 12,
+                                            backgroundColor: selectedMappingAccountId === acc.id ? colors.indigo : colors.inputBg,
+                                            borderWidth: 1,
+                                            borderColor: selectedMappingAccountId === acc.id ? colors.indigo : colors.border
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: selectedMappingAccountId === acc.id ? 'white' : colors.text }}>{acc.name}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                            <TouchableOpacity
+                                onPress={() => setMappingModalVisible(false)}
+                                style={{ flex: 1, padding: 16, borderRadius: 16, backgroundColor: isDark ? '#334155' : '#f1f5f9', alignItems: 'center' }}
+                            >
+                                <Text style={{ fontWeight: 'bold', color: colors.textMuted }}>キャンセル</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={handleSaveMapping}
+                                style={{ flex: 2, padding: 16, borderRadius: 16, backgroundColor: colors.indigo, alignItems: 'center' }}
+                            >
+                                <Text style={{ fontWeight: 'bold', color: 'white' }}>保存する</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 </View>
             </Modal>
         </SafeAreaView>

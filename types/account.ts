@@ -1,6 +1,6 @@
-export type AccountType = 'cash' | 'bank' | 'card' | 'others';
+export type AccountType = 'cash' | 'bank' | 'card' | 'emoney' | 'others';
 
-export type CardType = 'jp_bank' | 'jcb' | 'none';
+export type CardType = 'jp_bank' | 'jcb' | 'paypay' | 'none';
 
 export type Account = {
   id: string;

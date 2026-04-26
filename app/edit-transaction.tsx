@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRouter } from 'expo-router';
-import { ArrowDownCircle, ArrowUpCircle, Calendar, CircleEllipsis, Clock3, ExternalLink, FileUp, Plus, Store, Trash2, Wallet, X, ZapOff } from 'lucide-react-native';
+import { ArrowDownCircle, ArrowUpCircle, Building2, Calendar, CircleEllipsis, Clock3, CreditCard, ExternalLink, FileUp, Plus, Smartphone, Store, Trash2, Wallet, X, ZapOff } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Alert, InputAccessoryView, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -51,6 +51,10 @@ export default function EditTransactionScreen() {
   const [newCategoryLabel, setNewCategoryLabel] = useState('');
   const [newMajorLabel, setNewMajorLabel] = useState('');
   const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [missingAccountMappings, setMissingAccountMappings] = useState<string[]>([]);
+  const [isMappingModalVisible, setIsMappingModalVisible] = useState(false);
+  const [pendingCsvResult, setPendingCsvResult] = useState<any>(null);
+  const [localAccountMappings, setLocalAccountMappings] = useState<Record<string, string>>({});
 
   // 最後に反映した取引IDを保持して、不必要なリセットを防ぐ
   const lastResolvedId = useRef<number | string | null | undefined>(undefined);
@@ -192,16 +196,60 @@ export default function EditTransactionScreen() {
     if (isImporting) return;
     setIsImporting(true);
     try {
-      const transactions = await csvImportService.pickAndParseCsv(cardType, accountId);
-      if (transactions.length > 0) {
-        await addTransactions(transactions);
-        Alert.alert('完了', `${transactions.length}件の取引をインポートしました`);
+      const result = await csvImportService.pickAndParseCsv(cardType, accountId);
+      if (result.missingMappings.length > 0) {
+        setPendingCsvResult(result);
+        setMissingAccountMappings(result.missingMappings);
+        setLocalAccountMappings({});
+        setIsMappingModalVisible(true);
+      } else if (result.transactions.length > 0) {
+        await addTransactions(result.transactions);
+        Alert.alert('完了', `${result.transactions.length}件の取引をインポートしました`);
+      } else {
+        Alert.alert('情報', 'インポートする新しい取引はありませんでした');
       }
     } catch (error) {
       console.log(error);
       Alert.alert('エラー', 'CSVの読み込みに失敗しました');
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  const handleSaveMappingsAndImport = async () => {
+    if (!pendingCsvResult) return;
+
+    try {
+      // 紐付けを保存
+      for (const [extName, intId] of Object.entries(localAccountMappings)) {
+        await databaseService.setCsvAccountMapping(extName, intId);
+      }
+
+      // 再度パース（新しい紐付けを反映させるため）
+      const mappings = await databaseService.getAllPayeeCategoryMappings();
+      const existingTransactions = await databaseService.getAllTransactions();
+      const accountMappings = await databaseService.getAllCsvAccountMappings();
+
+      const { transactions } = csvImportService.mapCsvToTransactions(
+        pendingCsvResult.rawData,
+        pendingCsvResult.cardType,
+        pendingCsvResult.accountId,
+        mappings,
+        existingTransactions,
+        accountMappings
+      );
+
+      if (transactions.length > 0) {
+        await addTransactions(transactions);
+        Alert.alert('完了', `${transactions.length}件の取引をインポートしました`);
+      }
+      
+      setIsMappingModalVisible(false);
+      setPendingCsvResult(null);
+      setMissingAccountMappings([]);
+      setLocalAccountMappings({});
+    } catch (error) {
+      Alert.alert('エラー', 'インポート中にエラーが発生しました');
     }
   };
 
@@ -593,7 +641,13 @@ export default function EditTransactionScreen() {
                       borderWidth: 2, borderColor: isAccSelected ? colors.primary : 'transparent'
                     }}
                   >
-                    <Wallet size={16} color={isAccSelected ? colors.primary : colors.textMuted} />
+                    {(() => {
+                      let Icon = Wallet;
+                      if (account.type === 'bank') Icon = Building2;
+                      if (account.type === 'card') Icon = CreditCard;
+                      if (account.type === 'emoney') Icon = Smartphone;
+                      return <Icon size={16} color={isAccSelected ? colors.primary : colors.textMuted} />;
+                    })()}
                     <Text style={{ marginLeft: 8, fontWeight: '500', color: isAccSelected ? (isDark ? '#a5b4fc' : '#475569') : colors.textMuted }}>
                       {account.name}
                     </Text>
@@ -618,7 +672,13 @@ export default function EditTransactionScreen() {
                           borderWidth: 2, borderColor: isAccSelected ? colors.primary : 'transparent'
                         }}
                       >
-                        <Wallet size={16} color={isAccSelected ? colors.primary : colors.textMuted} />
+                        {(() => {
+                          let Icon = Wallet;
+                          if (account.type === 'bank') Icon = Building2;
+                          if (account.type === 'card') Icon = CreditCard;
+                          if (account.type === 'emoney') Icon = Smartphone;
+                          return <Icon size={16} color={isAccSelected ? colors.primary : colors.textMuted} />;
+                        })()}
                         <Text style={{ marginLeft: 8, fontWeight: '500', color: isAccSelected ? (isDark ? '#a5b4fc' : '#475569') : colors.textMuted }}>
                           {account.name}
                         </Text>
@@ -925,6 +985,61 @@ export default function EditTransactionScreen() {
               </View>
             </View>
           </KeyboardAvoidingView>
+        </View>
+      </Modal>
+      {/* 口座紐付けモーダル */}
+      <Modal visible={isMappingModalVisible} animationType="slide" transparent>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 32, borderTopRightRadius: 32, height: '70%', padding: 24 }}>
+            <View style={{ width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
+            
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 8 }}>口座の紐付け設定</Text>
+            <Text style={{ fontSize: 14, color: colors.textMuted, marginBottom: 24 }}>PayPayチャージ等の元口座をアプリ内の口座と紐付けてください。</Text>
+
+            <ScrollView style={{ flex: 1 }}>
+              {missingAccountMappings.map(extAcc => (
+                <View key={extAcc} style={{ marginBottom: 16, backgroundColor: colors.card, padding: 16, borderRadius: 16 }}>
+                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.text, marginBottom: 12 }}>CSV上の名前: {extAcc}</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {accounts.filter(a => a.type === 'bank' || a.type === 'cash').map(acc => (
+                        <TouchableOpacity
+                          key={acc.id}
+                          onPress={() => setLocalAccountMappings(prev => ({ ...prev, [extAcc]: acc.id }))}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderRadius: 12,
+                            backgroundColor: localAccountMappings[extAcc] === acc.id ? colors.primary : colors.inputBg,
+                            borderWidth: 1,
+                            borderColor: localAccountMappings[extAcc] === acc.id ? colors.primary : colors.border
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, color: localAccountMappings[extAcc] === acc.id ? 'white' : colors.text }}>{acc.name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={{ flexDirection: 'row', gap: 12, paddingTop: 16 }}>
+              <TouchableOpacity
+                onPress={() => setIsMappingModalVisible(false)}
+                style={{ flex: 1, padding: 16, borderRadius: 16, backgroundColor: colors.inputBg, alignItems: 'center' }}
+              >
+                <Text style={{ fontWeight: 'bold', color: colors.textMuted }}>キャンセル</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSaveMappingsAndImport}
+                disabled={Object.keys(localAccountMappings).length < missingAccountMappings.length}
+                style={{ flex: 2, padding: 16, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center', opacity: Object.keys(localAccountMappings).length < missingAccountMappings.length ? 0.5 : 1 }}
+              >
+                <Text style={{ fontWeight: 'bold', color: 'white' }}>保存して取り込む</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
     </View>

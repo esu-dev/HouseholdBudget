@@ -415,6 +415,24 @@ export const databaseService = {
     }
   },
 
+  async deleteAccount(id: string): Promise<void> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    await db.execAsync('BEGIN TRANSACTION;');
+    try {
+      await db.runAsync('DELETE FROM transactions WHERE account_id = ? OR to_account_id = ?', id, id);
+      await db.runAsync('DELETE FROM accounts WHERE id = ?', id);
+      await db.execAsync('COMMIT;');
+    } catch (e) {
+      await db.execAsync('ROLLBACK;');
+      throw e;
+    }
+  },
+
+  async deleteAllTransactionsForAccount(accountId: string): Promise<void> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    await db.runAsync('DELETE FROM transactions WHERE account_id = ? OR to_account_id = ?', accountId, accountId);
+  },
+
   async addAccount(account: Omit<Account, 'balance'>): Promise<void> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     await db.runAsync(
@@ -451,14 +469,6 @@ export const databaseService = {
       account.isHidden ? 1 : 0,
       account.id
     );
-  },
-
-  async deleteAccount(id: string): Promise<void> {
-    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
-    // Delete all transactions associated with this account first
-    await db.runAsync('DELETE FROM transactions WHERE account_id = ?', id);
-    // Then delete the account
-    await db.runAsync('DELETE FROM accounts WHERE id = ?', id);
   },
 
   async getAccountBalances(): Promise<{account_id: string, balance: number}[]> {
@@ -813,6 +823,28 @@ export const databaseService = {
     } catch (e) {
       await db.execAsync('ROLLBACK;');
       throw e;
+    }
+  },
+
+  async getAllCsvAccountMappings(): Promise<Record<string, string>> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    const result = await db.getAllAsync<{external_name: string, internal_id: string}>('SELECT external_name, internal_id FROM csv_account_mappings');
+    const mappings: Record<string, string> = {};
+    result.forEach(r => {
+      mappings[r.external_name] = r.internal_id;
+    });
+    return mappings;
+  },
+
+  async setCsvAccountMapping(externalName: string, internalId: string): Promise<void> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    if (!internalId) {
+      await db.runAsync('DELETE FROM csv_account_mappings WHERE external_name = ?', externalName);
+    } else {
+      await db.runAsync(
+        'INSERT OR REPLACE INTO csv_account_mappings (external_name, internal_id) VALUES (?, ?)',
+        externalName, internalId
+      );
     }
   }
 };

@@ -12,7 +12,14 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.haruki.budget",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleDocumentTypes": [
+          {
+            "CFBundleTypeName": "CSV File",
+            "LSItemContentTypes": ["public.comma-separated-values-text", "public.csv"],
+            "LSHandlerRank": "Alternate"
+          }
+        ]
       }
     },
     "android": {
@@ -23,7 +30,37 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": {
+            "mimeType": "text/comma-separated-values"
+          },
+          "category": ["DEFAULT"]
+        },
+        {
+          "action": "VIEW",
+          "data": {
+            "mimeType": "text/csv"
+          },
+          "category": ["DEFAULT"]
+        },
+        {
+          "action": "SEND",
+          "data": {
+            "mimeType": "text/comma-separated-values"
+          },
+          "category": ["DEFAULT"]
+        },
+        {
+          "action": "SEND",
+          "data": {
+            "mimeType": "text/csv"
+          },
+          "category": ["DEFAULT"]
+        }
+      ]
     },
     "web": {
       "output": "static",

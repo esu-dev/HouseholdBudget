@@ -1,5 +1,5 @@
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import { ArrowDownCircle, ArrowUpCircle, Building2, CreditCard, EyeOff, Mail, Wallet } from 'lucide-react-native';
+import { ArrowDownCircle, ArrowUpCircle, Building2, CreditCard, EyeOff, Mail, Smartphone, Wallet } from 'lucide-react-native';
 import React, { useCallback, useMemo } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
@@ -11,6 +11,7 @@ const ACCOUNT_TYPE_INFO: Record<string, { label: string; icon: any; color: strin
     cash: { label: '現金', icon: Wallet, color: '#f59e0b' },
     bank: { label: '銀行口座', icon: Building2, color: '#3b82f6' },
     card: { label: 'クレジットカード', icon: CreditCard, color: '#ef4444' },
+    emoney: { label: '電子マネー', icon: Smartphone, color: '#10b981' },
     others: { label: 'その他', icon: Wallet, color: '#64748b' },
 };
 

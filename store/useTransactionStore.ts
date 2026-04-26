@@ -12,6 +12,7 @@ interface TransactionState {
   budgets: Budget[];
   majorCategories: MajorCategory[];
   accountBalances: Record<string, number>;
+  csvAccountMappings: Record<string, string>;
   averageMonthlyIncome: number;
   averageMonthlyExpense: number;
   averageMonthlyExpensesByCategory: Record<string, number>;
@@ -31,6 +32,7 @@ interface TransactionState {
   addAccount: (account: Omit<Account, 'balance'>) => Promise<void>;
   updateAccount: (account: Omit<Account, 'balance'>) => Promise<void>;
   deleteAccount: (id: string) => Promise<void>;
+  deleteAllTransactionsForAccount: (accountId: string) => Promise<void>;
   upsertBudget: (budget: CreateBudgetInput) => Promise<void>;
   syncCardTransfers: (accountId: string, dateStr: string) => Promise<void>;
   reorderAccounts: (startIndex: number, endIndex: number) => Promise<void>;
@@ -49,6 +51,8 @@ interface TransactionState {
   getIgnoredPayees: () => Promise<string[]>;
   addIgnoredPayee: (payee: string) => Promise<void>;
   removeIgnoredPayee: (payee: string) => Promise<void>;
+  fetchCsvAccountMappings: () => Promise<void>;
+  setCsvAccountMapping: (externalName: string, internalId: string) => Promise<void>;
 }
 
 export const useTransactionStore = create<TransactionState>((set, get) => ({
@@ -57,6 +61,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   budgets: [],
   majorCategories: [],
   accountBalances: {},
+  csvAccountMappings: {},
   averageMonthlyIncome: 0,
   averageMonthlyExpense: 0,
   averageMonthlyExpensesByCategory: {},
@@ -68,7 +73,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   fetchData: async () => {
     set({ isLoading: true });
     try {
-      const [transactions, accounts, balances, categories, avgIncome, avgExpense, avgExpenses, savingsGoal] = await Promise.all([
+      const [transactions, accounts, balances, categories, avgIncome, avgExpense, avgExpenses, savingsGoal, csvMappings] = await Promise.all([
         databaseService.getAllTransactions(),
         databaseService.getAllAccounts(),
         databaseService.getAccountBalances(),
@@ -77,6 +82,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         databaseService.getAverageMonthlyExpense(6),
         databaseService.getAverageMonthlyExpenseByCategory(6),
         databaseService.getSetting('savings_goal'),
+        databaseService.getAllCsvAccountMappings(),
       ]);
 
       const balanceMap: Record<string, number> = {};
@@ -84,16 +90,17 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         balanceMap[b.account_id] = b.balance;
       });
 
-      set({ 
-        transactions, 
-        accounts, 
-        accountBalances: balanceMap, 
+      set({
+        transactions,
+        accounts,
+        accountBalances: balanceMap,
         majorCategories: categories,
         averageMonthlyIncome: avgIncome,
         averageMonthlyExpense: avgExpense,
         averageMonthlyExpensesByCategory: avgExpenses,
         savingsGoal: savingsGoal ? parseInt(savingsGoal) : 0,
-        isLoading: false 
+        csvAccountMappings: csvMappings || {},
+        isLoading: false
       });
     } catch (error) {
       set({ error: 'Failed to fetch data', isLoading: false });
@@ -141,7 +148,11 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   addTransactions: async (transactions: CreateTransactionInput[]) => {
     try {
       for (const t of transactions) {
-        await databaseService.addTransaction(t);
+        try {
+          await databaseService.addTransaction(t);
+        } catch (e) {
+          console.error('Error adding individual transaction during batch import:', e);
+        }
       }
       // 全て追加した後に、関係する全ての口座の振替を一括更新
       const affectedAccountIds = new Set(transactions.map(t => t.account_id));
@@ -158,7 +169,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
     try {
       const oldTx = get().transactions.find(t => t.id === transaction.id);
       await databaseService.updateTransaction(transaction);
-      
+
       // クレジットカード振替の更新 (変更前後の口座に対して)
       if (oldTx) {
         await creditCardPaymentService.updateTransferForDate(oldTx.account_id);
@@ -168,7 +179,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
       } else {
         await creditCardPaymentService.updateTransferForDate(transaction.account_id);
       }
-      
+
       await get().fetchData();
     } catch (error) {
       set({ error: 'Failed to update transaction' });
@@ -179,12 +190,12 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
     try {
       const tx = get().transactions.find(t => t.id === id);
       await databaseService.deleteTransaction(id);
-      
+
       // クレジットカード振替の更新
       if (tx) {
         await creditCardPaymentService.updateTransferForDate(tx.account_id, tx.date);
       }
-      
+
       await get().fetchData();
     } catch (error) {
       set({ error: 'Failed to delete transaction' });
@@ -194,7 +205,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   addTransfer: async (fromAccountId, toAccountId, amount, date, memo, fee = 0) => {
     try {
       const transferId = Date.now();
-      
+
       // 振替元からの出金
       await databaseService.addTransaction({
         amount: -Math.abs(amount),
@@ -255,7 +266,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   updateAccount: async (account: Omit<Account, 'balance'>) => {
     try {
       await databaseService.updateAccount(account);
-      
+
       // アカウント情報（締め日や引き落とし口座など）が変更された可能性があるため、
       // 全取引の振替を最新の設定で再計算・一括同期する
       await creditCardPaymentService.updateTransferForDate(account.id);
@@ -272,6 +283,15 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
       await get().fetchData();
     } catch (error) {
       set({ error: 'Failed to delete account' });
+    }
+  },
+
+  deleteAllTransactionsForAccount: async (accountId: string) => {
+    try {
+      await databaseService.deleteAllTransactionsForAccount(accountId);
+      await get().fetchData();
+    } catch (error) {
+      set({ error: 'Failed to delete all transactions' });
     }
   },
 
@@ -302,20 +322,20 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
     // 現金以外の口座を対象にする
     const cashAccount = accounts.find(a => a.id === 'cash');
     const otherAccounts = accounts.filter(a => a.id !== 'cash');
-    
+
     const result = Array.from(otherAccounts);
     const [removed] = result.splice(startIndex, 1);
     result.splice(endIndex, 0, removed);
-    
+
     const updates = result.map((a, index) => ({
       id: a.id,
       displayOrder: index + 1 // 現金が0番目
     }));
-    
+
     if (cashAccount) {
       updates.unshift({ id: 'cash', displayOrder: 0 });
     }
-    
+
     await databaseService.updateAccountsOrder(updates);
     await get().fetchData();
   },
@@ -354,20 +374,20 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
     await databaseService.deleteMinorCategory(id);
     await get().fetchData();
   },
-  
+
   reorderMajorCategories: async (type, startIndex, endIndex) => {
     const majors = get().majorCategories.filter(m => m.type === type);
     const otherMajors = get().majorCategories.filter(m => m.type !== type);
-    
+
     const result = Array.from(majors);
     const [removed] = result.splice(startIndex, 1);
     result.splice(endIndex, 0, removed);
-    
+
     const updates = result.map((m, index) => ({
       id: m.id,
       display_order: index
     }));
-    
+
     await databaseService.updateMajorCategoriesOrder(updates);
     await get().fetchData();
   },
@@ -375,16 +395,16 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   reorderMinorCategories: async (parentId, startIndex, endIndex) => {
     const major = get().majorCategories.find(m => m.id === parentId);
     if (!major) return;
-    
+
     const result = Array.from(major.subCategories);
     const [removed] = result.splice(startIndex, 1);
     result.splice(endIndex, 0, removed);
-    
+
     const updates = result.map((m, index) => ({
       id: m.id,
       display_order: index
     }));
-    
+
     await databaseService.updateMinorCategoriesOrder(updates);
     await get().fetchData();
   },
@@ -410,5 +430,15 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
 
   removeIgnoredPayee: async (payee) => {
     await databaseService.removeIgnoredPayee(payee);
+  },
+
+  fetchCsvAccountMappings: async () => {
+    const mappings = await databaseService.getAllCsvAccountMappings();
+    set({ csvAccountMappings: mappings });
+  },
+
+  setCsvAccountMapping: async (externalName, internalId) => {
+    await databaseService.setCsvAccountMapping(externalName, internalId);
+    await get().fetchCsvAccountMappings();
   },
 }));

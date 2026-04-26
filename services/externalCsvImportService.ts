@@ -28,7 +28,15 @@ export const externalCsvImportService = {
         return null;
       }
 
-      const fileUri = result.assets[0].uri;
+      return this.parseCsvFromUri(result.assets[0].uri);
+    } catch (error) {
+      console.error('External CSV pick and parse error:', error);
+      return null;
+    }
+  },
+
+  async parseCsvFromUri(fileUri: string): Promise<{ data: string[][], type: ExternalCsvType } | null> {
+    try {
       const base64Content = await FileSystem.readAsStringAsync(fileUri, {
         encoding: FileSystem.EncodingType.Base64,
       });
@@ -54,29 +62,7 @@ export const externalCsvImportService = {
               return;
             }
 
-            // Determine type based on column count or content
-            // Income/Expense: 9+ columns, Transfer: 9+ columns but different structure
-            // We'll check the first few rows to guess
-            const firstRow = data[0];
-            let type: ExternalCsvType = 'income_expense';
-            
-            // "毎日家計簿" specific detection logic
-            // Transfer CSV: Column 2 is "振替元", Column 5 is "振替先" in some cases, or we check column count
-            // Actually the user provided structure:
-            // Income/Expense: 1:Date, 2:Category, 4:Amount, 7:Account, 9:Memo
-            // Transfer: 1:Date, 2:From, 3:OutAmount, 5:To, 6:InAmount, 9:Memo
-            
-            // Simple check: if column 5 exists and it looks like a transfer
-            if (firstRow.length >= 6 && firstRow[2] && firstRow[4]) {
-               // This is a bit ambiguous, maybe ask user or check more rows
-               // For now let's assume if it has 6 columns and specific headers or data types
-               // Actually let's just try to detect based on content later or let user choose
-               // But the user said "収支のcsvと振替のcsvの２つを読み込みます"
-               // We can try to guess by looking at the 3rd column (Amount vs OutAmount)
-            }
-            
             // Improved detection for "毎日家計簿"
-            // Let's find a row that is not a header to determine the type
             let detectedType: ExternalCsvType = 'income_expense';
             for (const row of data) {
               if (row.length >= 10 && (row[9] === '収' || row[9] === '支')) {
@@ -94,7 +80,7 @@ export const externalCsvImportService = {
         });
       });
     } catch (error) {
-      console.error('External CSV pick and parse error:', error);
+      console.error('External CSV parse from URI error:', error);
       return null;
     }
   },

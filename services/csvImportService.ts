@@ -7,8 +7,16 @@ import { CardType } from '../types/account';
 import { CreateTransactionInput } from '../types/transaction';
 import { databaseService } from './database';
 
+export interface CsvImportResult {
+  transactions: CreateTransactionInput[];
+  missingMappings: string[];
+  rawData?: string[][];
+  cardType?: CardType;
+  accountId?: string;
+}
+
 export const csvImportService = {
-  async pickAndParseCsv(cardType: CardType, accountId: string): Promise<CreateTransactionInput[]> {
+  async pickAndParseCsv(cardType: CardType, accountId: string): Promise<CsvImportResult> {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['text/csv', 'text/comma-separated-values'],
@@ -16,11 +24,18 @@ export const csvImportService = {
       });
 
       if (result.canceled || !result.assets || result.assets.length === 0) {
-        return [];
+        return { transactions: [], missingMappings: [] };
       }
 
-      const fileUri = result.assets[0].uri;
+      return this.parseCsvFromUri(result.assets[0].uri, cardType, accountId);
+    } catch (error) {
+      console.error('CSV pick and parse error:', error);
+      throw error;
+    }
+  },
 
+  async parseCsvFromUri(fileUri: string, cardType: CardType, accountId: string): Promise<CsvImportResult> {
+    try {
       // Read as Base64 to handle different encodings (like Shift-JIS)
       const base64Content = await FileSystem.readAsStringAsync(fileUri, {
         encoding: FileSystem.EncodingType.Base64,
@@ -28,7 +43,7 @@ export const csvImportService = {
 
       if (!base64Content) {
         console.error('Failed to read CSV content or file is empty');
-        return [];
+        return { transactions: [], missingMappings: [] };
       }
 
       // Convert Base64 to Uint8Array
@@ -53,16 +68,27 @@ export const csvImportService = {
         Papa.parse(unicodeArray, {
           header: false,
           skipEmptyLines: true,
-          complete: (results) => {
+          complete: async (results) => {
             try {
-              const transactions = this.mapCsvToTransactions(
-                results.data as string[][],
+              // Fetch account mappings
+              const accountMappings = await databaseService.getAllCsvAccountMappings();
+
+              const data = results.data as string[][];
+              const { transactions, missingMappings } = this.mapCsvToTransactions(
+                data,
                 cardType,
                 accountId,
                 mappings,
-                existingTransactions
+                existingTransactions,
+                accountMappings
               );
-              resolve(transactions);
+              resolve({
+                transactions,
+                missingMappings,
+                rawData: data,
+                cardType,
+                accountId
+              });
             } catch (error) {
               console.error('CSV parse error:', error);
               reject(error);
@@ -74,7 +100,7 @@ export const csvImportService = {
         });
       });
     } catch (error) {
-      console.error('CSV pick and parse error:', error);
+      console.error('CSV parse from URI error:', error);
       throw error;
     }
   },
@@ -84,9 +110,11 @@ export const csvImportService = {
     cardType: CardType,
     accountId: string,
     mappings: Record<string, string> = {},
-    existingTransactions: any[] = []
-  ): CreateTransactionInput[] {
+    existingTransactions: any[] = [],
+    accountMappings: Record<string, string> = {}
+  ): { transactions: CreateTransactionInput[], missingMappings: string[] } {
     const transactions: CreateTransactionInput[] = [];
+    const missingMappings = new Set<string>();
 
     // Filter existing transactions once for this account to speed up comparison
     const accountTransactions = existingTransactions.filter(t => t.account_id === accountId);
@@ -118,6 +146,9 @@ export const csvImportService = {
     } else if (cardType === 'jcb') {
       amountIdx = 4;
       startIndex = 0;
+    } else if (cardType === 'paypay') {
+      amountIdx = 1; // 出金金額
+      startIndex = 0;
     }
 
     if (data.length > startIndex) {
@@ -131,7 +162,7 @@ export const csvImportService = {
 
     for (let i = startIndex; i < data.length; i++) {
       const row = data[i];
-      const minLength = cardType === 'jcb' ? 5 : 3;
+      const minLength = cardType === 'jcb' ? 5 : (cardType === 'paypay' ? 13 : 3);
       if (!row || row.length < minLength) continue;
 
       let date = '';
@@ -155,12 +186,102 @@ export const csvImportService = {
         date = this.normalizeDate(row[2].slice(1));
         payee = (row[3] || '').trim();
         amountStr = row[4] || '0';
+      } else if (cardType === 'paypay') {
+        // PayPay: 1:取引日, 2:出金金額, 3:入金金額, 9:取引先, 13:取引番号
+        date = this.normalizeDate(row[0]);
+        payee = (row[8] || '').trim();
+        const withdrawal = row[1] ? Number(row[1].replace(/[,円]/g, '')) : 0;
+        const deposit = row[2] ? Number(row[2].replace(/[,円]/g, '')) : 0;
+
+        if (withdrawal > 0) {
+          amountStr = (-withdrawal).toString();
+        } else if (deposit > 0) {
+          amountStr = deposit.toString();
+        } else {
+          amountStr = '0';
+        }
+
+        const transactionId = (row[12] || '').trim();
+        if (transactionId) {
+          const isDuplicateInDb = existingTransactions.some(t => 
+            t.import_hash === transactionId || 
+            (t.import_hash && t.import_hash.startsWith(transactionId + '_'))
+          );
+          const isDuplicateInBatch = transactions.some(t => 
+            t.import_hash === transactionId || 
+            (t.import_hash && t.import_hash.startsWith(transactionId + '_'))
+          );
+          
+          if (isDuplicateInDb || isDuplicateInBatch) {
+            console.log(`Skipping duplicate by hash: ${transactionId}`);
+            continue;
+          }
+        }
+
+        // Skip PayPay points transactions as they don't affect cash balance
+        const methodStr = (row[9] || '').trim();
+        if (methodStr === 'PayPayポイント') {
+          console.log('Skipping point transaction');
+          continue;
+        }
+
+        const typeStr = (row[7] || '').trim();
+        // Also skip rows that are just point acquisitions without cash movement
+        if (typeStr === 'ポイント、残高の獲得' && withdrawal === 0 && deposit === 0) {
+          console.log('Skipping point acquisition without cash movement');
+          continue;
+        }
+
+        // Special handling for PayPay "Charge" (チャージ)
+        if (typeStr === 'チャージ') {
+          const externalAccountName = (row[9] || '').trim();
+          const sourceAccountId = accountMappings[externalAccountName];
+
+          if (sourceAccountId) {
+            const amount = Number(deposit || withdrawal);
+            const transferId = Date.now() + i;
+
+            // Side 1: Destination (PayPay)
+            transactions.push({
+              amount: Math.abs(amount),
+              category_id: 'transfer',
+              account_id: accountId,
+              to_account_id: sourceAccountId,
+              date,
+              memo: `PayPayチャージ (${externalAccountName})`,
+              payee: externalAccountName,
+              import_hash: transactionId ? `${transactionId}_dest` : null,
+              transfer_id: transferId
+            });
+
+            // Side 2: Source (Bank)
+            transactions.push({
+              amount: -Math.abs(amount),
+              category_id: 'transfer',
+              account_id: sourceAccountId,
+              to_account_id: accountId,
+              date,
+              memo: `PayPayチャージ`,
+              payee: 'PayPay',
+              import_hash: transactionId ? `${transactionId}_src` : null,
+              transfer_id: transferId
+            });
+
+            continue; // Skip standard processing for this row
+          } else {
+            // Mapping missing
+            missingMappings.add(externalAccountName);
+          }
+        }
       } else {
         continue;
       }
 
       const cleanAmount = amountStr.replace(/[,円]/g, '');
-      const amount = -Math.abs(Number(cleanAmount)); // Credit card payments are expenses (negative)
+      let amount = Number(cleanAmount);
+      if (cardType !== 'paypay') {
+        amount = -Math.abs(amount); // Credit card payments are expenses (negative)
+      }
 
       console.log(row[2]);
       console.log(date);
@@ -189,11 +310,12 @@ export const csvImportService = {
           date,
           memo: `${cardType.toUpperCase()} CSVインポート`,
           payee,
+          import_hash: cardType === 'paypay' ? (row[12] || '').trim() : null,
         });
       }
     }
 
-    return transactions;
+    return { transactions, missingMappings: Array.from(missingMappings) };
   },
 
   normalizeDate(dateStr: string): string {

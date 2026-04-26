@@ -1,6 +1,7 @@
-import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, FileUp, Info, Tag, Wallet } from 'lucide-react-native';
-import React, { useState } from 'react';
+import * as DocumentPicker from 'expo-document-picker';
+import React, { useState, useEffect } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { databaseService } from '../../services/database';
@@ -9,8 +10,30 @@ import { useTransactionStore } from '../../store/useTransactionStore';
 
 export default function CsvImportScreen() {
     const router = useRouter();
+    const { uri } = useLocalSearchParams<{ uri: string }>();
     const colorScheme = useAppColorScheme();
-    const { accounts, majorCategories, fetchData } = useTransactionStore();
+    const { accounts, majorCategories, fetchData, addTransactions } = useTransactionStore();
+
+    useEffect(() => {
+        if (uri) {
+            handleSharedFile(uri);
+        }
+    }, [uri]);
+
+    const handleSharedFile = async (sharedUri: string) => {
+        setIsLoading(true);
+        try {
+            const result = await externalCsvImportService.parseCsvFromUri(sharedUri);
+            if (result) {
+                setPendingCsvData(result);
+                checkMappings(result.data, result.type);
+            }
+        } catch (error) {
+            Alert.alert('エラー', 'ファイルの読み込みに失敗しました');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const [isLoading, setIsLoading] = useState(false);
     const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -182,6 +205,23 @@ export default function CsvImportScreen() {
         }
     };
 
+    const handleSimulateShare = async () => {
+        try {
+            const result = await DocumentPicker.getDocumentAsync({
+                type: ['text/csv', 'text/comma-separated-values'],
+                copyToCacheDirectory: true,
+            });
+            if (!result.canceled && result.assets && result.assets[0]) {
+                router.push({
+                    pathname: '/import-shared',
+                    params: { uri: result.assets[0].uri }
+                });
+            }
+        } catch (error) {
+            console.error('Simulate share error:', error);
+        }
+    };
+
     return (
         <View style={{ flex: 1, backgroundColor: colors.background }}>
             <Stack.Screen options={{ headerShown: false }} />
@@ -237,6 +277,27 @@ export default function CsvImportScreen() {
                         </>
                     )}
                 </TouchableOpacity>
+
+                {/* Expo Go Test Section */}
+                <View style={{ backgroundColor: colors.card + '80', padding: 16, borderRadius: 20, marginBottom: 32, borderStyle: 'dashed', borderWidth: 1, borderColor: colors.border }}>
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12, textAlign: 'center' }}>Expo Go 開発用テスト機能</Text>
+                    <TouchableOpacity
+                        onPress={handleSimulateShare}
+                        style={{
+                            padding: 12,
+                            borderRadius: 12,
+                            backgroundColor: colors.background,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            alignItems: 'center'
+                        }}
+                    >
+                        <Text style={{ color: colors.text, fontSize: 14, fontWeight: 'bold' }}>共有インポート画面をテスト (ファイル選択)</Text>
+                    </TouchableOpacity>
+                    <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 8, textAlign: 'center' }}>
+                        ファイルを選択すると、他アプリから共有された時の動作をシミュレートします。
+                    </Text>
+                </View>
 
                 {/* Last Result Section */}
                 {importResult && (
