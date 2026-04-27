@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "my-hb",
+    "name": "my-app",
     "slug": "my-app",
     "version": "1.2.2",
     "orientation": "portrait",
     "icon": "./assets/images/appicon.png",
-    "scheme": "myhb",
+    "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
