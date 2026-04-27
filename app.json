@@ -5,7 +5,7 @@
     "version": "1.2.2",
     "orientation": "portrait",
     "icon": "./assets/images/appicon.png",
-    "scheme": "myapp",
+    "scheme": "myhb",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
