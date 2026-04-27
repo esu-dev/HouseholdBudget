@@ -15,6 +15,8 @@ export type Account = {
   billingStartDate?: string;
   excludeFromNetWorth?: boolean;
   isHidden?: boolean;
+  lastImportedAt: string | undefined;
+  initialBalance: number;
 };
 
 // バランス計算用のヘルパー型

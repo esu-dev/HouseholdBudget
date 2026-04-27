@@ -500,7 +500,7 @@ export default function HomeScreen() {
         const next = new Date(selectedMonth);
         next.setMonth(next.getMonth() + offset);
         setSelectedMonth(next);
-        
+
         // カレンダーの日付選択も切り替え後の月の1日に合わせる
         const year = next.getFullYear();
         const month = String(next.getMonth() + 1).padStart(2, '0');
@@ -562,7 +562,7 @@ export default function HomeScreen() {
         <View className="flex-1 bg-slate-50 dark:bg-slate-900">
             <View className="bg-white dark:bg-slate-800 px-4 pt-[30px] pb-4 flex-row justify-between items-center shadow-sm z-10">
                 <View className="flex-row items-center">
-                    <TouchableOpacity onPress={() => changeMonth(-1)} className="p-2" hitSlop={{ top: 30, bottom: 15, left: 30, right: 30 }}>
+                    <TouchableOpacity onPress={() => changeMonth(-1)} className="p-2" hitSlop={{ top: 60, bottom: 60, left: 60, right: 60 }}>
                         <ChevronLeft size={24} color="#6366f1" />
                     </TouchableOpacity>
 
@@ -570,7 +570,7 @@ export default function HomeScreen() {
                         {monthLabel}
                     </Text>
 
-                    <TouchableOpacity onPress={() => changeMonth(1)} className="p-2" hitSlop={{ top: 30, bottom: 15, left: 30, right: 30 }}>
+                    <TouchableOpacity onPress={() => changeMonth(1)} className="p-2" hitSlop={{ top: 60, bottom: 60, left: 60, right: 60 }}>
                         <ChevronRight size={24} color="#6366f1" />
                     </TouchableOpacity>
                 </View>

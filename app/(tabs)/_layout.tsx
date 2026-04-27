@@ -29,21 +29,21 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'ホーム',
-          tabBarIcon: ({ color }) => <Home size={24} color={color} hitSlop={{ top: 30, bottom: 10, left: 10, right: 10 }} />,
+          tabBarIcon: ({ color }) => <Home size={24} color={color} hitSlop={{ top: 60, bottom: 10, left: 10, right: 10 }} />,
         }}
       />
       <Tabs.Screen
         name="balance"
         options={{
           title: '残高',
-          tabBarIcon: ({ color }) => <Wallet size={24} color={color} hitSlop={{ top: 30, bottom: 10, left: 10, right: 10 }} />,
+          tabBarIcon: ({ color }) => <Wallet size={24} color={color} hitSlop={{ top: 60, bottom: 10, left: 10, right: 10 }} />,
         }}
       />
       <Tabs.Screen
         name="input"
         options={{
           title: '入力',
-          tabBarIcon: ({ color }) => <PlusCircle size={24} color={color} hitSlop={{ top: 30, bottom: 10, left: 10, right: 10 }} />,
+          tabBarIcon: ({ color }) => <PlusCircle size={24} color={color} hitSlop={{ top: 60, bottom: 10, left: 10, right: 10 }} />,
         }}
         listeners={{
           tabPress: (e) => {
@@ -56,14 +56,14 @@ export default function TabLayout() {
         name="analysis"
         options={{
           title: '分析',
-          tabBarIcon: ({ color }) => <BarChart2 size={24} color={color} hitSlop={{ top: 30, bottom: 10, left: 10, right: 10 }} />,
+          tabBarIcon: ({ color }) => <BarChart2 size={24} color={color} hitSlop={{ top: 60, bottom: 10, left: 10, right: 10 }} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: '設定',
-          tabBarIcon: ({ color }) => <Settings size={24} color={color} hitSlop={{ top: 30, bottom: 10, left: 10, right: 10 }} />,
+          tabBarIcon: ({ color }) => <Settings size={24} color={color} hitSlop={{ top: 60, bottom: 10, left: 10, right: 10 }} />,
         }}
       />
     </Tabs>

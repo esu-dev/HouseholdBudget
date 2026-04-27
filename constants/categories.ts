@@ -91,7 +91,7 @@ export const CATEGORIES: MajorCategory[] = [
     id: 'transport_group',
     label: '交通・車両',
     icon: 'transport',
-    color: '#3b82f6',
+    color: '#06b6d4', // Cyan
     type: 'expense',
     displayOrder: 1,
     subCategories: [
@@ -104,7 +104,7 @@ export const CATEGORIES: MajorCategory[] = [
     id: 'daily_group',
     label: '生活用品',
     icon: 'shopping',
-    color: '#ec4899',
+    color: '#ec4899', // Pink
     type: 'expense',
     displayOrder: 2,
     subCategories: [
@@ -117,7 +117,7 @@ export const CATEGORIES: MajorCategory[] = [
     id: 'housing_group',
     label: '住居・光熱費',
     icon: 'housing',
-    color: '#6366f1',
+    color: '#84cc16', // Lime
     type: 'expense',
     displayOrder: 3,
     subCategories: [

@@ -1,6 +1,7 @@
 import { Stack, useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, FileUp, Info, Tag, Wallet } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import React, { useState, useEffect } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
@@ -279,25 +280,27 @@ export default function CsvImportScreen() {
                 </TouchableOpacity>
 
                 {/* Expo Go Test Section */}
-                <View style={{ backgroundColor: colors.card + '80', padding: 16, borderRadius: 20, marginBottom: 32, borderStyle: 'dashed', borderWidth: 1, borderColor: colors.border }}>
-                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12, textAlign: 'center' }}>Expo Go 開発用テスト機能</Text>
-                    <TouchableOpacity
-                        onPress={handleSimulateShare}
-                        style={{
-                            padding: 12,
-                            borderRadius: 12,
-                            backgroundColor: colors.background,
-                            borderWidth: 1,
-                            borderColor: colors.border,
-                            alignItems: 'center'
-                        }}
-                    >
-                        <Text style={{ color: colors.text, fontSize: 14, fontWeight: 'bold' }}>共有インポート画面をテスト (ファイル選択)</Text>
-                    </TouchableOpacity>
-                    <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 8, textAlign: 'center' }}>
-                        ファイルを選択すると、他アプリから共有された時の動作をシミュレートします。
-                    </Text>
-                </View>
+                {Constants.executionEnvironment === ExecutionEnvironment.StoreClient && (
+                    <View style={{ backgroundColor: colors.card + '80', padding: 16, borderRadius: 20, marginBottom: 32, borderStyle: 'dashed', borderWidth: 1, borderColor: colors.border }}>
+                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12, textAlign: 'center' }}>Expo Go 開発用テスト機能</Text>
+                        <TouchableOpacity
+                            onPress={handleSimulateShare}
+                            style={{
+                                padding: 12,
+                                borderRadius: 12,
+                                backgroundColor: colors.background,
+                                borderWidth: 1,
+                                borderColor: colors.border,
+                                alignItems: 'center'
+                            }}
+                        >
+                            <Text style={{ color: colors.text, fontSize: 14, fontWeight: 'bold' }}>共有インポート画面をテスト (ファイル選択)</Text>
+                        </TouchableOpacity>
+                        <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 8, textAlign: 'center' }}>
+                            ファイルを選択すると、他アプリから共有された時の動作をシミュレートします。
+                        </Text>
+                    </View>
+                )}
 
                 {/* Last Result Section */}
                 {importResult && (

@@ -1,5 +1,5 @@
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import { ArrowDownCircle, ArrowUpCircle, Building2, CreditCard, EyeOff, Mail, Smartphone, Wallet } from 'lucide-react-native';
+import { ArrowDownCircle, ArrowUpCircle, Building2, CreditCard, EyeOff, Mail, RefreshCw, Smartphone, Wallet } from 'lucide-react-native';
 import React, { useCallback, useMemo } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
@@ -19,7 +19,7 @@ export default function BalanceScreen() {
     const router = useRouter();
     const colorScheme = useAppColorScheme();
     const isDark = colorScheme === 'dark';
-    const { transactions, accounts, accountBalances, fetchData } = useTransactionStore();
+    const { transactions, accounts, accountBalances, fetchData, syncCardTransfers } = useTransactionStore();
     const [gmailToken, setGmailToken] = React.useState<string | null>(null);
     const [isImporting, setIsImporting] = React.useState(false);
 
@@ -61,6 +61,29 @@ export default function BalanceScreen() {
         }
     };
 
+    const handleSync = async (accountId: string) => {
+        const account = accounts.find(a => a.id === accountId);
+        if (!account || !account.withdrawalAccountId || account.withdrawalDay == null) {
+            Alert.alert('設定不足', '引き落とし口座と引き落とし日が設定されている必要があります。');
+            return;
+        }
+
+        try {
+            const now = new Date();
+            // 今月と先月、来月分を同期
+            const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+            await syncCardTransfers(accountId, now.toISOString());
+            await syncCardTransfers(accountId, lastMonth.toISOString());
+            await syncCardTransfers(accountId, nextMonth.toISOString());
+
+            Alert.alert('同期完了', `${account.name} の最近の振替を更新しました。`);
+        } catch (e) {
+            Alert.alert('エラー', '振替の同期に失敗しました');
+        }
+    };
+
     const colors = {
         background: isDark ? '#0f172a' : '#f8fafc',
         card: isDark ? '#1e293b' : 'white',
@@ -68,6 +91,16 @@ export default function BalanceScreen() {
         textMuted: isDark ? '#94a3b8' : '#64748b',
         border: isDark ? '#334155' : '#e2e8f0',
         indigo: '#6366f1',
+    };
+
+    const formatLastImported = (dateStr: string | undefined) => {
+        if (!dateStr) return null;
+        const date = new Date(dateStr);
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        const hours = date.getHours();
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${month}/${day} ${hours}:${minutes}`;
     };
 
     // 合計資産（純資産）を計算
@@ -87,6 +120,7 @@ export default function BalanceScreen() {
         let expenses = 0;
 
         transactions.forEach(t => {
+            if (t.category_id === 'transfer' || t.category_id === 'adjustment') return;
             const d = new Date(t.date);
             if (d >= startOfMonth) {
                 if (t.amount > 0) income += t.amount;
@@ -188,6 +222,11 @@ export default function BalanceScreen() {
                                     <Text style={{ fontSize: 12, color: colors.textMuted }}>
                                         {typeInfo.label}
                                     </Text>
+                                    {account.lastImportedAt && (
+                                        <Text style={{ fontSize: 10, color: colors.textMuted }}>
+                                            • 読込:{formatLastImported(account.lastImportedAt)}
+                                        </Text>
+                                    )}
                                     {account.excludeFromNetWorth && (
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
                                             <EyeOff size={10} color="#f43f5e" />
@@ -196,7 +235,24 @@ export default function BalanceScreen() {
                                     )}
                                 </View>
                             </View>
-                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, minWidth: 100, textAlign: 'right' }}>¥{balance.toLocaleString()}</Text>
+                            <View style={{ alignItems: 'flex-end', minWidth: 100 }}>
+                                <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>¥{balance.toLocaleString()}</Text>
+                                {account.type === 'card' && account.withdrawalAccountId && (
+                                    <TouchableOpacity
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            handleSync(account.id);
+                                        }}
+                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                        style={{ marginTop: 4, padding: 4 }}
+                                    >
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                            <RefreshCw size={12} color={colors.indigo} />
+                                            <Text style={{ fontSize: 10, color: colors.indigo, fontWeight: 'bold' }}>振替更新</Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
                         </TouchableOpacity>
                     );
                 })}

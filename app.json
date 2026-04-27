@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "my-app",
-    "slug": "my-app",
-    "version": "1.1.1",
+    "name": "MyHB",
+    "slug": "myhb",
+    "version": "1.2.2",
     "orientation": "portrait",
     "icon": "./assets/images/appicon.png",
-    "scheme": "myapp",
+    "scheme": "myhb",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -16,7 +16,10 @@
         "CFBundleDocumentTypes": [
           {
             "CFBundleTypeName": "CSV File",
-            "LSItemContentTypes": ["public.comma-separated-values-text", "public.csv"],
+            "LSItemContentTypes": [
+              "public.comma-separated-values-text",
+              "public.csv"
+            ],
             "LSHandlerRank": "Alternate"
           }
         ]
@@ -37,28 +40,36 @@
           "data": {
             "mimeType": "text/comma-separated-values"
           },
-          "category": ["DEFAULT"]
+          "category": [
+            "DEFAULT"
+          ]
         },
         {
           "action": "VIEW",
           "data": {
             "mimeType": "text/csv"
           },
-          "category": ["DEFAULT"]
+          "category": [
+            "DEFAULT"
+          ]
         },
         {
           "action": "SEND",
           "data": {
             "mimeType": "text/comma-separated-values"
           },
-          "category": ["DEFAULT"]
+          "category": [
+            "DEFAULT"
+          ]
         },
         {
           "action": "SEND",
           "data": {
             "mimeType": "text/csv"
           },
-          "category": ["DEFAULT"]
+          "category": [
+            "DEFAULT"
+          ]
         }
       ]
     },

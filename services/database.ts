@@ -22,8 +22,14 @@ export const initDatabase = async () => {
       card_type TEXT DEFAULT 'none',
       login_url TEXT,
       closing_day INTEGER,
+      withdrawal_day INTEGER,
       withdrawal_account_id TEXT,
       display_order INTEGER DEFAULT 0,
+      billing_start_date TEXT,
+      exclude_from_net_worth INTEGER DEFAULT 0,
+      is_hidden INTEGER DEFAULT 0,
+      last_imported_at TEXT,
+      initial_balance INTEGER DEFAULT 0,
       FOREIGN KEY (withdrawal_account_id) REFERENCES accounts(id)
     );
     
@@ -176,9 +182,18 @@ export const initDatabase = async () => {
     await db.execAsync('ALTER TABLE accounts ADD COLUMN exclude_from_net_worth INTEGER DEFAULT 0');
   } catch (e) {}
 
-  // Migration: Add is_hidden to accounts if it doesn't exist
   try {
     await db.execAsync('ALTER TABLE accounts ADD COLUMN is_hidden INTEGER DEFAULT 0');
+  } catch (e) {}
+
+  // Migration: Add last_imported_at to accounts if it doesn't exist
+  try {
+    await db.execAsync('ALTER TABLE accounts ADD COLUMN last_imported_at TEXT');
+  } catch (e) {}
+
+  // Migration: Add initial_balance to accounts if it doesn't exist
+  try {
+    await db.execAsync('ALTER TABLE accounts ADD COLUMN initial_balance INTEGER DEFAULT 0');
   } catch (e) {}
   
   // Insert default accounts if empty
@@ -394,7 +409,9 @@ export const databaseService = {
       displayOrder: row.display_order,
       billingStartDate: row.billing_start_date,
       excludeFromNetWorth: row.exclude_from_net_worth === 1,
-      isHidden: row.is_hidden === 1
+      isHidden: row.is_hidden === 1,
+      lastImportedAt: row.last_imported_at,
+      initialBalance: row.initial_balance || 0
     }));
   },
 
@@ -436,7 +453,7 @@ export const databaseService = {
   async addAccount(account: Omit<Account, 'balance'>): Promise<void> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     await db.runAsync(
-      'INSERT INTO accounts (id, name, type, card_type, login_url, closing_day, withdrawal_day, withdrawal_account_id, display_order, billing_start_date, exclude_from_net_worth, is_hidden) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO accounts (id, name, type, card_type, login_url, closing_day, withdrawal_day, withdrawal_account_id, display_order, billing_start_date, exclude_from_net_worth, is_hidden, last_imported_at, initial_balance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       account.id,
       account.name,
       account.type,
@@ -448,14 +465,16 @@ export const databaseService = {
       account.displayOrder ?? 0,
       account.billingStartDate ?? null,
       account.excludeFromNetWorth ? 1 : 0,
-      account.isHidden ? 1 : 0
+      account.isHidden ? 1 : 0,
+      account.lastImportedAt ?? null,
+      account.initialBalance ?? 0
     );
   },
 
   async updateAccount(account: Omit<Account, 'balance'>): Promise<void> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     await db.runAsync(
-      'UPDATE accounts SET name = ?, type = ?, card_type = ?, login_url = ?, closing_day = ?, withdrawal_day = ?, withdrawal_account_id = ?, display_order = ?, billing_start_date = ?, exclude_from_net_worth = ?, is_hidden = ? WHERE id = ?',
+      'UPDATE accounts SET name = ?, type = ?, card_type = ?, login_url = ?, closing_day = ?, withdrawal_day = ?, withdrawal_account_id = ?, display_order = ?, billing_start_date = ?, exclude_from_net_worth = ?, is_hidden = ?, last_imported_at = ?, initial_balance = ? WHERE id = ?',
       account.name,
       account.type,
       account.cardType ?? 'none',
@@ -467,14 +486,26 @@ export const databaseService = {
       account.billingStartDate ?? null,
       account.excludeFromNetWorth ? 1 : 0,
       account.isHidden ? 1 : 0,
+      account.lastImportedAt ?? null,
+      account.initialBalance ?? 0,
       account.id
+    );
+  },
+
+  async updateLastImportedAt(accountId: string, date: string): Promise<void> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    await db.runAsync(
+      'UPDATE accounts SET last_imported_at = ? WHERE id = ?',
+      date,
+      accountId
     );
   },
 
   async getAccountBalances(): Promise<{account_id: string, balance: number}[]> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    // 取引の合計 + アカウントの初期残高
     return await db.getAllAsync<{account_id: string, balance: number}>(
-      'SELECT t.account_id, SUM(t.amount) as balance FROM transactions t JOIN accounts a ON t.account_id = a.id GROUP BY t.account_id'
+      'SELECT a.id as account_id, (COALESCE(SUM(t.amount), 0) + a.initial_balance) as balance FROM accounts a LEFT JOIN transactions t ON a.id = t.account_id GROUP BY a.id'
     );
   },
 

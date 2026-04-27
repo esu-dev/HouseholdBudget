@@ -42,6 +42,7 @@ export default function AccountManagementScreen() {
     const [billingStartDate, setBillingStartDate] = useState('');
     const [excludeFromNetWorth, setExcludeFromNetWorth] = useState(false);
     const [isHidden, setIsHidden] = useState(false);
+    const [accountInitialBalance, setAccountInitialBalance] = useState('');
     const [showBillingMonthPicker, setShowBillingMonthPicker] = useState(false);
     const [mappingModalVisible, setMappingModalVisible] = useState(false);
     const [editingMappingName, setEditingMappingName] = useState('');
@@ -92,7 +93,8 @@ export default function AccountManagementScreen() {
                     billingStartDate: accountType === 'card' ? billingStartDate : undefined,
                     displayOrder: editingAccount.displayOrder ?? 0,
                     excludeFromNetWorth: excludeFromNetWorth,
-                    isHidden: isHidden
+                    isHidden: isHidden,
+                    initialBalance: parseInt(accountInitialBalance) || 0
                 });
             } else {
                 await addAccount({
@@ -107,7 +109,8 @@ export default function AccountManagementScreen() {
                     billingStartDate: accountType === 'card' ? billingStartDate : undefined,
                     displayOrder: accounts.length,
                     excludeFromNetWorth: excludeFromNetWorth,
-                    isHidden: isHidden
+                    isHidden: isHidden,
+                    initialBalance: parseInt(accountInitialBalance) || 0
                 });
             }
             setModalVisible(false);
@@ -120,6 +123,7 @@ export default function AccountManagementScreen() {
             setBillingStartDate('');
             setExcludeFromNetWorth(false);
             setIsHidden(false);
+            setAccountInitialBalance('');
             setEditingAccount(null);
             setModalVisible(false);
         } catch (e) {
@@ -339,6 +343,7 @@ export default function AccountManagementScreen() {
                                             setBillingStartDate(account.billingStartDate || '');
                                             setExcludeFromNetWorth(!!account.excludeFromNetWorth);
                                             setIsHidden(!!account.isHidden);
+                                            setAccountInitialBalance(account.initialBalance?.toString() || '0');
                                             setModalVisible(true);
                                         }}
                                         hitSlop={{ top: 30, bottom: 10, left: 10, right: 10 }}
@@ -379,6 +384,7 @@ export default function AccountManagementScreen() {
                         setBillingStartDate('');
                         setExcludeFromNetWorth(false);
                         setIsHidden(false);
+                        setAccountInitialBalance('0');
                         setModalVisible(true);
                     }}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -488,6 +494,23 @@ export default function AccountManagementScreen() {
                                 placeholderTextColor={colors.textMuted}
                                 value={accountName}
                                 onChangeText={setAccountName}
+                            />
+                            
+                            <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 8 }}>初期残高</Text>
+                            <TextInput
+                                style={{
+                                    backgroundColor: colors.inputBg,
+                                    padding: 16,
+                                    borderRadius: 16,
+                                    fontSize: 16,
+                                    color: colors.text,
+                                    marginBottom: 20
+                                }}
+                                placeholder="例: 10000"
+                                placeholderTextColor={colors.textMuted}
+                                value={accountInitialBalance}
+                                onChangeText={setAccountInitialBalance}
+                                keyboardType="numeric"
                             />
 
                             <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 8 }}>ログインURL (任意)</Text>

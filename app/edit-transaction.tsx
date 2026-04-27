@@ -203,9 +203,13 @@ export default function EditTransactionScreen() {
         setLocalAccountMappings({});
         setIsMappingModalVisible(true);
       } else if (result.transactions.length > 0) {
+        await databaseService.updateLastImportedAt(accountId, new Date().toISOString());
         await addTransactions(result.transactions);
+        await fetchData();
         Alert.alert('完了', `${result.transactions.length}件の取引をインポートしました`);
       } else {
+        await databaseService.updateLastImportedAt(accountId, new Date().toISOString());
+        await fetchData();
         Alert.alert('情報', 'インポートする新しい取引はありませんでした');
       }
     } catch (error) {
@@ -241,7 +245,11 @@ export default function EditTransactionScreen() {
 
       if (transactions.length > 0) {
         await addTransactions(transactions);
+        await databaseService.updateLastImportedAt(pendingCsvResult.accountId, new Date().toISOString());
         Alert.alert('完了', `${transactions.length}件の取引をインポートしました`);
+      } else {
+        await databaseService.updateLastImportedAt(pendingCsvResult.accountId, new Date().toISOString());
+        Alert.alert('情報', 'インポートする新しい取引はありませんでした');
       }
       
       setIsMappingModalVisible(false);
@@ -421,7 +429,7 @@ export default function EditTransactionScreen() {
                     </View>
                     <View style={{ marginLeft: 12, flex: 1 }}>
                       <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.text }} numberOfLines={1}>{account.name}</Text>
-                      <Text style={{ fontSize: 10, color: colors.textMuted }}>{account.cardType === 'jp_bank' ? 'JP BANK' : 'JCB'}</Text>
+                      <Text style={{ fontSize: 10, color: colors.textMuted }}>{account.cardType === 'jp_bank' ? 'JP BANK' : account.cardType === 'paypay' ? 'PayPay' : 'JCB'}</Text>
                     </View>
                     {account.loginUrl && (
                       <TouchableOpacity

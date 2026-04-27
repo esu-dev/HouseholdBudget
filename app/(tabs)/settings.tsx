@@ -270,7 +270,7 @@ export default function SettingsScreen() {
                     style={{ alignItems: 'center', marginTop: 32, marginBottom: 60 }}
                     hitSlop={{ top: 20, bottom: 20, right: 20, left: 20 }}
                 >
-                    <Text style={{ fontSize: 12, color: colors.textMuted }}>Household Budget v1.1.1</Text>
+                    <Text style={{ fontSize: 12, color: colors.textMuted }}>MyHB v1.2.2</Text>
                 </TouchableOpacity>
             </View>
         </ScrollView>

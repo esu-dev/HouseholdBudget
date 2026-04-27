@@ -13,7 +13,7 @@ export default function ImportSharedScreen() {
     const { uri } = useLocalSearchParams<{ uri: string }>();
     const router = useRouter();
     const colorScheme = useAppColorScheme();
-    const { accounts, addTransactions } = useTransactionStore();
+    const { accounts, addTransactions, fetchData } = useTransactionStore();
     const [isLoading, setIsLoading] = useState(false);
     const [step, setStep] = useState<'type' | 'account' | 'mapping'>('type');
     const [selectedType, setSelectedType] = useState<CardType | 'external' | null>(null);
@@ -77,10 +77,13 @@ export default function ImportSharedScreen() {
             }
 
             if (result.transactions.length > 0) {
+                await databaseService.updateLastImportedAt(accountId, new Date().toISOString());
                 await addTransactions(result.transactions);
                 Alert.alert('完了', `${result.transactions.length}件の取引をインポートしました`);
                 router.replace('/');
             } else {
+                await databaseService.updateLastImportedAt(accountId, new Date().toISOString());
+                await fetchData();
                 Alert.alert('情報', 'インポートする新しい取引はありませんでした');
                 router.replace('/');
             }
@@ -118,10 +121,13 @@ export default function ImportSharedScreen() {
             );
 
             if (transactions.length > 0) {
+                await databaseService.updateLastImportedAt(selectedAccountId, new Date().toISOString());
                 await addTransactions(transactions);
                 Alert.alert('完了', `${transactions.length}件の取引をインポートしました`);
                 router.replace('/');
             } else {
+                await databaseService.updateLastImportedAt(selectedAccountId, new Date().toISOString());
+                await fetchData();
                 Alert.alert('情報', 'インポートする取引はありませんでした');
                 router.replace('/');
             }
