@@ -6,6 +6,8 @@ import { useAppColorScheme } from '../hooks/useAppColorScheme';
 import { csvImportService } from '../services/csvImportService';
 import { useTransactionStore } from '../store/useTransactionStore';
 import { CardType } from '../types/account';
+import { databaseService } from '../services/database';
+import { CreateTransactionInput } from '../types/transaction';
 
 export default function ImportSharedScreen() {
     const { uri } = useLocalSearchParams<{ uri: string }>();
@@ -13,8 +15,13 @@ export default function ImportSharedScreen() {
     const colorScheme = useAppColorScheme();
     const { accounts, addTransactions } = useTransactionStore();
     const [isLoading, setIsLoading] = useState(false);
-    const [step, setStep] = useState<'type' | 'account'>('type');
+    const [step, setStep] = useState<'type' | 'account' | 'mapping'>('type');
     const [selectedType, setSelectedType] = useState<CardType | 'external' | null>(null);
+    const [missingMappings, setMissingMappings] = useState<string[]>([]);
+    const [accountMappings, setAccountMappings] = useState<Record<string, string>>({});
+    const [pendingTransactions, setPendingTransactions] = useState<CreateTransactionInput[]>([]);
+    const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+    const [rawData, setRawData] = useState<string[][]>([]);
 
     const isDark = colorScheme === 'dark';
     const colors = {
@@ -31,7 +38,13 @@ export default function ImportSharedScreen() {
     if (!uri) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-                <Text style={{ color: colors.text }}>ファイルが見つかりません</Text>
+                <Text style={{ color: colors.text, marginBottom: 20 }}>ファイルが見つかりません</Text>
+                <TouchableOpacity
+                    onPress={() => router.replace('/')}
+                    style={{ padding: 12, backgroundColor: colors.primary, borderRadius: 12 }}
+                >
+                    <Text style={{ color: 'white', fontWeight: 'bold' }}>ホームに戻る</Text>
+                </TouchableOpacity>
             </View>
         );
     }
@@ -54,16 +67,12 @@ export default function ImportSharedScreen() {
         setIsLoading(true);
         try {
             const result = await csvImportService.parseCsvFromUri(uri, selectedType, accountId);
+            setSelectedAccountId(accountId);
+            setRawData(result.rawData || []);
 
             if (result.missingMappings.length > 0) {
-                // 紐付けが必要な場合は、一旦input画面に飛ばしてモーダルを出す等の対応が必要だが、
-                // 今回は簡単のため、結果をAlertで出すか、既存のロジックに合わせる
-                // 本来は input.tsx と同様のモーダルが必要だが、画面遷移の都合上、
-                // 一旦「紐付け設定を完了してから再度お試しください」とするか、
-                // ここでも紐付けモーダルを実装する。
-                // ユーザー体験を優先し、アラートで案内する。
-                Alert.alert('紐付けが必要です', '新しい取引口座が見つかりました。設定画面または入力画面から一度手動でインポートし、口座の紐付けを行ってください。');
-                router.back();
+                setMissingMappings(result.missingMappings);
+                setStep('mapping');
                 return;
             }
 
@@ -73,11 +82,52 @@ export default function ImportSharedScreen() {
                 router.replace('/');
             } else {
                 Alert.alert('情報', 'インポートする新しい取引はありませんでした');
-                router.back();
+                router.replace('/');
             }
         } catch (error) {
             console.error(error);
             Alert.alert('エラー', 'CSVの解析に失敗しました');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleMappingComplete = async () => {
+        if (!selectedType || !selectedAccountId) return;
+
+        setIsLoading(true);
+        try {
+            // Save mappings to database
+            for (const [extName, intId] of Object.entries(accountMappings)) {
+                await databaseService.updateCsvAccountMapping(extName, intId);
+            }
+
+            // Re-parse with new mappings
+            // We need to fetch all current mappings and transactions again for consistency
+            const mappings = await databaseService.getAllPayeeCategoryMappings();
+            const existingTransactions = await databaseService.getAllTransactions();
+            const dbAccountMappings = await databaseService.getAllCsvAccountMappings();
+
+            const { transactions } = csvImportService.mapCsvToTransactions(
+                rawData,
+                selectedType,
+                selectedAccountId,
+                mappings,
+                existingTransactions,
+                dbAccountMappings
+            );
+
+            if (transactions.length > 0) {
+                await addTransactions(transactions);
+                Alert.alert('完了', `${transactions.length}件の取引をインポートしました`);
+                router.replace('/');
+            } else {
+                Alert.alert('情報', 'インポートする取引はありませんでした');
+                router.replace('/');
+            }
+        } catch (error) {
+            console.error(error);
+            Alert.alert('エラー', '保存またはインポートに失敗しました');
         } finally {
             setIsLoading(false);
         }
@@ -90,6 +140,11 @@ export default function ImportSharedScreen() {
                 headerShown: true,
                 headerStyle: { backgroundColor: colors.background },
                 headerTintColor: colors.text,
+                headerLeft: () => (
+                    <TouchableOpacity onPress={() => router.replace('/')} style={{ marginLeft: 8 }}>
+                        <Text style={{ color: colors.primary, fontSize: 16 }}>キャンセル</Text>
+                    </TouchableOpacity>
+                ),
             }} />
 
             <ScrollView contentContainerStyle={{ padding: 20 }}>
@@ -133,8 +188,15 @@ export default function ImportSharedScreen() {
                             onPress={() => handleTypeSelect('external')}
                             colors={colors}
                         />
+
+                        <TouchableOpacity
+                            onPress={() => router.replace('/')}
+                            style={{ marginTop: 24, alignItems: 'center', padding: 12 }}
+                        >
+                            <Text style={{ color: colors.textMuted, fontSize: 14 }}>キャンセルしてホームに戻る</Text>
+                        </TouchableOpacity>
                     </View>
-                ) : (
+                ) : step === 'account' ? (
                     <View style={{ gap: 12 }}>
                         <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.text, marginBottom: 8, marginLeft: 4 }}>
                             インポート先の口座を選択
@@ -172,7 +234,80 @@ export default function ImportSharedScreen() {
 
                         <TouchableOpacity
                             onPress={() => setStep('type')}
-                            style={{ marginTop: 20, alignItems: 'center' }}
+                            style={{ marginTop: 20, alignItems: 'center', padding: 12 }}
+                        >
+                            <Text style={{ color: colors.primary, fontWeight: '600' }}>形式選択に戻る</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={() => router.replace('/')}
+                            style={{ marginTop: 8, alignItems: 'center', padding: 12 }}
+                        >
+                            <Text style={{ color: colors.textMuted, fontSize: 14 }}>キャンセルしてホームに戻る</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <View style={{ gap: 16 }}>
+                        <View style={{ backgroundColor: colors.card, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.border }}>
+                            <Text style={{ fontSize: 14, color: colors.text, lineHeight: 20 }}>
+                                CSV内に不明な口座名が見つかりました。本アプリのどの口座と対応するか選択してください。
+                            </Text>
+                        </View>
+
+                        {missingMappings.map(extName => (
+                            <View key={extName} style={{ gap: 8 }}>
+                                <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginLeft: 4 }}>
+                                    CSV内の表記: <Text style={{ color: colors.text }}>{extName}</Text>
+                                </Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                                    {accounts.map(acc => (
+                                        <TouchableOpacity
+                                            key={acc.id}
+                                            onPress={() => setAccountMappings(prev => ({ ...prev, [extName]: acc.id }))}
+                                            style={{
+                                                paddingHorizontal: 12,
+                                                paddingVertical: 8,
+                                                borderRadius: 12,
+                                                backgroundColor: accountMappings[extName] === acc.id ? colors.primary : colors.card,
+                                                borderWidth: 1,
+                                                borderColor: accountMappings[extName] === acc.id ? colors.primary : colors.border
+                                            }}
+                                        >
+                                            <Text style={{
+                                                fontSize: 12,
+                                                color: accountMappings[extName] === acc.id ? 'white' : colors.text,
+                                                fontWeight: accountMappings[extName] === acc.id ? 'bold' : 'normal'
+                                            }}>
+                                                {acc.name}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        ))}
+
+                        <TouchableOpacity
+                            onPress={handleMappingComplete}
+                            disabled={missingMappings.some(name => !accountMappings[name]) || isLoading}
+                            style={{
+                                marginTop: 12,
+                                backgroundColor: missingMappings.some(name => !accountMappings[name]) ? colors.textMuted : colors.primary,
+                                padding: 16,
+                                borderRadius: 16,
+                                alignItems: 'center',
+                                shadowColor: colors.primary,
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.2,
+                                shadowRadius: 8,
+                                elevation: 4
+                            }}
+                        >
+                            <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>保存してインポートを完了する</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={() => setStep('account')}
+                            style={{ marginTop: 8, alignItems: 'center', padding: 12 }}
                         >
                             <Text style={{ color: colors.primary }}>戻る</Text>
                         </TouchableOpacity>

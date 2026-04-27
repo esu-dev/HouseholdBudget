@@ -107,7 +107,7 @@ export const csvImportService = {
 
   mapCsvToTransactions(
     data: string[][],
-    cardType: CardType,
+    cardType: CardType | "external",
     accountId: string,
     mappings: Record<string, string> = {},
     existingTransactions: any[] = [],
@@ -203,15 +203,15 @@ export const csvImportService = {
 
         const transactionId = (row[12] || '').trim();
         if (transactionId) {
-          const isDuplicateInDb = existingTransactions.some(t => 
-            t.import_hash === transactionId || 
+          const isDuplicateInDb = existingTransactions.some(t =>
+            t.import_hash === transactionId ||
             (t.import_hash && t.import_hash.startsWith(transactionId + '_'))
           );
-          const isDuplicateInBatch = transactions.some(t => 
-            t.import_hash === transactionId || 
+          const isDuplicateInBatch = transactions.some(t =>
+            t.import_hash === transactionId ||
             (t.import_hash && t.import_hash.startsWith(transactionId + '_'))
           );
-          
+
           if (isDuplicateInDb || isDuplicateInBatch) {
             console.log(`Skipping duplicate by hash: ${transactionId}`);
             continue;
