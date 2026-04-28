@@ -50,6 +50,7 @@ export default function EditTransactionScreen() {
   const [isNewMajorModalVisible, setIsNewMajorModalVisible] = useState(false);
   const [newCategoryLabel, setNewCategoryLabel] = useState('');
   const [newMajorLabel, setNewMajorLabel] = useState('');
+  const [newMajorColor, setNewMajorColor] = useState('#6366f1');
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [missingAccountMappings, setMissingAccountMappings] = useState<string[]>([]);
   const [isMappingModalVisible, setIsMappingModalVisible] = useState(false);
@@ -373,7 +374,7 @@ export default function EditTransactionScreen() {
         id: newId,
         label: newMajorLabel.trim(),
         icon: 'others',
-        color: '#6366f1',
+        color: newMajorColor,
         type: transactionType as 'expense' | 'income',
         displayOrder: currentMajorCategories.length
       });
@@ -975,6 +976,33 @@ export default function EditTransactionScreen() {
                 returnKeyType="done"
                 onSubmitEditing={handleAddMajorCategory}
               />
+
+              <Text style={{ color: colors.textMuted, marginBottom: 12, fontSize: 13 }}>カラー</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
+                {[
+                  '#f97316', '#06b6d4', '#ec4899', '#84cc16', '#a855f7',
+                  '#ef4444', '#10b981', '#f59e0b', '#64748b', '#6366f1',
+                  '#3b82f6', '#facc15',
+                ].map((color) => {
+                  const isSelected = newMajorColor === color;
+                  return (
+                    <TouchableOpacity
+                      key={color}
+                      onPress={() => setNewMajorColor(color)}
+                      style={{
+                        width: 32, height: 32, borderRadius: 16,
+                        backgroundColor: color,
+                        marginRight: 10,
+                        borderWidth: 2, borderColor: isSelected ? colors.text : 'transparent',
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {isSelected && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: 'white' }} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
 
               <View style={{ flexDirection: 'row', gap: 12 }}>
                 <TouchableOpacity

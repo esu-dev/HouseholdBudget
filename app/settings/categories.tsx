@@ -21,6 +21,7 @@ export default function CategoryManagementScreen() {
     const [type, setType] = useState<'expense' | 'income'>('expense');
     const [editingMajor, setEditingMajor] = useState<any>(null);
     const [selectedIcon, setSelectedIcon] = useState('others');
+    const [selectedColor, setSelectedColor] = useState('#6366f1');
     const [modalVisible, setModalVisible] = useState(false);
     const [minorModalVisible, setMinorModalVisible] = useState(false);
     const [editingMinor, setEditingMinor] = useState<any>(null);
@@ -49,13 +50,14 @@ export default function CategoryManagementScreen() {
                 id,
                 label: newItemLabel.trim(),
                 icon: selectedIcon,
-                color: '#6366f1',
+                color: selectedColor,
                 type,
                 displayOrder: filteredMajors.length
             });
             setModalVisible(false);
             setNewItemLabel('');
             setSelectedIcon('others');
+            setSelectedColor('#6366f1');
         } catch (e) {
             Alert.alert('エラー', '保存に失敗しました');
         } finally {
@@ -71,11 +73,13 @@ export default function CategoryManagementScreen() {
                 ...editingMajor,
                 label: newItemLabel.trim(),
                 icon: selectedIcon,
+                color: selectedColor,
             });
             setModalVisible(false);
             setEditingMajor(null);
             setNewItemLabel('');
             setSelectedIcon('others');
+            setSelectedColor('#6366f1');
         } catch (e) {
             Alert.alert('エラー', '保存に失敗しました');
         } finally {
@@ -180,6 +184,7 @@ export default function CategoryManagementScreen() {
                                             setEditingMajor(major);
                                             setNewItemLabel(major.label);
                                             setSelectedIcon(major.icon || 'others');
+                                            setSelectedColor(major.color || '#6366f1');
                                             setModalVisible(true);
                                         }}
                                         style={{ padding: 8 }}
@@ -245,6 +250,7 @@ export default function CategoryManagementScreen() {
                         setEditingMajor(null);
                         setNewItemLabel('');
                         setSelectedIcon('others');
+                        setSelectedColor('#6366f1');
                         setModalVisible(true);
                     }}
                     style={{
@@ -315,6 +321,42 @@ export default function CategoryManagementScreen() {
                             })}
                         </ScrollView>
 
+                        <Text style={{ color: colors.textMuted, marginBottom: 12, fontSize: 13 }}>カラー</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
+                            {[
+                                '#f97316', // Orange
+                                '#06b6d4', // Cyan
+                                '#ec4899', // Pink
+                                '#84cc16', // Lime
+                                '#a855f7', // Purple
+                                '#ef4444', // Red
+                                '#10b981', // Emerald
+                                '#f59e0b', // Amber
+                                '#64748b', // Slate
+                                '#6366f1', // Indigo
+                                '#3b82f6', // Blue
+                                '#facc15', // Yellow
+                            ].map((color) => {
+                                const isSelected = selectedColor === color;
+                                return (
+                                    <TouchableOpacity
+                                        key={color}
+                                        onPress={() => setSelectedColor(color)}
+                                        style={{
+                                            width: 36, height: 36, borderRadius: 18,
+                                            backgroundColor: color,
+                                            marginRight: 12,
+                                            borderWidth: 3, borderColor: isSelected ? colors.text : 'transparent',
+                                            justifyContent: 'center',
+                                            alignItems: 'center'
+                                        }}
+                                    >
+                                        {isSelected && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: 'white' }} />}
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+
                         <View style={{ flexDirection: 'row', gap: 12 }}>
                             <TouchableOpacity
                                 onPress={() => {
@@ -322,6 +364,7 @@ export default function CategoryManagementScreen() {
                                     setEditingMajor(null);
                                     setNewItemLabel('');
                                     setSelectedIcon('others');
+                                    setSelectedColor('#6366f1');
                                 }}
                                 disabled={isLoading}
                                 style={{ flex: 1, padding: 16, borderRadius: 12, backgroundColor: isDark ? '#334155' : '#f1f5f9', alignItems: 'center', opacity: isLoading ? 0.5 : 1 }}
