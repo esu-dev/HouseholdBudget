@@ -6,6 +6,9 @@ import { useDeveloperStore } from '../store/useDeveloperStore';
 
 export const emailImportService = {
   async importFromGmail(token: string) {
+    // カテゴリマッピングの取得
+    const categoryMappings = await databaseService.getAllPayeeCategoryMappings();
+
     if (token === 'mock_token') {
       const logger = useDeveloperStore.getState();
       logger.addLog('info', 'Mock mode started');
@@ -50,15 +53,18 @@ JCBカードのご利用がありましたのでご連絡します。
         }
         logger.addLog('debug', `Target Account ID: ${accountId}`);
 
+        const category_id = categoryMappings[parsed.payee] || 'others';
+
         await store.addTransaction({
           amount: parsed.amount,
           date: parsed.date,
           payee: parsed.payee,
-          category_id: 'others',
+          category_id,
           account_id: accountId,
           memo: 'Gmail自動インポート(Mock)',
           import_hash: `mock_${Date.now()}`, // 重複回避のため毎回変える
         });
+        await databaseService.updateLastEmailImportedAt(accountId, new Date().toISOString());
         logger.addLog('info', 'Mock transaction added successfully');
 
         return { total: 1, imported: 1, skipped: 0, failed: 0 };
@@ -85,6 +91,8 @@ JCBカードのご利用がありましたのでご連絡します。
       'from:mail@vpass.ne.jp subject:"【三井住友カード】ご利用のお知らせ"',
       'from:mail@qa.jcb.co.jp subject:"JCBカード／ショッピングご利用のお知らせ"',
     ];
+
+    const affectedAccountIds = new Set<string>();
 
     for (const query of queries) {
       try {
@@ -113,12 +121,7 @@ JCBカードのご利用がありましたのでご連絡します。
 
             if (parsed) {
               logger.addLog('info', `Parsed transaction: ${parsed.payee}, ${parsed.amount}円`);
-              // 取引を追加
-              // 口座IDは暫定的に「card」グループのものを探すか、
-              // カード会社ごとに紐付ける設定が必要
-              // ここでは簡易的に「楽天カード」なら特定のID、「三井住友」なら特定のIDとする
-              // 実際の運用ではアカウント設定に「Gmail連携用のアドレス」を持たせるのが理想
-
+              
               let accountId = 'card'; // デフォルト
               const store = useTransactionStore.getState();
               const accounts = store.accounts;
@@ -148,16 +151,19 @@ JCBカードのご利用がありましたのでご連絡します。
                 logger.addLog('debug', `Using fallback account ID: ${accountId}`);
               }
 
+              const category_id = categoryMappings[parsed.payee] || 'others';
+
               await store.addTransaction({
                 amount: parsed.amount,
                 date: parsed.date,
                 payee: parsed.payee,
-                category_id: 'others', // カテゴリは後で自動学習または手動修正
+                category_id,
                 account_id: accountId,
                 memo: 'Gmail自動インポート',
                 import_hash: parsed.gmail_message_id,
               });
 
+              affectedAccountIds.add(accountId);
               results.imported++;
               logger.addLog('success', `Imported: ${parsed.payee}`);
             } else {
@@ -172,6 +178,25 @@ JCBカードのご利用がありましたのでご連絡します。
       } catch (e: any) {
         logger.addLog('error', `Failed to list messages for query "${query}": ${e.message}`);
       }
+    }
+
+    // 実行されたアカウント（マッピングされているものすべて）の最終読み込み日時を更新
+    const now = new Date().toISOString();
+    const mappedAccounts = [
+      await databaseService.getSetting('gmail_account_id_rakuten'),
+      await databaseService.getSetting('gmail_account_id_vpass'),
+      await databaseService.getSetting('gmail_account_id_jcb'),
+    ].filter(id => id !== null) as string[];
+
+    // 実際に取引があったアカウントも追加（マッピングがない場合のフォールバック等）
+    for (const id of affectedAccountIds) {
+      if (!mappedAccounts.includes(id)) {
+        mappedAccounts.push(id);
+      }
+    }
+
+    for (const accountId of mappedAccounts) {
+      await databaseService.updateLastEmailImportedAt(accountId, now);
     }
 
     logger.addLog('info', `Import process finished. Results: ${JSON.stringify(results)}`);

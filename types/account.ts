@@ -16,6 +16,7 @@ export type Account = {
   excludeFromNetWorth?: boolean;
   isHidden?: boolean;
   lastImportedAt: string | undefined;
+  lastEmailImportedAt?: string;
   initialBalance: number;
 };
 

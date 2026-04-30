@@ -489,7 +489,13 @@ export default function HomeScreen() {
 
         const flatList: any[] = [];
         Object.entries(groups).forEach(([date, items]) => {
-            flatList.push({ type: 'header', date });
+            // その日の収支を計算
+            const dailyBalance = items.reduce((acc, t) => {
+                if (t.category_id === 'transfer' || t.category_id === 'adjustment') return acc;
+                return acc + t.amount;
+            }, 0);
+
+            flatList.push({ type: 'header', date, dailyBalance });
             items.forEach(item => flatList.push({ type: 'item', ...item }));
         });
 
@@ -515,10 +521,19 @@ export default function HomeScreen() {
     const renderItem = useCallback(({ item }: { item: any }) => {
         if (item.type === 'header') {
             return (
-                <View style={{ paddingHorizontal: 24, paddingVertical: 8, marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
-                    <CalendarIcon size={12} color="#94a3b8" />
-                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#94a3b8', marginLeft: 8, textTransform: 'uppercase' }}>
-                        {item.date}
+                <View style={{ paddingHorizontal: 24, paddingVertical: 8, marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <CalendarIcon size={12} color="#94a3b8" />
+                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#94a3b8', marginLeft: 8, textTransform: 'uppercase' }}>
+                            {item.date}
+                        </Text>
+                    </View>
+                    <Text style={{ 
+                        fontSize: 12, 
+                        fontWeight: 'bold', 
+                        color: item.dailyBalance > 0 ? '#22c55e' : (item.dailyBalance < 0 ? (isDark ? '#fb7185' : '#e11d48') : '#94a3b8') 
+                    }}>
+                        {item.dailyBalance > 0 ? '+' : ''}¥{item.dailyBalance.toLocaleString()}
                     </Text>
                 </View>
             );
@@ -649,9 +664,28 @@ export default function HomeScreen() {
                         </View>
 
                         <View className="mb-10">
-                            <Text className="text-sm font-bold text-slate-400 dark:text-slate-500 mb-4 ml-6 uppercase tracking-widest">
-                                {selectedDay.replace(/-/g, '/')} の履歴
-                            </Text>
+                            <View className="flex-row justify-between items-center pr-6">
+                                <Text className="text-sm font-bold text-slate-400 dark:text-slate-500 mb-4 ml-6 uppercase tracking-widest">
+                                    {selectedDay.replace(/-/g, '/')} の履歴
+                                </Text>
+                                {(() => {
+                                    const dailyBalance = dayTransactions.reduce((acc, t) => {
+                                        if (t.category_id === 'transfer' || t.category_id === 'adjustment') return acc;
+                                        return acc + t.amount;
+                                    }, 0);
+                                    if (dayTransactions.length === 0) return null;
+                                    return (
+                                        <Text style={{ 
+                                            fontSize: 12, 
+                                            fontWeight: 'bold', 
+                                            color: dailyBalance > 0 ? '#22c55e' : (dailyBalance < 0 ? (isDark ? '#fb7185' : '#e11d48') : '#94a3b8'),
+                                            marginBottom: 16
+                                        }}>
+                                            収支: {dailyBalance > 0 ? '+' : ''}¥{dailyBalance.toLocaleString()}
+                                        </Text>
+                                    );
+                                })()}
+                            </View>
                             {dayTransactions.length > 0 ? (
                                 dayTransactions.map(t => (
                                     <TransactionItem

@@ -164,9 +164,9 @@ export default function GmailImportScreen() {
     };
 
     const checkToken = async () => {
-        const storedToken = await gmailService.getStoredToken();
-        if (storedToken) {
-            setToken(storedToken);
+        const validToken = await gmailService.getValidToken(GoogleSignin);
+        if (validToken) {
+            setToken(validToken);
         }
     };
 
@@ -177,6 +177,8 @@ export default function GmailImportScreen() {
         try {
             const result = await emailImportService.importFromGmail(token);
             setImportResult(result);
+            const { fetchData } = useTransactionStore.getState();
+            await fetchData();
         } catch (e: any) {
             if (e.message === 'Unauthorized') {
                 setToken(null);

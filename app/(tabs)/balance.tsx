@@ -1,5 +1,19 @@
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { ArrowDownCircle, ArrowUpCircle, Building2, CreditCard, EyeOff, Mail, RefreshCw, Smartphone, Wallet } from 'lucide-react-native';
+
+// Expo Goで実行されているかどうかを判別
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+let GoogleSignin: any = null;
+if (!isExpoGo) {
+    try {
+        const GoogleSigninModule = require('@react-native-google-signin/google-signin');
+        GoogleSignin = GoogleSigninModule.GoogleSignin;
+    } catch (e) {
+        console.warn('GoogleSignin module could not be loaded', e);
+    }
+}
 import React, { useCallback, useMemo } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
@@ -24,7 +38,13 @@ export default function BalanceScreen() {
     const [isImporting, setIsImporting] = React.useState(false);
 
     const checkGmailStatus = async () => {
-        const token = await gmailService.getStoredToken();
+        if (!isExpoGo && GoogleSignin) {
+            GoogleSignin.configure({
+                scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
+                iosClientId: '707898512731-491f9ltfgsoq46j1sff1pb8gqs4bnrqs.apps.googleusercontent.com',
+            });
+        }
+        const token = await gmailService.getValidToken(GoogleSignin);
         setGmailToken(token);
     };
 
@@ -36,13 +56,21 @@ export default function BalanceScreen() {
     );
 
     const handleQuickImport = async () => {
-        if (!gmailToken || isImporting) return;
+        if (isImporting) return;
+        
+        // トークンが古い可能性があるので再確認
+        const currentToken = await gmailService.getValidToken(GoogleSignin);
+        if (!currentToken) {
+            setGmailToken(null);
+            Alert.alert('認証エラー', 'Gmailにログインしていません。設定画面からログインしてください。');
+            return;
+        }
 
         setIsImporting(true);
         try {
-            const result = await emailImportService.importFromGmail(gmailToken);
+            const result = await emailImportService.importFromGmail(currentToken);
+            await fetchData();
             if (result.imported > 0) {
-                await fetchData();
                 Alert.alert('インポート完了', `${result.imported}件の取引を新しく追加しました。`);
             } else if (result.failed > 0) {
                 Alert.alert('完了', `新着取引はありませんでした。（解析失敗: ${result.failed}件）`);
@@ -224,7 +252,12 @@ export default function BalanceScreen() {
                                     </Text>
                                     {account.lastImportedAt && (
                                         <Text style={{ fontSize: 10, color: colors.textMuted }}>
-                                            • 読込:{formatLastImported(account.lastImportedAt)}
+                                            • CSV:{formatLastImported(account.lastImportedAt)}
+                                        </Text>
+                                    )}
+                                    {account.lastEmailImportedAt && (
+                                        <Text style={{ fontSize: 10, color: colors.textMuted }}>
+                                            • メール:{formatLastImported(account.lastEmailImportedAt)}
                                         </Text>
                                     )}
                                     {account.excludeFromNetWorth && (

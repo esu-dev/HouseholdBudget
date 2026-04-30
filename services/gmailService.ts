@@ -30,6 +30,32 @@ export const gmailService = {
     await SecureStore.deleteItemAsync(TOKEN_KEY);
   },
 
+  async getValidToken(GoogleSignin: any): Promise<string | null> {
+    const logger = useDeveloperStore.getState();
+    
+    // 1. まずは保存されているトークンを確認
+    let token = await this.getStoredToken();
+    
+    // 2. ネイティブ環境ならサイレントサインインを試行してトークンを更新
+    if (GoogleSignin) {
+      try {
+        logger.addLog('debug', 'Attempting silent sign-in...');
+        const user = await GoogleSignin.signInSilently();
+        const tokens = await GoogleSignin.getTokens();
+        if (tokens.accessToken) {
+          logger.addLog('debug', 'Silent sign-in successful, token refreshed');
+          await this.saveToken(tokens.accessToken);
+          return tokens.accessToken;
+        }
+      } catch (error: any) {
+        logger.addLog('debug', `Silent sign-in failed or no user: ${error.message}`);
+        // サイレントサインインに失敗しても、保存されているトークンがあればそれを使う（後で401になる可能性はある）
+      }
+    }
+    
+    return token;
+  },
+
   async listMessages(token: string, query: string) {
     const logger = useDeveloperStore.getState();
     logger.addLog('debug', `Gmail API Request: listMessages (query: ${query})`);

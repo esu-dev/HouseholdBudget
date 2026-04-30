@@ -29,6 +29,7 @@ export const initDatabase = async () => {
       exclude_from_net_worth INTEGER DEFAULT 0,
       is_hidden INTEGER DEFAULT 0,
       last_imported_at TEXT,
+      last_email_imported_at TEXT,
       initial_balance INTEGER DEFAULT 0,
       FOREIGN KEY (withdrawal_account_id) REFERENCES accounts(id)
     );
@@ -186,9 +187,13 @@ export const initDatabase = async () => {
     await db.execAsync('ALTER TABLE accounts ADD COLUMN is_hidden INTEGER DEFAULT 0');
   } catch (e) {}
 
-  // Migration: Add last_imported_at to accounts if it doesn't exist
   try {
     await db.execAsync('ALTER TABLE accounts ADD COLUMN last_imported_at TEXT');
+  } catch (e) {}
+
+  // Migration: Add last_email_imported_at to accounts if it doesn't exist
+  try {
+    await db.execAsync('ALTER TABLE accounts ADD COLUMN last_email_imported_at TEXT');
   } catch (e) {}
 
   // Migration: Add initial_balance to accounts if it doesn't exist
@@ -411,6 +416,7 @@ export const databaseService = {
       excludeFromNetWorth: row.exclude_from_net_worth === 1,
       isHidden: row.is_hidden === 1,
       lastImportedAt: row.last_imported_at,
+      lastEmailImportedAt: row.last_email_imported_at,
       initialBalance: row.initial_balance || 0
     }));
   },
@@ -453,7 +459,7 @@ export const databaseService = {
   async addAccount(account: Omit<Account, 'balance'>): Promise<void> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     await db.runAsync(
-      'INSERT INTO accounts (id, name, type, card_type, login_url, closing_day, withdrawal_day, withdrawal_account_id, display_order, billing_start_date, exclude_from_net_worth, is_hidden, last_imported_at, initial_balance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO accounts (id, name, type, card_type, login_url, closing_day, withdrawal_day, withdrawal_account_id, display_order, billing_start_date, exclude_from_net_worth, is_hidden, last_imported_at, last_email_imported_at, initial_balance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       account.id,
       account.name,
       account.type,
@@ -467,6 +473,7 @@ export const databaseService = {
       account.excludeFromNetWorth ? 1 : 0,
       account.isHidden ? 1 : 0,
       account.lastImportedAt ?? null,
+      account.lastEmailImportedAt ?? null,
       account.initialBalance ?? 0
     );
   },
@@ -474,7 +481,7 @@ export const databaseService = {
   async updateAccount(account: Omit<Account, 'balance'>): Promise<void> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     await db.runAsync(
-      'UPDATE accounts SET name = ?, type = ?, card_type = ?, login_url = ?, closing_day = ?, withdrawal_day = ?, withdrawal_account_id = ?, display_order = ?, billing_start_date = ?, exclude_from_net_worth = ?, is_hidden = ?, last_imported_at = ?, initial_balance = ? WHERE id = ?',
+      'UPDATE accounts SET name = ?, type = ?, card_type = ?, login_url = ?, closing_day = ?, withdrawal_day = ?, withdrawal_account_id = ?, display_order = ?, billing_start_date = ?, exclude_from_net_worth = ?, is_hidden = ?, last_imported_at = ?, last_email_imported_at = ?, initial_balance = ? WHERE id = ?',
       account.name,
       account.type,
       account.cardType ?? 'none',
@@ -487,6 +494,7 @@ export const databaseService = {
       account.excludeFromNetWorth ? 1 : 0,
       account.isHidden ? 1 : 0,
       account.lastImportedAt ?? null,
+      account.lastEmailImportedAt ?? null,
       account.initialBalance ?? 0,
       account.id
     );
@@ -496,6 +504,15 @@ export const databaseService = {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     await db.runAsync(
       'UPDATE accounts SET last_imported_at = ? WHERE id = ?',
+      date,
+      accountId
+    );
+  },
+
+  async updateLastEmailImportedAt(accountId: string, date: string): Promise<void> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    await db.runAsync(
+      'UPDATE accounts SET last_email_imported_at = ? WHERE id = ?',
       date,
       accountId
     );
