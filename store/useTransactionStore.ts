@@ -17,13 +17,15 @@ interface TransactionState {
   averageMonthlyExpense: number;
   averageMonthlyExpensesByCategory: Record<string, number>;
   savingsGoal: number;
+  incomeCategoryIdsForAverage: string[];
   editingTransaction: Transaction | null;
   isLoading: boolean;
   error: string | null;
-  fetchData: () => Promise<void>;
+  fetchData: (baseDate?: string) => Promise<void>;
   fetchBudgets: (month: string) => Promise<void>;
-  fetchStatistics: () => Promise<void>;
+  fetchStatistics: (baseDate?: string) => Promise<void>;
   updateSavingsGoal: (amount: number) => Promise<void>;
+  updateIncomeCategoriesForAverage: (categoryIds: string[]) => Promise<void>;
   addTransaction: (transaction: CreateTransactionInput) => Promise<void>;
   addTransactions: (transactions: CreateTransactionInput[]) => Promise<void>;
   updateTransaction: (transaction: Transaction) => Promise<void>;
@@ -66,23 +68,30 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   averageMonthlyExpense: 0,
   averageMonthlyExpensesByCategory: {},
   savingsGoal: 0,
+  incomeCategoryIdsForAverage: [],
   editingTransaction: null,
   isLoading: false,
   error: null,
 
-  fetchData: async () => {
+  fetchData: async (baseDate?: string) => {
     set({ isLoading: true });
     try {
-      const [transactions, accounts, balances, categories, avgIncome, avgExpense, avgExpenses, savingsGoal, csvMappings] = await Promise.all([
+      const [transactions, accounts, balances, categories, savingsGoal, incomeCats, csvMappings] = await Promise.all([
         databaseService.getAllTransactions(),
         databaseService.getAllAccounts(),
         databaseService.getAccountBalances(),
         databaseService.getAllMajorCategories(),
-        databaseService.getAverageMonthlyIncome(6),
-        databaseService.getAverageMonthlyExpense(6),
-        databaseService.getAverageMonthlyExpenseByCategory(6),
         databaseService.getSetting('savings_goal'),
+        databaseService.getSetting('income_categories_for_average'),
         databaseService.getAllCsvAccountMappings(),
+      ]);
+
+      const incomeCategoryIds = incomeCats ? JSON.parse(incomeCats) : [];
+      
+      const [avgIncome, avgExpense, avgExpenses] = await Promise.all([
+        databaseService.getAverageMonthlyIncome(6, incomeCategoryIds, baseDate),
+        databaseService.getAverageMonthlyExpense(6, baseDate),
+        databaseService.getAverageMonthlyExpenseByCategory(6, baseDate),
       ]);
 
       const balanceMap: Record<string, number> = {};
@@ -99,6 +108,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         averageMonthlyExpense: avgExpense,
         averageMonthlyExpensesByCategory: avgExpenses,
         savingsGoal: savingsGoal ? parseInt(savingsGoal) : 0,
+        incomeCategoryIdsForAverage: incomeCategoryIds,
         csvAccountMappings: csvMappings || {},
         isLoading: false
       });
@@ -116,12 +126,31 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
     }
   },
 
-  fetchStatistics: async () => {
+  fetchStatistics: async (baseDate?: string) => {
     try {
-      const avgIncome = await databaseService.getAverageMonthlyIncome(6);
-      set({ averageMonthlyIncome: avgIncome });
+      const { incomeCategoryIdsForAverage } = get();
+      const [avgIncome, avgExpense, avgExpenses] = await Promise.all([
+        databaseService.getAverageMonthlyIncome(6, incomeCategoryIdsForAverage, baseDate),
+        databaseService.getAverageMonthlyExpense(6, baseDate),
+        databaseService.getAverageMonthlyExpenseByCategory(6, baseDate),
+      ]);
+      set({ 
+        averageMonthlyIncome: avgIncome,
+        averageMonthlyExpense: avgExpense,
+        averageMonthlyExpensesByCategory: avgExpenses
+      });
     } catch (error) {
       set({ error: 'Failed to fetch statistics' });
+    }
+  },
+
+  updateIncomeCategoriesForAverage: async (categoryIds: string[]) => {
+    try {
+      await databaseService.updateSetting('income_categories_for_average', JSON.stringify(categoryIds));
+      set({ incomeCategoryIdsForAverage: categoryIds });
+      await get().fetchStatistics();
+    } catch (error) {
+      set({ error: 'Failed to update income categories for average' });
     }
   },
 

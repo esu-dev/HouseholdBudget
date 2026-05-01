@@ -1,7 +1,7 @@
 import { Stack, useRouter } from 'expo-router';
-import { ChevronLeft, ChevronRight, Lightbulb, Save, Target, TrendingUp } from 'lucide-react-native';
+import { Check, ChevronLeft, ChevronRight, Lightbulb, Save, Settings, Target, TrendingDown, TrendingUp, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { useTransactionStore } from '../../store/useTransactionStore';
@@ -17,16 +17,20 @@ export default function BudgetSettingsScreen() {
         upsertBudget,
         isLoading,
         fetchData,
+        fetchStatistics,
         averageMonthlyIncome,
         averageMonthlyExpense,
         averageMonthlyExpensesByCategory,
         savingsGoal,
-        updateSavingsGoal
+        updateSavingsGoal,
+        incomeCategoryIdsForAverage,
+        updateIncomeCategoriesForAverage
     } = useTransactionStore();
 
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [localBudgets, setLocalBudgets] = useState<Record<string, string>>({});
     const [localSavingsGoal, setLocalSavingsGoal] = useState('');
+    const [showIncomeSettings, setShowIncomeSettings] = useState(false);
 
     const colors = {
         background: isDark ? '#0f172a' : '#f8fafc',
@@ -50,11 +54,12 @@ export default function BudgetSettingsScreen() {
     }, [selectedDate]);
 
     useEffect(() => {
-        fetchData();
+        fetchData(monthStr + '-01');
     }, []);
 
     useEffect(() => {
         fetchBudgets(monthStr);
+        fetchStatistics(monthStr + '-01');
     }, [monthStr]);
 
     useEffect(() => {
@@ -100,6 +105,10 @@ export default function BudgetSettingsScreen() {
         return majorCategories.filter(cat => cat.type === 'expense');
     }, [majorCategories]);
 
+    const incomeCategories = useMemo(() => {
+        return majorCategories.filter(cat => cat.type === 'income');
+    }, [majorCategories]);
+
     const totalBudget = useMemo(() => {
         return Object.values(localBudgets).reduce((sum, val) => sum + (parseInt(val) || 0), 0);
     }, [localBudgets]);
@@ -119,12 +128,12 @@ export default function BudgetSettingsScreen() {
                 title: '予算設定',
                 headerLeft: () => (
                     <TouchableOpacity onPress={() => router.back()} style={{ marginLeft: 8 }}>
-                        <ChevronLeft size={24} color={colors.indigo} />
+                        <ChevronLeft size={24} color={colors.indigo} hitSlop={{ top: 30, bottom: 30, right: 30, left: 30 }} />
                     </TouchableOpacity>
                 ),
                 headerRight: () => (
                     <TouchableOpacity onPress={handleSave} style={{ marginRight: 8 }}>
-                        <Save size={24} color={colors.indigo} />
+                        <Save size={24} color={colors.indigo} hitSlop={{ top: 30, bottom: 30, right: 30, left: 30 }} />
                     </TouchableOpacity>
                 ),
                 headerStyle: { backgroundColor: colors.background },
@@ -148,7 +157,7 @@ export default function BudgetSettingsScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
                             <View style={{ flex: 1, backgroundColor: colors.greenSub, padding: 16, borderRadius: 20 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                                     <TrendingUp size={16} color={colors.green} />
@@ -161,7 +170,7 @@ export default function BudgetSettingsScreen() {
 
                             <View style={{ flex: 1, backgroundColor: isDark ? '#451a1a' : '#fef2f2', padding: 16, borderRadius: 20 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                                    <TrendingUp size={16} color="#ef4444" style={{ transform: [{ rotate: '180deg' }] }} />
+                                    <TrendingDown size={16} color="#ef4444" />
                                     <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#ef4444', marginLeft: 6 }}>平均支出 (6ヶ月)</Text>
                                 </View>
                                 <Text style={{ fontSize: 18, fontWeight: 'black', color: isDark ? '#fff' : '#451a1a' }}>
@@ -169,6 +178,20 @@ export default function BudgetSettingsScreen() {
                                 </Text>
                             </View>
                         </View>
+
+                        <TouchableOpacity
+                            onPress={() => setShowIncomeSettings(true)}
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                alignSelf: 'flex-end',
+                                marginBottom: 16,
+                                paddingRight: 4
+                            }}
+                        >
+                            <Settings size={12} color={colors.textMuted} />
+                            <Text style={{ fontSize: 11, color: colors.textMuted, marginLeft: 4 }}>平均月収の計算対象を設定</Text>
+                        </TouchableOpacity>
 
                         <View style={{ flex: 1, backgroundColor: colors.amberSub, padding: 16, borderRadius: 20, marginBottom: 20 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
@@ -300,6 +323,106 @@ export default function BudgetSettingsScreen() {
                     </TouchableOpacity>
                 </View>
             </ScrollView>
+
+            <Modal
+                visible={showIncomeSettings}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowIncomeSettings(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+                    <View style={{
+                        backgroundColor: colors.card,
+                        borderTopLeftRadius: 32,
+                        borderTopRightRadius: 32,
+                        padding: 24,
+                        maxHeight: '80%'
+                    }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                            <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>計算に含める収入カテゴリ</Text>
+                            <TouchableOpacity onPress={() => setShowIncomeSettings(false)}>
+                                <X size={24} color={colors.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={{ fontSize: 14, color: colors.textMuted, marginBottom: 20 }}>
+                            平均月収の計算に含めるカテゴリを選択してください。選択を外したカテゴリの収入は計算から除外されます。
+                        </Text>
+
+                        <ScrollView>
+                            {incomeCategories.map(category => {
+                                const isSelected = incomeCategoryIdsForAverage.length === 0 || incomeCategoryIdsForAverage.includes(category.id);
+                                const IconComp = CATEGORY_ICONS[category.icon] || Save;
+                                return (
+                                    <TouchableOpacity
+                                        key={category.id}
+                                        onPress={async () => {
+                                            let newIds = [...incomeCategoryIdsForAverage];
+                                            if (newIds.length === 0) {
+                                                // もし空（＝全て選択）なら、今のカテゴリ以外を全て入れる
+                                                newIds = incomeCategories.map(c => c.id);
+                                            }
+
+                                            if (newIds.includes(category.id)) {
+                                                newIds = newIds.filter(id => id !== category.id);
+                                            } else {
+                                                newIds.push(category.id);
+                                            }
+
+                                            // 全て選択されている状態なら空にする（デフォルト）
+                                            if (newIds.length === incomeCategories.length) {
+                                                newIds = [];
+                                            }
+
+                                            await updateIncomeCategoriesForAverage(newIds);
+                                        }}
+                                        style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            paddingVertical: 16,
+                                            borderBottomWidth: 1,
+                                            borderBottomColor: colors.border
+                                        }}
+                                    >
+                                        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: category.color + '20', alignItems: 'center', justifyContent: 'center' }}>
+                                            <IconComp size={20} color={category.color} />
+                                        </View>
+                                        <Text style={{ flex: 1, marginLeft: 12, fontSize: 16, fontWeight: 'bold', color: colors.text }}>
+                                            {category.label}
+                                        </Text>
+                                        <View style={{
+                                            width: 24,
+                                            height: 24,
+                                            borderRadius: 12,
+                                            backgroundColor: isSelected ? colors.indigo : 'transparent',
+                                            borderWidth: isSelected ? 0 : 2,
+                                            borderColor: colors.border,
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}>
+                                            {isSelected && <Check size={16} color="white" />}
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+
+                        <TouchableOpacity
+                            onPress={() => setShowIncomeSettings(false)}
+                            style={{
+                                backgroundColor: colors.indigo,
+                                paddingVertical: 16,
+                                borderRadius: 20,
+                                alignItems: 'center',
+                                marginTop: 24,
+                                marginBottom: Platform.OS === 'ios' ? 20 : 0
+                            }}
+                        >
+                            <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>閉じる</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </KeyboardAvoidingView>
     );
 }

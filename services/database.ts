@@ -734,12 +734,12 @@ export const databaseService = {
   },
 
   // Statistics
-  async getAverageMonthlyIncome(monthsCount: number): Promise<number> {
+  async getAverageMonthlyIncome(monthsCount: number, categoryIds?: string[], baseDate?: string): Promise<number> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     
-    // 現在の月から過去 monthsCount ヶ月分の収入を取得
-    // 振替は除外、かつカテゴリが「収入」タイプのもののみを対象とする
-    const result = await db.getAllAsync<{month: string, total: number}>(`
+    const referenceDate = baseDate || 'now';
+
+    let query = `
       SELECT 
         strftime('%Y-%m', t.date) as month,
         SUM(t.amount) as total
@@ -750,10 +750,21 @@ export const databaseService = {
         AND t.amount > 0 
         AND t.to_account_id IS NULL
         AND t.transfer_id IS NULL
-        AND t.date >= date('now', 'start of month', '-' || ? || ' months')
-        AND t.date < date('now', 'start of month')
-      GROUP BY month
-    `, monthsCount);
+        AND t.date >= date(?, 'start of month', '-' || ? || ' months')
+        AND t.date < date(?, 'start of month')
+    `;
+
+    const params: any[] = [referenceDate, monthsCount, referenceDate];
+
+    if (categoryIds && categoryIds.length > 0) {
+      const placeholders = categoryIds.map(() => '?').join(',');
+      query += ` AND maj.id IN (${placeholders})`;
+      params.push(...categoryIds);
+    }
+
+    query += ` GROUP BY month`;
+
+    const result = await db.getAllAsync<{month: string, total: number}>(query, ...params);
 
     if (result.length === 0) return 0;
     
@@ -762,9 +773,11 @@ export const databaseService = {
     return Math.round(totalSum / result.length);
   },
 
-  async getAverageMonthlyExpenseByCategory(monthsCount: number): Promise<Record<string, number>> {
+  async getAverageMonthlyExpenseByCategory(monthsCount: number, baseDate?: string): Promise<Record<string, number>> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     
+    const referenceDate = baseDate || 'now';
+
     const rows = await db.getAllAsync<{major_id: string, month: string, total: number}>(`
       SELECT 
         maj.id as major_id,
@@ -776,10 +789,10 @@ export const databaseService = {
       WHERE maj.type = 'expense'
         AND t.amount < 0
         AND t.transfer_id IS NULL
-        AND t.date >= date('now', 'start of month', '-' || ? || ' months')
-        AND t.date < date('now', 'start of month')
+        AND t.date >= date(?, 'start of month', '-' || ? || ' months')
+        AND t.date < date(?, 'start of month')
       GROUP BY major_id, month
-    `, monthsCount);
+    `, referenceDate, monthsCount, referenceDate);
 
     const categoryMonthlyTotals: Record<string, number[]> = {};
     rows.forEach(row => {
@@ -799,9 +812,11 @@ export const databaseService = {
     return averages;
   },
 
-  async getAverageMonthlyExpense(monthsCount: number): Promise<number> {
+  async getAverageMonthlyExpense(monthsCount: number, baseDate?: string): Promise<number> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     
+    const referenceDate = baseDate || 'now';
+
     const result = await db.getAllAsync<{month: string, total: number}>(`
       SELECT 
         strftime('%Y-%m', t.date) as month,
@@ -813,10 +828,10 @@ export const databaseService = {
         AND t.amount < 0 
         AND t.to_account_id IS NULL
         AND t.transfer_id IS NULL
-        AND t.date >= date('now', 'start of month', '-' || ? || ' months')
-        AND t.date < date('now', 'start of month')
+        AND t.date >= date(?, 'start of month', '-' || ? || ' months')
+        AND t.date < date(?, 'start of month')
       GROUP BY month
-    `, monthsCount);
+    `, referenceDate, monthsCount, referenceDate);
 
     if (result.length === 0) return 0;
     

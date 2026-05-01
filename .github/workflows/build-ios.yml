@@ -38,7 +38,7 @@ jobs:
       - name: Build with Xcode (Unsigned)
         run: |
           xcodebuild -workspace ios/*.xcworkspace \
-            -scheme myapp \
+            -scheme myhb \
             -configuration Release \
             -derivedDataPath build \
             -jobs 2 \

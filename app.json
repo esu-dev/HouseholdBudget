@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "my-app",
+    "name": "my-hb",
     "slug": "my-app",
-    "version": "1.2.2",
+    "version": "1.2.4",
     "orientation": "portrait",
     "icon": "./assets/images/appicon.png",
     "scheme": "myapp",
