@@ -1,5 +1,5 @@
 import { Stack, useRouter } from 'expo-router';
-import { Check, ChevronLeft, ChevronRight, Lightbulb, Save, Settings, Target, TrendingDown, TrendingUp, X } from 'lucide-react-native';
+import { Check, ChevronLeft, ChevronRight, Lightbulb, Save, Settings, Target, TrendingDown, TrendingUp } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CATEGORY_ICONS } from '../../constants/categories';
@@ -128,7 +128,7 @@ export default function BudgetSettingsScreen() {
                 title: '予算設定',
                 headerLeft: () => (
                     <TouchableOpacity onPress={() => router.back()} style={{ marginLeft: 8 }}>
-                        <ChevronLeft size={24} color={colors.indigo} hitSlop={{ top: 30, bottom: 30, right: 30, left: 30 }} />
+                        <ChevronLeft size={24} color={colors.indigo} hitSlop={{ top: 60, bottom: 60, right: 60, left: 60 }} />
                     </TouchableOpacity>
                 ),
                 headerRight: () => (
@@ -340,9 +340,6 @@ export default function BudgetSettingsScreen() {
                     }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                             <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>計算に含める収入カテゴリ</Text>
-                            <TouchableOpacity onPress={() => setShowIncomeSettings(false)}>
-                                <X size={24} color={colors.textMuted} />
-                            </TouchableOpacity>
                         </View>
 
                         <Text style={{ fontSize: 14, color: colors.textMuted, marginBottom: 20 }}>
