@@ -20,6 +20,103 @@ export default function AccountHistoryScreen() {
     const account = accounts.find(a => a.id === id);
     const balance = accountBalances[id as string] ?? 0;
 
+    const nextWithdrawal = useMemo(() => {
+        if (!account || account.type !== 'card' || account.withdrawalDay == null) return null;
+
+        const closingDay = account.closingDay || 0;
+        const normalizeYearMonth = (str: string | undefined) => {
+            if (!str) return undefined;
+            const match = str.match(/(\d{4})[-/年](\d{1,2})/);
+            if (match) {
+                return `${match[1]}-${match[2].padStart(2, '0')}`;
+            }
+            return str;
+        };
+        const billingStartDate = normalizeYearMonth(account.billingStartDate);
+
+        // クレジットカードの通常の取引（振替以外・残高除外以外）
+        const cardTransactions = transactions.filter(t => 
+            t.account_id === id && t.category_id !== 'transfer' && !t.exclude_from_balance
+        );
+
+        const withdrawalGroups = new Map<string, { date: Date, amount: number }>();
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        cardTransactions.forEach(t => {
+            const tDate = new Date(t.date);
+            let tYear = tDate.getFullYear();
+            let tMonth = tDate.getMonth();
+            const tDay = tDate.getDate();
+
+            if (t.is_deferred) {
+                tMonth++;
+                if (tMonth > 11) {
+                    tMonth = 0;
+                    tYear++;
+                }
+            }
+
+            if (closingDay > 0 && tDay > closingDay) {
+                tMonth++;
+                if (tMonth > 11) {
+                    tMonth = 0;
+                    tYear++;
+                }
+            }
+
+            const cycleKey = `${tYear}-${String(tMonth + 1).padStart(2, '0')}`;
+            if (billingStartDate && cycleKey < billingStartDate) return;
+
+            // 引き落とし日を計算 (サイクル月の翌月)
+            let withdrawalYear = tYear;
+            let withdrawalMonth = tMonth + 1;
+            if (withdrawalMonth > 11) {
+                withdrawalYear++;
+                withdrawalMonth = 0;
+            }
+
+            let wDay = account.withdrawalDay;
+            if (wDay === 0) {
+                wDay = new Date(withdrawalYear, withdrawalMonth + 1, 0).getDate();
+            }
+
+            let withdrawalDate = new Date(withdrawalYear, withdrawalMonth, wDay);
+
+            // 土日の営業日調整
+            if (withdrawalDate.getDay() === 0) {
+                withdrawalDate.setDate(withdrawalDate.getDate() + 1);
+            } else if (withdrawalDate.getDay() === 6) {
+                withdrawalDate.setDate(withdrawalDate.getDate() + 2);
+            }
+
+            const dateKey = withdrawalDate.toISOString().split('T')[0];
+
+            if (!withdrawalGroups.has(dateKey)) {
+                withdrawalGroups.set(dateKey, { date: withdrawalDate, amount: 0 });
+            }
+            // クレジットカードの支出は負の値なので、引落額として正の値にするため減算する
+            withdrawalGroups.get(dateKey)!.amount -= t.amount;
+        });
+
+        // 未来の引落日かつ金額がプラスのもの
+        const futureWithdrawals = Array.from(withdrawalGroups.values())
+            .filter(w => w.date > today && w.amount > 0)
+            .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+        if (futureWithdrawals.length === 0) return null;
+
+        const next = futureWithdrawals[0];
+        return {
+            amount: next.amount,
+            dateStr: next.date.toLocaleDateString('ja-JP', {
+                month: 'long',
+                day: 'numeric',
+                weekday: 'short'
+            })
+        };
+    }, [transactions, id, account]);
+
     const colors = {
         background: isDark ? '#0f172a' : '#f8fafc',
         card: isDark ? '#1e293b' : 'white',
@@ -275,6 +372,23 @@ export default function AccountHistoryScreen() {
                         <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold', marginLeft: 6 }}>残高調整</Text>
                     </TouchableOpacity>
                 </View>
+                {account?.type === 'card' && nextWithdrawal && (
+                    <View style={{
+                        marginTop: 16,
+                        backgroundColor: 'rgba(255,255,255,0.15)',
+                        padding: 14,
+                        borderRadius: 16,
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,255,255,0.1)'
+                    }}>
+                        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: 'bold' }}>
+                            直近の引き落とし額 ({nextWithdrawal.dateStr})
+                        </Text>
+                        <Text style={{ color: 'white', fontSize: 22, fontWeight: 'bold', marginTop: 4 }}>
+                            ¥{nextWithdrawal.amount.toLocaleString()}
+                        </Text>
+                    </View>
+                )}
             </View>
 
             <FlashList

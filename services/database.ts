@@ -64,6 +64,7 @@ export const initDatabase = async () => {
       fee INTEGER DEFAULT 0,
       import_hash TEXT UNIQUE,
       is_deferred INTEGER DEFAULT 0,
+      exclude_from_balance INTEGER DEFAULT 0,
       FOREIGN KEY (account_id) REFERENCES accounts(id)
     );
 
@@ -171,6 +172,11 @@ export const initDatabase = async () => {
   // Migration: Add is_deferred to transactions if it doesn't exist
   try {
     await db.execAsync('ALTER TABLE transactions ADD COLUMN is_deferred INTEGER DEFAULT 0');
+  } catch (e) {}
+
+  // Migration: Add exclude_from_balance to transactions if it doesn't exist
+  try {
+    await db.execAsync('ALTER TABLE transactions ADD COLUMN exclude_from_balance INTEGER DEFAULT 0');
   } catch (e) {}
 
   // Migration: Add billing_start_date to accounts if it doesn't exist
@@ -320,7 +326,7 @@ export const databaseService = {
   async addTransaction(transaction: CreateTransactionInput): Promise<number> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     const result = await db.runAsync(
-      'INSERT INTO transactions (amount, category_id, account_id, to_account_id, date, memo, payee, transfer_id, fee, import_hash, is_deferred) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO transactions (amount, category_id, account_id, to_account_id, date, memo, payee, transfer_id, fee, import_hash, is_deferred, exclude_from_balance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       transaction.amount,
       transaction.category_id,
       transaction.account_id,
@@ -331,7 +337,8 @@ export const databaseService = {
       transaction.transfer_id ?? null,
       transaction.fee ?? 0,
       transaction.import_hash ?? null,
-      transaction.is_deferred ? 1 : 0
+      transaction.is_deferred ? 1 : 0,
+      transaction.exclude_from_balance ? 1 : 0
     );
 
     if (transaction.payee) {
@@ -347,7 +354,7 @@ export const databaseService = {
   async updateTransaction(transaction: Transaction): Promise<void> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     await db.runAsync(
-      'UPDATE transactions SET amount = ?, category_id = ?, account_id = ?, to_account_id = ?, date = ?, memo = ?, payee = ?, transfer_id = ?, fee = ?, import_hash = ?, is_deferred = ? WHERE id = ?',
+      'UPDATE transactions SET amount = ?, category_id = ?, account_id = ?, to_account_id = ?, date = ?, memo = ?, payee = ?, transfer_id = ?, fee = ?, import_hash = ?, is_deferred = ?, exclude_from_balance = ? WHERE id = ?',
       transaction.amount,
       transaction.category_id,
       transaction.account_id,
@@ -359,6 +366,7 @@ export const databaseService = {
       transaction.fee ?? 0,
       transaction.import_hash ?? null,
       transaction.is_deferred ? 1 : 0,
+      transaction.exclude_from_balance ? 1 : 0,
       transaction.id
     );
 
@@ -377,7 +385,8 @@ export const databaseService = {
     );
     return rows.map(row => ({
       ...row,
-      is_deferred: row.is_deferred === 1
+      is_deferred: row.is_deferred === 1,
+      exclude_from_balance: row.exclude_from_balance === 1
     }));
   },
 
@@ -520,9 +529,9 @@ export const databaseService = {
 
   async getAccountBalances(): Promise<{account_id: string, balance: number}[]> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
-    // 取引の合計 + アカウントの初期残高
+    // 取引の合計 + アカウントの初期残高 (残高計算から除外されているものを除外)
     return await db.getAllAsync<{account_id: string, balance: number}>(
-      'SELECT a.id as account_id, (COALESCE(SUM(t.amount), 0) + a.initial_balance) as balance FROM accounts a LEFT JOIN transactions t ON a.id = t.account_id GROUP BY a.id'
+      'SELECT a.id as account_id, (COALESCE(SUM(CASE WHEN t.exclude_from_balance = 1 THEN 0 ELSE t.amount END), 0) + a.initial_balance) as balance FROM accounts a LEFT JOIN transactions t ON a.id = t.account_id GROUP BY a.id'
     );
   },
 
@@ -750,6 +759,7 @@ export const databaseService = {
         AND t.amount > 0 
         AND t.to_account_id IS NULL
         AND t.transfer_id IS NULL
+        AND (t.exclude_from_balance IS NULL OR t.exclude_from_balance = 0)
         AND t.date >= date(?, 'start of month', '-' || ? || ' months')
         AND t.date < date(?, 'start of month')
     `;
@@ -789,6 +799,7 @@ export const databaseService = {
       WHERE maj.type = 'expense'
         AND t.amount < 0
         AND t.transfer_id IS NULL
+        AND (t.exclude_from_balance IS NULL OR t.exclude_from_balance = 0)
         AND t.date >= date(?, 'start of month', '-' || ? || ' months')
         AND t.date < date(?, 'start of month')
       GROUP BY major_id, month
@@ -828,6 +839,7 @@ export const databaseService = {
         AND t.amount < 0 
         AND t.to_account_id IS NULL
         AND t.transfer_id IS NULL
+        AND (t.exclude_from_balance IS NULL OR t.exclude_from_balance = 0)
         AND t.date >= date(?, 'start of month', '-' || ? || ' months')
         AND t.date < date(?, 'start of month')
       GROUP BY month

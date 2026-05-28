@@ -73,6 +73,12 @@ export const csvImportService = {
               // Fetch account mappings
               const accountMappings = await databaseService.getAllCsvAccountMappings();
 
+              // Check if this account is configured for email import
+              const rakutenId = await databaseService.getSetting('gmail_account_id_rakuten');
+              const vpassId = await databaseService.getSetting('gmail_account_id_vpass');
+              const jcbId = await databaseService.getSetting('gmail_account_id_jcb');
+              const isEmailImportAccount = [rakutenId, vpassId, jcbId].filter(id => id !== null).includes(accountId);
+
               const data = results.data as string[][];
               const { transactions, missingMappings } = this.mapCsvToTransactions(
                 data,
@@ -80,7 +86,8 @@ export const csvImportService = {
                 accountId,
                 mappings,
                 existingTransactions,
-                accountMappings
+                accountMappings,
+                isEmailImportAccount
               );
               resolve({
                 transactions,
@@ -111,7 +118,8 @@ export const csvImportService = {
     accountId: string,
     mappings: Record<string, string> = {},
     existingTransactions: any[] = [],
-    accountMappings: Record<string, string> = {}
+    accountMappings: Record<string, string> = {},
+    isEmailImportAccount: boolean = false
   ): { transactions: CreateTransactionInput[], missingMappings: string[] } {
     const transactions: CreateTransactionInput[] = [];
     const missingMappings = new Set<string>();
@@ -287,16 +295,27 @@ export const csvImportService = {
       console.log(date);
       if (!isNaN(amount) && date) {
         console.log("check");
-        // Check for duplicates (Date, Payee, Amount)
-        const isDuplicate = accountTransactions.some(t => {
-          // Compare date part only (YYYY-MM-DD)
+        
+        let duplicateEmailCandidate: any = null;
+        if (isEmailImportAccount) {
+          // 日付と金額が一致し、かつメールから生成された可能性が高い取引（ハッシュがある、またはメモにGmailと記載されている）を特定
+          duplicateEmailCandidate = accountTransactions.find(t => {
+            const tDate = t.date.split('T')[0];
+            const importDate = date.split('T')[0];
+            const isEmailTx = t.import_hash !== null || (t.memo && (t.memo.includes('Gmail') || t.memo.includes('gmail')));
+            return tDate === importDate && t.amount === amount && isEmailTx;
+          });
+        }
+
+        // 重複チェック (通常のアカウントの場合、またはメール重複候補以外の完全一致)
+        const isStandardDuplicate = accountTransactions.some(t => {
           const tDate = t.date.split('T')[0];
           const importDate = date.split('T')[0];
-          return tDate === importDate && t.payee === payee && t.amount === amount;
+          return tDate === importDate && t.payee === payee && t.amount === amount && (!duplicateEmailCandidate || t.id !== duplicateEmailCandidate.id);
         });
 
-        if (isDuplicate) {
-          console.log(`Skipping duplicate: ${date}, ${payee}, ${amount}`);
+        if (isStandardDuplicate) {
+          console.log(`Skipping standard duplicate: ${date}, ${payee}, ${amount}`);
           continue;
         }
 
@@ -311,6 +330,7 @@ export const csvImportService = {
           memo: `${cardType.toUpperCase()} CSVインポート`,
           payee,
           import_hash: cardType === 'paypay' ? (row[12] || '').trim() : null,
+          duplicateEmailCandidate: duplicateEmailCandidate || null
         });
       }
     }

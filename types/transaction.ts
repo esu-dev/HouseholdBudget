@@ -11,6 +11,7 @@ export type Transaction = {
   fee: number;
   import_hash: string | null;
   is_deferred: boolean;
+  exclude_from_balance: boolean;
 };
 
 export type CreateTransactionInput = {
@@ -25,4 +26,6 @@ export type CreateTransactionInput = {
   fee?: number;
   import_hash?: string | null;
   is_deferred?: boolean;
+  exclude_from_balance?: boolean;
+  duplicateEmailCandidate?: any;
 };

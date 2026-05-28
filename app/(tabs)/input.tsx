@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRouter } from 'expo-router';
-import { ArrowDownCircle, ArrowUpCircle, Building2, Calendar, ChevronLeft, CircleEllipsis, Clock3, CreditCard, ExternalLink, FileUp, Plus, Smartphone, Store, Trash2, Wallet, X, ZapOff } from 'lucide-react-native';
+import { ArrowDownCircle, ArrowUpCircle, Building2, Calendar, ChevronLeft, CircleEllipsis, Clock3, Coins, CreditCard, ExternalLink, FileUp, Plus, Smartphone, Store, Trash2, Wallet, X, ZapOff } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Alert, InputAccessoryView, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -26,6 +26,7 @@ const schema = z.object({
   fee: z.string().optional(),
   ignore_learning: z.boolean().optional(),
   is_deferred: z.boolean().optional(),
+  exclude_from_balance: z.boolean().optional(),
 }).refine(data => {
   if (data.type === 'transfer') return !!data.to_account_id && data.account_id !== data.to_account_id;
   return !!data.category_id;
@@ -55,6 +56,12 @@ export default function InputScreen() {
   const [isMappingModalVisible, setIsMappingModalVisible] = useState(false);
   const [pendingCsvResult, setPendingCsvResult] = useState<any>(null);
   const [localAccountMappings, setLocalAccountMappings] = useState<Record<string, string>>({});
+
+  // 重複取引の置換・新規追加選択用ステート
+  const [duplicateCandidates, setDuplicateCandidates] = useState<any[]>([]);
+  const [isDuplicateModalVisible, setIsDuplicateModalVisible] = useState(false);
+  const [pendingImportTransactions, setPendingImportTransactions] = useState<any[]>([]);
+  const [pendingAccountId, setPendingAccountId] = useState<string>('');
 
   // 最後に反映した取引IDを保持して、不必要なリセットを防ぐ
   const lastResolvedId = useRef<number | string | null | undefined>(undefined);
@@ -87,6 +94,7 @@ export default function InputScreen() {
       fee: '',
       ignore_learning: false,
       is_deferred: false,
+      exclude_from_balance: false,
     },
   });
 
@@ -155,6 +163,7 @@ export default function InputScreen() {
       setValue('memo', editingTransaction.memo || '');
       setValue('fee', editingTransaction.fee ? editingTransaction.fee.toString() : '');
       setValue('is_deferred', editingTransaction.is_deferred || false);
+      setValue('exclude_from_balance', editingTransaction.exclude_from_balance || false);
 
       if (editingTransaction.transfer_id) {
         setValue('type', 'transfer');
@@ -174,6 +183,7 @@ export default function InputScreen() {
         memo: '',
         fee: '',
         is_deferred: false,
+        exclude_from_balance: false,
       });
       setSelectedMajorId(null);
     }
@@ -199,9 +209,24 @@ export default function InputScreen() {
         setLocalAccountMappings({});
         setIsMappingModalVisible(true);
       } else if (result.transactions.length > 0) {
-        await databaseService.updateLastImportedAt(accountId, new Date().toISOString());
-        await addTransactions(result.transactions);
-        Alert.alert('完了', `${result.transactions.length}件の取引をインポートしました`);
+        // 重複メール取引の候補があるかチェック
+        const duplicates = result.transactions.filter(t => t.duplicateEmailCandidate !== null);
+        if (duplicates.length > 0) {
+          setPendingImportTransactions(result.transactions);
+          setPendingAccountId(accountId);
+          const candidates = duplicates.map((t, idx) => ({
+            id: idx,
+            csvTx: t,
+            existingTx: t.duplicateEmailCandidate,
+            resolution: 'replace'
+          }));
+          setDuplicateCandidates(candidates);
+          setIsDuplicateModalVisible(true);
+        } else {
+          await databaseService.updateLastImportedAt(accountId, new Date().toISOString());
+          await addTransactions(result.transactions);
+          Alert.alert('完了', `${result.transactions.length}件の取引をインポートしました`);
+        }
       } else {
         await databaseService.updateLastImportedAt(accountId, new Date().toISOString());
         await fetchData();
@@ -229,31 +254,120 @@ export default function InputScreen() {
       const existingTransactions = await databaseService.getAllTransactions();
       const accountMappings = await databaseService.getAllCsvAccountMappings();
 
+      const rakutenId = await databaseService.getSetting('gmail_account_id_rakuten');
+      const vpassId = await databaseService.getSetting('gmail_account_id_vpass');
+      const jcbId = await databaseService.getSetting('gmail_account_id_jcb');
+      const isEmailImportAccount = [rakutenId, vpassId, jcbId].filter(id => id !== null).includes(pendingCsvResult.accountId);
+
       const { transactions } = csvImportService.mapCsvToTransactions(
         pendingCsvResult.rawData,
         pendingCsvResult.cardType,
         pendingCsvResult.accountId,
         mappings,
         existingTransactions,
-        accountMappings
+        accountMappings,
+        isEmailImportAccount
       );
 
+      setIsMappingModalVisible(false);
+      setPendingCsvResult(null);
+      setMissingAccountMappings([]);
+      setLocalAccountMappings({});
+
       if (transactions.length > 0) {
-        await databaseService.updateLastImportedAt(pendingCsvResult.accountId, new Date().toISOString());
-        await addTransactions(transactions);
-        Alert.alert('完了', `${transactions.length}件の取引をインポートしました`);
+        const duplicates = transactions.filter(t => t.duplicateEmailCandidate !== null);
+        if (duplicates.length > 0) {
+          setPendingImportTransactions(transactions);
+          setPendingAccountId(pendingCsvResult.accountId);
+          const candidates = duplicates.map((t, idx) => ({
+            id: idx,
+            csvTx: t,
+            existingTx: t.duplicateEmailCandidate,
+            resolution: 'replace'
+          }));
+          setDuplicateCandidates(candidates);
+          setIsDuplicateModalVisible(true);
+        } else {
+          await databaseService.updateLastImportedAt(pendingCsvResult.accountId, new Date().toISOString());
+          await addTransactions(transactions);
+          Alert.alert('完了', `${transactions.length}件の取引をインポートしました`);
+        }
       } else {
         await databaseService.updateLastImportedAt(pendingCsvResult.accountId, new Date().toISOString());
         await fetchData();
         Alert.alert('情報', 'インポートする新しい取引はありませんでした');
       }
-      
-      setIsMappingModalVisible(false);
-      setPendingCsvResult(null);
-      setMissingAccountMappings([]);
-      setLocalAccountMappings({});
     } catch (error) {
       Alert.alert('エラー', 'インポート中にエラーが発生しました');
+    }
+  };
+
+  const handleSaveDuplicateResolutions = async () => {
+    setIsImporting(true);
+    setIsDuplicateModalVisible(false);
+
+    try {
+      let importedCount = 0;
+      let replacedCount = 0;
+
+      for (const t of pendingImportTransactions) {
+        const candidate = duplicateCandidates.find(c => c.csvTx === t);
+        if (candidate) {
+          if (candidate.resolution === 'replace') {
+            const existingTx = candidate.existingTx;
+            // 既存の取引カテゴリが'others'以外ならそれを引き継ぎ、そうでなければCSVのものを適用
+            const finalCategory = (existingTx.category_id && existingTx.category_id !== 'others') ? existingTx.category_id : t.category_id;
+            // 既存のメモがGmail自動インポート以外ならそれを引き継ぎ、そうでなければCSVのものを適用
+            const finalMemo = (existingTx.memo && existingTx.memo !== 'Gmail自動インポート' && existingTx.memo !== 'Gmail自動インポート(Mock)') ? existingTx.memo : t.memo;
+
+            await databaseService.updateTransaction({
+              ...existingTx,
+              amount: t.amount,
+              date: t.date,
+              payee: t.payee,
+              memo: finalMemo,
+              category_id: finalCategory,
+              import_hash: t.import_hash || existingTx.import_hash
+            });
+            replacedCount++;
+          } else {
+            // 新規作成
+            await databaseService.addTransaction({
+              amount: t.amount,
+              category_id: t.category_id,
+              account_id: t.account_id,
+              date: t.date,
+              memo: t.memo,
+              payee: t.payee,
+              import_hash: t.import_hash
+            });
+            importedCount++;
+          }
+        } else {
+          // 通常の重複なし取引の追加
+          await databaseService.addTransaction(t);
+          importedCount++;
+        }
+      }
+
+      const { creditCardPaymentService } = require('../../services/creditCardPaymentService');
+      await creditCardPaymentService.updateTransferForDate(pendingAccountId);
+
+      await fetchData();
+
+      Alert.alert(
+        'インポート完了',
+        `CSVの取り込みが完了しました。\n(新規追加: ${importedCount}件、置換更新: ${replacedCount}件)`
+      );
+
+      setPendingImportTransactions([]);
+      setDuplicateCandidates([]);
+      setPendingAccountId('');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('エラー', '取引のインポートに失敗しました');
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -294,7 +408,8 @@ export default function InputScreen() {
           memo: data.memo || null,
           transfer_id: null,
           fee: feeNum,
-          is_deferred: !!data.is_deferred
+          is_deferred: !!data.is_deferred,
+          exclude_from_balance: !!data.exclude_from_balance
         });
       }
     } else {
@@ -309,7 +424,8 @@ export default function InputScreen() {
           payee: data.payee || null,
           memo: data.memo || null,
           fee: feeNum,
-          is_deferred: !!data.is_deferred
+          is_deferred: !!data.is_deferred,
+          exclude_from_balance: !!data.exclude_from_balance
         });
       }
     }
@@ -561,7 +677,7 @@ export default function InputScreen() {
                       </TouchableOpacity>
                     );
                   })}
-                  
+
                   {/* 大カテゴリ追加ボタン */}
                   <TouchableOpacity
                     onPress={() => setIsNewMajorModalVisible(true)}
@@ -602,7 +718,7 @@ export default function InputScreen() {
                           </TouchableOpacity>
                         );
                       })}
-                      
+
                       {/* カテゴリ追加ボタン */}
                       <TouchableOpacity
                         onPress={() => setIsNewCategoryModalVisible(true)}
@@ -824,6 +940,41 @@ export default function InputScreen() {
                     )}
                   />
                 )}
+
+                <Controller
+                  control={control}
+                  name="exclude_from_balance"
+                  render={({ field: { onChange, value } }) => (
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: colors.inputBg,
+                      padding: 12,
+                      borderRadius: 12,
+                      marginTop: 8
+                    }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                        <Coins size={16} color={value ? colors.primary : colors.textMuted} />
+                        <View style={{ marginLeft: 12, flex: 1 }}>
+                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: value ? colors.primary : colors.text }}>
+                            残高の計算から除外する
+                          </Text>
+                          <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>
+                            この取引を口座の残高計算（集計）に含めません
+                          </Text>
+                        </View>
+                      </View>
+                      <Switch
+                        value={value}
+                        onValueChange={onChange}
+                        trackColor={{ false: isDark ? '#334155' : '#e2e8f0', true: colors.primary + '80' }}
+                        thumbColor={value ? colors.primary : '#f4f3f4'}
+                        ios_backgroundColor={isDark ? '#334155' : '#e2e8f0'}
+                      />
+                    </View>
+                  )}
+                />
               </>
             )}
 
@@ -895,7 +1046,7 @@ export default function InputScreen() {
         onRequestClose={() => setIsNewCategoryModalVisible(false)}
       >
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <KeyboardAvoidingView 
+          <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ width: '100%', maxWidth: 400 }}
           >
@@ -950,7 +1101,7 @@ export default function InputScreen() {
         onRequestClose={() => setIsNewMajorModalVisible(false)}
       >
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <KeyboardAvoidingView 
+          <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ width: '100%', maxWidth: 400 }}
           >
@@ -1001,7 +1152,7 @@ export default function InputScreen() {
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
           <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 32, borderTopRightRadius: 32, height: '70%', padding: 24 }}>
             <View style={{ width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
-            
+
             <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 8 }}>口座の紐付け設定</Text>
             <Text style={{ fontSize: 14, color: colors.textMuted, marginBottom: 24 }}>PayPayチャージ等の元口座をアプリ内の口座と紐付けてください。</Text>
 
@@ -1046,6 +1197,128 @@ export default function InputScreen() {
                 style={{ flex: 2, padding: 16, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center', opacity: Object.keys(localAccountMappings).length < missingAccountMappings.length ? 0.5 : 1 }}
               >
                 <Text style={{ fontWeight: 'bold', color: 'white' }}>保存して取り込む</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 重複取引処理選択モーダル */}
+      <Modal visible={isDuplicateModalVisible} animationType="slide" transparent>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 32, borderTopRightRadius: 32, height: '80%', padding: 24 }}>
+            <View style={{ width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
+
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 8 }}>重複する可能性のある取引の処理</Text>
+            <Text style={{ fontSize: 13, color: colors.textMuted, marginBottom: 16 }}>
+              メールから自動インポートされた既存の取引が見つかりました。置換（カテゴリやメモを引き継ぎます）か、新規作成かを選択してください。
+            </Text>
+
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+              {duplicateCandidates.map((candidate) => {
+                const csvTx = candidate.csvTx;
+                const existingTx = candidate.existingTx;
+                const dateLabel = new Date(csvTx.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
+
+                return (
+                  <View key={candidate.id} style={{ marginBottom: 16, backgroundColor: colors.card, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: colors.border }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted }}>{dateLabel} の取引</Text>
+                      <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>
+                        ¥{Math.abs(csvTx.amount).toLocaleString()}
+                      </Text>
+                    </View>
+
+                    <View style={{ gap: 8, marginBottom: 16 }}>
+                      {/* CSV Row */}
+                      <View style={{ backgroundColor: colors.inputBg, padding: 10, borderRadius: 12 }}>
+                        <Text style={{ fontSize: 11, color: colors.textMuted, fontWeight: 'bold' }}>CSVインポートデータ</Text>
+                        <Text style={{ fontSize: 13, color: colors.text, marginTop: 2, fontWeight: 'bold' }} numberOfLines={1}>
+                          {csvTx.payee}
+                        </Text>
+                      </View>
+
+                      {/* Gmail Row */}
+                      <View style={{ backgroundColor: colors.inputBg, padding: 10, borderRadius: 12, borderLeftWidth: 3, borderLeftColor: colors.primary }}>
+                        <Text style={{ fontSize: 11, color: colors.primary, fontWeight: 'bold' }}>既存のメール取り込みデータ</Text>
+                        <Text style={{ fontSize: 13, color: colors.text, marginTop: 2 }} numberOfLines={1}>
+                          {existingTx.payee}
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+                          <Text style={{ fontSize: 10, color: colors.textMuted }}>
+                            カテゴリ: {(() => {
+                              const parentId = majorCategories.find(maj => maj.subCategories.some(min => min.id === existingTx.category_id))?.id;
+                              const parentLabel = majorCategories.find(maj => maj.id === parentId)?.label;
+                              const minorLabel = majorCategories.find(maj => maj.subCategories.some(min => min.id === existingTx.category_id))?.subCategories.find(s => s.id === existingTx.category_id)?.label;
+                              return parentLabel && minorLabel ? `${parentLabel} > ${minorLabel}` : '未設定';
+                            })()}
+                          </Text>
+                          {existingTx.memo && existingTx.memo !== 'Gmail自動インポート' && existingTx.memo !== 'Gmail自動インポート(Mock)' && (
+                            <Text style={{ fontSize: 10, color: colors.textMuted }} numberOfLines={1}>
+                              メモ: {existingTx.memo}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Selector */}
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <TouchableOpacity
+                        onPress={() => setDuplicateCandidates(prev => prev.map(c => c.id === candidate.id ? { ...c, resolution: 'replace' } : c))}
+                        style={{
+                          flex: 1,
+                          paddingVertical: 10,
+                          borderRadius: 12,
+                          backgroundColor: candidate.resolution === 'replace' ? colors.primarySub : colors.inputBg,
+                          borderWidth: 2,
+                          borderColor: candidate.resolution === 'replace' ? colors.primary : 'transparent',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: candidate.resolution === 'replace' ? colors.primary : colors.textMuted }}>
+                          既存を置換する
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setDuplicateCandidates(prev => prev.map(c => c.id === candidate.id ? { ...c, resolution: 'new' } : c))}
+                        style={{
+                          flex: 1,
+                          paddingVertical: 10,
+                          borderRadius: 12,
+                          backgroundColor: candidate.resolution === 'new' ? colors.primarySub : colors.inputBg,
+                          borderWidth: 2,
+                          borderColor: candidate.resolution === 'new' ? colors.primary : 'transparent',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: candidate.resolution === 'new' ? colors.primary : colors.textMuted }}>
+                          新規追加する
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+
+            <View style={{ flexDirection: 'row', gap: 12, paddingTop: 16 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setIsDuplicateModalVisible(false);
+                  setPendingImportTransactions([]);
+                  setDuplicateCandidates([]);
+                  setPendingAccountId('');
+                }}
+                style={{ flex: 1, padding: 16, borderRadius: 16, backgroundColor: colors.inputBg, alignItems: 'center' }}
+              >
+                <Text style={{ fontWeight: 'bold', color: colors.textMuted }}>キャンセル</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSaveDuplicateResolutions}
+                style={{ flex: 2, padding: 16, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center' }}
+              >
+                <Text style={{ fontWeight: 'bold', color: 'white' }}>インポートを実行</Text>
               </TouchableOpacity>
             </View>
           </View>

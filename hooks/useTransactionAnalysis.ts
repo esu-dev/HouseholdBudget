@@ -26,8 +26,8 @@ export const useTransactionAnalysis = (
   // カテゴリ別の支出集計 (円グラフ用)
   // 大カテゴリ単位で集計することで、グラフの視認性を高める
   const categoryData = useMemo(() => {
-    // 振替は集計から除外
-    const expenses = transactions.filter(t => t.amount < 0 && t.category_id !== 'transfer');
+    // 振替および残高計算除外の取引は集計から除外
+    const expenses = transactions.filter(t => t.amount < 0 && t.category_id !== 'transfer' && !t.exclude_from_balance);
     const majorTotals: Record<string, number> = {};
 
     expenses.forEach(t => {
@@ -56,7 +56,7 @@ export const useTransactionAnalysis = (
       const daily: Record<string, number> = {};
       
       transactions.forEach(t => {
-        if (t.category_id === 'transfer') return;
+        if (t.category_id === 'transfer' || t.exclude_from_balance) return;
         const dateKey = t.date.split('T')[0];
         daily[dateKey] = (daily[dateKey] || 0) + t.amount;
       });
@@ -71,7 +71,7 @@ export const useTransactionAnalysis = (
       const monthly: Record<string, number> = {};
       
       transactions.forEach(t => {
-        if (t.category_id === 'transfer') return;
+        if (t.category_id === 'transfer' || t.exclude_from_balance) return;
         const date = new Date(t.date);
         const monthKey = `${date.getMonth() + 1}`;
         monthly[monthKey] = (monthly[monthKey] || 0) + t.amount;
@@ -90,7 +90,7 @@ export const useTransactionAnalysis = (
       let maxYear = minYear;
 
       transactions.forEach(t => {
-        if (t.category_id === 'transfer') return;
+        if (t.category_id === 'transfer' || t.exclude_from_balance) return;
         const year = new Date(t.date).getFullYear();
         yearly[year] = (yearly[year] || 0) + t.amount;
         if (year < minYear) minYear = year;
@@ -116,11 +116,13 @@ export const useTransactionAnalysis = (
       const firstDayOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
       let runningTotal = 0;
       allTransactions.forEach(t => {
+        if (t.exclude_from_balance) return;
         if (new Date(t.date) < firstDayOfMonth) runningTotal += t.amount;
       });
 
       const dailyChanges: Record<string, number> = {};
       transactions.forEach(t => {
+        if (t.exclude_from_balance) return;
         const dateKey = t.date.split('T')[0];
         dailyChanges[dateKey] = (dailyChanges[dateKey] || 0) + t.amount;
       });
@@ -142,11 +144,13 @@ export const useTransactionAnalysis = (
       const targetYear = targetDate.getFullYear();
 
       allTransactions.forEach(t => {
+        if (t.exclude_from_balance) return;
         if (new Date(t.date).getFullYear() < targetYear) runningTotal += t.amount;
       });
 
       const monthlyChanges: number[] = new Array(12).fill(0);
       allTransactions.forEach(t => {
+        if (t.exclude_from_balance) return;
         const d = new Date(t.date);
         if (d.getFullYear() === targetYear) {
           monthlyChanges[d.getMonth()] += t.amount;
@@ -168,6 +172,7 @@ export const useTransactionAnalysis = (
       let maxYear = minYear;
 
       allTransactions.forEach(t => {
+        if (t.exclude_from_balance) return;
         const year = new Date(t.date).getFullYear();
         yearlyChanges[year] = (yearlyChanges[year] || 0) + t.amount;
         if (year < minYear) minYear = year;
