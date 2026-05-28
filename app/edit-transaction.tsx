@@ -64,6 +64,35 @@ export default function EditTransactionScreen() {
   const [pendingImportTransactions, setPendingImportTransactions] = useState<any[]>([]);
   const [pendingAccountId, setPendingAccountId] = useState<string>('');
 
+  const [emailTransactions, setEmailTransactions] = useState<any[]>([]);
+  const [isManualSelectModalVisible, setIsManualSelectModalVisible] = useState(false);
+  const [activeCandidateId, setActiveCandidateId] = useState<number | null>(null);
+
+  const sortedEmailTransactions = React.useMemo(() => {
+    if (activeCandidateId === null) return [];
+    const candidate = duplicateCandidates.find(c => c.id === activeCandidateId);
+    if (!candidate) return [];
+    const csvTx = candidate.csvTx;
+
+    return [...emailTransactions].sort((a, b) => {
+      const aAmtDiff = Math.abs(Math.abs(a.amount) - Math.abs(csvTx.amount));
+      const bAmtDiff = Math.abs(Math.abs(b.amount) - Math.abs(csvTx.amount));
+      
+      // Exact amount match first
+      if (aAmtDiff === 0 && bAmtDiff > 0) return -1;
+      if (bAmtDiff === 0 && aAmtDiff > 0) return 1;
+
+      // Then by amount diff
+      if (aAmtDiff !== bAmtDiff) return aAmtDiff - bAmtDiff;
+
+      // Then by date proximity
+      const csvDate = new Date(csvTx.date).getTime();
+      const aDateDiff = Math.abs(new Date(a.date).getTime() - csvDate);
+      const bDateDiff = Math.abs(new Date(b.date).getTime() - csvDate);
+      return aDateDiff - bDateDiff;
+    });
+  }, [emailTransactions, duplicateCandidates, activeCandidateId]);
+
   // 最後に反映した取引IDを保持して、不必要なリセットを防ぐ
   const lastResolvedId = useRef<number | string | null | undefined>(undefined);
 
@@ -215,8 +244,31 @@ export default function EditTransactionScreen() {
         setIsMappingModalVisible(true);
       } else if (result.transactions.length > 0) {
         // 重複メール取引の候補があるかチェック
+        const rakutenId = await databaseService.getSetting('gmail_account_id_rakuten');
+        const vpassId = await databaseService.getSetting('gmail_account_id_vpass');
+        const jcbId = await databaseService.getSetting('gmail_account_id_jcb');
+        const isEmailImportAccount = [rakutenId, vpassId, jcbId].filter(id => id !== null).includes(accountId);
+
+        const existingTransactions = await databaseService.getAllTransactions();
+        const emailTxs = existingTransactions.filter(t => {
+          const isEmailTx = t.import_hash !== null || (t.memo && (t.memo.includes('Gmail') || t.memo.includes('gmail')));
+          return t.account_id === accountId && isEmailTx;
+        });
+        setEmailTransactions(emailTxs);
+
         const duplicates = result.transactions.filter(t => t.duplicateEmailCandidate !== null);
-        if (duplicates.length > 0) {
+        if (isEmailImportAccount) {
+          setPendingImportTransactions(result.transactions);
+          setPendingAccountId(accountId);
+          const candidates = result.transactions.map((t, idx) => ({
+            id: idx,
+            csvTx: t,
+            existingTx: t.duplicateEmailCandidate,
+            resolution: t.duplicateEmailCandidate ? 'replace' : 'new'
+          }));
+          setDuplicateCandidates(candidates);
+          setIsDuplicateModalVisible(true);
+        } else if (duplicates.length > 0) {
           setPendingImportTransactions(result.transactions);
           setPendingAccountId(accountId);
           const candidates = duplicates.map((t, idx) => ({
@@ -281,8 +333,25 @@ export default function EditTransactionScreen() {
       setLocalAccountMappings({});
 
       if (transactions.length > 0) {
+        const emailTxs = existingTransactions.filter(t => {
+          const isEmailTx = t.import_hash !== null || (t.memo && (t.memo.includes('Gmail') || t.memo.includes('gmail')));
+          return t.account_id === pendingCsvResult.accountId && isEmailTx;
+        });
+        setEmailTransactions(emailTxs);
+
         const duplicates = transactions.filter(t => t.duplicateEmailCandidate !== null);
-        if (duplicates.length > 0) {
+        if (isEmailImportAccount) {
+          setPendingImportTransactions(transactions);
+          setPendingAccountId(pendingCsvResult.accountId);
+          const candidates = transactions.map((t, idx) => ({
+            id: idx,
+            csvTx: t,
+            existingTx: t.duplicateEmailCandidate,
+            resolution: t.duplicateEmailCandidate ? 'replace' : 'new'
+          }));
+          setDuplicateCandidates(candidates);
+          setIsDuplicateModalVisible(true);
+        } else if (duplicates.length > 0) {
           setPendingImportTransactions(transactions);
           setPendingAccountId(pendingCsvResult.accountId);
           const candidates = duplicates.map((t, idx) => ({
@@ -1238,9 +1307,9 @@ export default function EditTransactionScreen() {
           <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 32, borderTopRightRadius: 32, height: '80%', padding: 24 }}>
             <View style={{ width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
 
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 8 }}>重複する可能性のある取引の処理</Text>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 8 }}>取引のインポート確認</Text>
             <Text style={{ fontSize: 13, color: colors.textMuted, marginBottom: 16 }}>
-              メールから自動インポートされた既存の取引が見つかりました。置換（カテゴリやメモを引き継ぎます）か、新規作成かを選択してください。
+              メールから自動インポートされた既存の取引と一致させる（置換）か、新規取引として追加するかを選択してください。
             </Text>
 
             <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
@@ -1268,32 +1337,58 @@ export default function EditTransactionScreen() {
                       </View>
 
                       {/* Gmail Row */}
-                      <View style={{ backgroundColor: colors.inputBg, padding: 10, borderRadius: 12, borderLeftWidth: 3, borderLeftColor: colors.primary }}>
-                        <Text style={{ fontSize: 11, color: colors.primary, fontWeight: 'bold' }}>既存のメール取り込みデータ</Text>
-                        <Text style={{ fontSize: 13, color: colors.text, marginTop: 2 }} numberOfLines={1}>
-                          {existingTx.payee}
-                        </Text>
-                        <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
-                          <Text style={{ fontSize: 10, color: colors.textMuted }}>
-                            カテゴリ: {(() => {
-                              const parentId = majorCategories.find(maj => maj.subCategories.some(min => min.id === existingTx.category_id))?.id;
-                              const parentLabel = majorCategories.find(maj => maj.id === parentId)?.label;
-                              const minorLabel = majorCategories.find(maj => maj.subCategories.some(min => min.id === existingTx.category_id))?.subCategories.find(s => s.id === existingTx.category_id)?.label;
-                              return parentLabel && minorLabel ? `${parentLabel} > ${minorLabel}` : '未設定';
-                            })()}
+                      {existingTx ? (
+                        <View style={{ backgroundColor: colors.inputBg, padding: 10, borderRadius: 12, borderLeftWidth: 3, borderLeftColor: colors.primary }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={{ fontSize: 11, color: colors.primary, fontWeight: 'bold' }}>置換するメール取り込みデータ</Text>
+                            <TouchableOpacity
+                              onPress={() => {
+                                setActiveCandidateId(candidate.id);
+                                setIsManualSelectModalVisible(true);
+                              }}
+                            >
+                              <Text style={{ fontSize: 11, color: colors.primary, fontWeight: 'bold' }}>変更する</Text>
+                            </TouchableOpacity>
+                          </View>
+                          <Text style={{ fontSize: 13, color: colors.text, marginTop: 2 }} numberOfLines={1}>
+                            {existingTx.payee} (¥{Math.abs(existingTx.amount).toLocaleString()})
                           </Text>
-                          {existingTx.memo && existingTx.memo !== 'Gmail自動インポート' && existingTx.memo !== 'Gmail自動インポート(Mock)' && (
-                            <Text style={{ fontSize: 10, color: colors.textMuted }} numberOfLines={1}>
-                              メモ: {existingTx.memo}
+                          <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+                            <Text style={{ fontSize: 10, color: colors.textMuted }}>
+                              カテゴリ: {(() => {
+                                const parentId = majorCategories.find(maj => maj.subCategories.some(min => min.id === existingTx.category_id))?.id;
+                                const parentLabel = majorCategories.find(maj => maj.id === parentId)?.label;
+                                const minorLabel = majorCategories.find(maj => maj.subCategories.some(min => min.id === existingTx.category_id))?.subCategories.find(s => s.id === existingTx.category_id)?.label;
+                                return parentLabel && minorLabel ? `${parentLabel} > ${minorLabel}` : '未設定';
+                              })()}
                             </Text>
-                          )}
+                            {existingTx.memo && existingTx.memo !== 'Gmail自動インポート' && existingTx.memo !== 'Gmail自動インポート(Mock)' && (
+                              <Text style={{ fontSize: 10, color: colors.textMuted }} numberOfLines={1}>
+                                メモ: {existingTx.memo}
+                              </Text>
+                            )}
+                          </View>
                         </View>
-                      </View>
+                      ) : (
+                        <View style={{ backgroundColor: colors.inputBg, padding: 10, borderRadius: 12, borderStyle: 'dashed', borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}>
+                          <Text style={{ fontSize: 12, color: colors.textMuted, marginBottom: 8 }}>紐付く既存メール取引はありません（新規取引）</Text>
+                          <TouchableOpacity
+                            onPress={() => {
+                              setActiveCandidateId(candidate.id);
+                              setIsManualSelectModalVisible(true);
+                            }}
+                            style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.primarySub }}
+                          >
+                            <Text style={{ fontSize: 11, color: colors.primary, fontWeight: 'bold' }}>置換先を手動で選択...</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
                     </View>
 
                     {/* Selector */}
                     <View style={{ flexDirection: 'row', gap: 10 }}>
                       <TouchableOpacity
+                        disabled={!existingTx}
                         onPress={() => setDuplicateCandidates(prev => prev.map(c => c.id === candidate.id ? { ...c, resolution: 'replace' } : c))}
                         style={{
                           flex: 1,
@@ -1302,7 +1397,8 @@ export default function EditTransactionScreen() {
                           backgroundColor: candidate.resolution === 'replace' ? colors.primarySub : colors.inputBg,
                           borderWidth: 2,
                           borderColor: candidate.resolution === 'replace' ? colors.primary : 'transparent',
-                          alignItems: 'center'
+                          alignItems: 'center',
+                          opacity: !existingTx ? 0.4 : 1
                         }}
                       >
                         <Text style={{ fontSize: 13, fontWeight: 'bold', color: candidate.resolution === 'replace' ? colors.primary : colors.textMuted }}>
@@ -1350,6 +1446,81 @@ export default function EditTransactionScreen() {
                 <Text style={{ fontWeight: 'bold', color: 'white' }}>インポートを実行</Text>
               </TouchableOpacity>
             </View>
+
+            {isManualSelectModalVisible && (
+              <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', zIndex: 999 }}>
+                <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 32, borderTopRightRadius: 32, height: '75%', padding: 24 }}>
+                  <View style={{ width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
+                  
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>置換する既存メール取引を選択</Text>
+                    <TouchableOpacity onPress={() => setIsManualSelectModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <X size={20} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text style={{ fontSize: 13, color: colors.textMuted, marginBottom: 20 }}>
+                    インポートする取引と金額や日付が近い既存のメール取り込み取引が優先的に表示されています。
+                  </Text>
+
+                  <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+                    {sortedEmailTransactions.length > 0 ? (
+                      sortedEmailTransactions.map((tx) => {
+                        const txDate = new Date(tx.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' });
+                        return (
+                          <TouchableOpacity
+                            key={tx.id}
+                            onPress={() => {
+                              setDuplicateCandidates(prev => prev.map(c => 
+                                c.id === activeCandidateId 
+                                  ? { ...c, existingTx: tx, resolution: 'replace' } 
+                                  : c
+                              ));
+                              setIsManualSelectModalVisible(false);
+                            }}
+                            style={{
+                              backgroundColor: colors.card,
+                              padding: 16,
+                              borderRadius: 16,
+                              marginBottom: 10,
+                              borderWidth: 1,
+                              borderColor: colors.border,
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}
+                          >
+                            <View style={{ flex: 1, marginRight: 12 }}>
+                              <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.primary }}>{txDate}</Text>
+                              <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.text, marginTop: 2 }} numberOfLines={1}>{tx.payee || '利用先不明'}</Text>
+                              <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>
+                                {tx.memo || ''}
+                              </Text>
+                            </View>
+                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>
+                              ¥{Math.abs(tx.amount).toLocaleString()}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })
+                    ) : (
+                      <View style={{ padding: 40, alignItems: 'center' }}>
+                        <Text style={{ color: colors.textMuted }}>選択可能な既存メール取引がありません</Text>
+                      </View>
+                    )}
+                  </ScrollView>
+
+                  <View style={{ paddingTop: 16 }}>
+                    <TouchableOpacity
+                      onPress={() => setIsManualSelectModalVisible(false)}
+                      style={{ padding: 16, borderRadius: 16, backgroundColor: colors.inputBg, alignItems: 'center' }}
+                    >
+                      <Text style={{ fontWeight: 'bold', color: colors.textMuted }}>閉じる</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
         </View>
       </Modal>

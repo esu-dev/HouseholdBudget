@@ -47,7 +47,7 @@ export default function AnalysisScreen() {
 
     const groupedTransactions = useMemo(() => {
         const groups: Record<string, typeof transactions> = {};
-        const expenses = filteredTransactions.filter(t => t.amount < 0 && t.category_id !== 'transfer');
+        const expenses = filteredTransactions.filter(t => t.amount < 0 && t.category_id !== 'transfer' && !t.exclude_from_balance);
 
         expenses.forEach(t => {
             const major = useTransactionStore.getState().majorCategories.find(maj =>

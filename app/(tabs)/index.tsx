@@ -405,6 +405,7 @@ export default function HomeScreen() {
         let expense = 0;
         monthTransactions.forEach(t => {
             if (t.category_id === 'transfer' || t.category_id === 'adjustment') return; // 振替・調整は収支に計上しない
+            if (t.exclude_from_balance) return; // 残高計算除外も収支・予算に計上しない
             if (t.amount > 0) {
                 income += t.amount;
             } else {
@@ -446,7 +447,7 @@ export default function HomeScreen() {
 
         // 実際の支出を合算
         monthTransactions.forEach(t => {
-            if (t.amount < 0 && t.category_id !== 'transfer' && t.category_id !== 'adjustment') {
+            if (t.amount < 0 && t.category_id !== 'transfer' && t.category_id !== 'adjustment' && !t.exclude_from_balance) {
                 // 小カテゴリから親の大カテゴリを探す
                 let parentMajId = null;
                 for (const maj of majorCategories) {
@@ -492,6 +493,7 @@ export default function HomeScreen() {
             // その日の収支を計算
             const dailyBalance = items.reduce((acc, t) => {
                 if (t.category_id === 'transfer' || t.category_id === 'adjustment') return acc;
+                if (t.exclude_from_balance) return acc;
                 return acc + t.amount;
             }, 0);
 
@@ -671,6 +673,7 @@ export default function HomeScreen() {
                                 {(() => {
                                     const dailyBalance = dayTransactions.reduce((acc, t) => {
                                         if (t.category_id === 'transfer' || t.category_id === 'adjustment') return acc;
+                                        if (t.exclude_from_balance) return acc;
                                         return acc + t.amount;
                                     }, 0);
                                     if (dayTransactions.length === 0) return null;
