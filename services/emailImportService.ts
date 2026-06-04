@@ -67,7 +67,7 @@ export const emailImportService = {
           payee: parsed.payee,
           category_id,
           account_id: accountId,
-          memo: 'Gmail自動インポート(Mock)',
+          memo: null,
           import_hash: `${msgId}_${i}`,
         });
         results.imported++;
@@ -159,7 +159,7 @@ export const emailImportService = {
                   payee: parsed.payee,
                   category_id,
                   account_id: accountId,
-                  memo: 'Gmail自動インポート',
+                  memo: null,
                   import_hash: currentHash,
                 });
 

@@ -86,6 +86,24 @@ const TransactionItem = React.memo(({
                                 </View>
                             </>
                         ) : null}
+                        {item.import_hash ? (
+                            <>
+                                <Text className="text-slate-300 mx-1">|</Text>
+                                <View className={`px-1.5 py-0.5 rounded-md ${
+                                    item.import_hash.startsWith('csv_') || !/^(mock_msg|[0-9a-f]{16})/.test(item.import_hash)
+                                        ? 'bg-sky-100 dark:bg-sky-955'
+                                        : 'bg-amber-100 dark:bg-amber-955'
+                                }`}>
+                                    <Text className={`text-[9px] font-bold ${
+                                        item.import_hash.startsWith('csv_') || !/^(mock_msg|[0-9a-f]{16})/.test(item.import_hash)
+                                            ? 'text-sky-700 dark:text-sky-300'
+                                            : 'text-amber-700 dark:text-amber-300'
+                                    }`}>
+                                        {item.import_hash.startsWith('csv_') || !/^(mock_msg|[0-9a-f]{16})/.test(item.import_hash) ? 'CSV' : 'メール'}
+                                    </Text>
+                                </View>
+                            </>
+                        ) : null}
                     </View>
                 </View>
 
@@ -283,7 +301,7 @@ export default function HomeScreen() {
     const isDark = colorScheme === 'dark';
     const { transactions, accounts, fetchData, fetchBudgets, budgets, setEditingTransaction, majorCategories } = useTransactionStore();
     const [selectedMonth, setSelectedMonth] = useState(new Date());
-    const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
+    const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
     const [selectedDay, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const [isBudgetModalVisible, setIsBudgetModalVisible] = useState(false);
     const [selectedMajorId, setSelectedMajorId] = useState<string | null>(null);
@@ -530,10 +548,10 @@ export default function HomeScreen() {
                             {item.date}
                         </Text>
                     </View>
-                    <Text style={{ 
-                        fontSize: 12, 
-                        fontWeight: 'bold', 
-                        color: item.dailyBalance > 0 ? '#22c55e' : (item.dailyBalance < 0 ? (isDark ? '#fb7185' : '#e11d48') : '#94a3b8') 
+                    <Text style={{
+                        fontSize: 12,
+                        fontWeight: 'bold',
+                        color: item.dailyBalance > 0 ? '#22c55e' : (item.dailyBalance < 0 ? (isDark ? '#fb7185' : '#e11d48') : '#94a3b8')
                     }}>
                         {item.dailyBalance > 0 ? '+' : ''}¥{item.dailyBalance.toLocaleString()}
                     </Text>
@@ -595,7 +613,7 @@ export default function HomeScreen() {
                 <View style={{ flexDirection: 'row', backgroundColor: isDark ? '#334155' : '#f1f5f9', borderRadius: 12, padding: 4 }}>
                     <TouchableOpacity
                         onPress={() => setViewMode('list')}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        hitSlop={{ top: 30, bottom: 30, left: 30, right: 30 }}
                         style={{
                             padding: 8,
                             borderRadius: 8,
@@ -611,7 +629,7 @@ export default function HomeScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                         onPress={() => setViewMode('calendar')}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        hitSlop={{ top: 10, bottom: 10, left: 0, right: 10 }}
                         style={{
                             padding: 8,
                             borderRadius: 8,
@@ -678,9 +696,9 @@ export default function HomeScreen() {
                                     }, 0);
                                     if (dayTransactions.length === 0) return null;
                                     return (
-                                        <Text style={{ 
-                                            fontSize: 12, 
-                                            fontWeight: 'bold', 
+                                        <Text style={{
+                                            fontSize: 12,
+                                            fontWeight: 'bold',
                                             color: dailyBalance > 0 ? '#22c55e' : (dailyBalance < 0 ? (isDark ? '#fb7185' : '#e11d48') : '#94a3b8'),
                                             marginBottom: 16
                                         }}>

@@ -303,12 +303,34 @@ export default function AccountHistoryScreen() {
                                     ? `${item.amount > 0 ? '←' : '→'} ${toAccount.name}`
                                     : label}
                             </Text>
-                            {item.payee && (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                                    <Store size={10} color={colors.textMuted} />
-                                    <Text style={{ fontSize: 11, color: colors.textMuted, marginLeft: 4 }} numberOfLines={1}>{item.payee}</Text>
-                                </View>
-                            )}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                {item.payee && (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Store size={10} color={colors.textMuted} />
+                                        <Text style={{ fontSize: 11, color: colors.textMuted, marginLeft: 4 }} numberOfLines={1}>{item.payee}</Text>
+                                    </View>
+                                )}
+                                {item.import_hash && (
+                                    <View style={{
+                                        backgroundColor: item.import_hash.startsWith('csv_') || !/^(mock_msg|[0-9a-f]{16})/.test(item.import_hash)
+                                            ? (isDark ? 'rgba(56, 189, 248, 0.15)' : '#e0f2fe')
+                                            : (isDark ? 'rgba(251, 191, 36, 0.15)' : '#fef3c7'),
+                                        paddingHorizontal: 6,
+                                        paddingVertical: 1,
+                                        borderRadius: 6
+                                    }}>
+                                        <Text style={{
+                                            fontSize: 9,
+                                            fontWeight: 'bold',
+                                            color: item.import_hash.startsWith('csv_') || !/^(mock_msg|[0-9a-f]{16})/.test(item.import_hash)
+                                                ? (isDark ? '#38bdf8' : '#0369a1')
+                                                : (isDark ? '#fbbf24' : '#b45309')
+                                        }}>
+                                            {item.import_hash.startsWith('csv_') || !/^(mock_msg|[0-9a-f]{16})/.test(item.import_hash) ? 'CSV' : 'メール'}
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
                             {item.memo && (
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                                     <MessageSquare size={10} color={colors.textMuted} />
@@ -332,15 +354,15 @@ export default function AccountHistoryScreen() {
             <Stack.Screen options={{ headerShown: false }} />
 
             {/* Header Area */}
-            <View style={{ backgroundColor: colors.indigo, paddingHorizontal: 20, paddingTop: 30, paddingBottom: 20, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 }}>
+            <View style={{ backgroundColor: colors.indigo, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 }}>
                 <TouchableOpacity
                     onPress={() => router.back()}
-                    style={{ marginBottom: 20 }}
+                    style={{ marginBottom: 12 }}
                     hitSlop={{ top: 10, bottom: 10, left: 20, right: 10 }}
                 >
                     <ArrowLeft size={24} color="white" />
                 </TouchableOpacity>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Wallet size={20} color="rgba(255,255,255,0.7)" />
                         <Text style={{ color: 'rgba(255,255,255,0.7)', marginLeft: 8, fontSize: 14 }}>{account?.name || 'アカウント'}</Text>
@@ -374,9 +396,10 @@ export default function AccountHistoryScreen() {
                 </View>
                 {account?.type === 'card' && nextWithdrawal && (
                     <View style={{
-                        marginTop: 16,
+                        marginTop: 10,
                         backgroundColor: 'rgba(255,255,255,0.15)',
-                        padding: 14,
+                        paddingVertical: 10,
+                        paddingHorizontal: 14,
                         borderRadius: 16,
                         borderWidth: 1,
                         borderColor: 'rgba(255,255,255,0.1)'
@@ -384,7 +407,7 @@ export default function AccountHistoryScreen() {
                         <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: 'bold' }}>
                             直近の引き落とし額 ({nextWithdrawal.dateStr})
                         </Text>
-                        <Text style={{ color: 'white', fontSize: 22, fontWeight: 'bold', marginTop: 4 }}>
+                        <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold', marginTop: 2 }}>
                             ¥{nextWithdrawal.amount.toLocaleString()}
                         </Text>
                     </View>
@@ -397,8 +420,8 @@ export default function AccountHistoryScreen() {
                 keyExtractor={(item, index) => item.type === 'header' ? `header-${item.date}-${index}` : `item-${item.id}-${index}`}
                 //estimatedItemSize={80}
                 ListHeaderComponent={() => (
-                    <View style={{ paddingTop: 24, paddingBottom: 8 }}>
-                        <View style={{ paddingHorizontal: 24, marginBottom: 16 }}>
+                    <View style={{ paddingTop: 16, paddingBottom: 4 }}>
+                        <View style={{ paddingHorizontal: 24, marginBottom: 10 }}>
                             <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>取引履歴</Text>
                         </View>
 

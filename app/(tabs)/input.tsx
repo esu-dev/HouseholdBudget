@@ -246,7 +246,7 @@ export default function InputScreen() {
 
         const existingTransactions = await databaseService.getAllTransactions();
         const emailTxs = existingTransactions.filter(t => {
-          const isEmailTx = t.import_hash !== null || (t.memo && (t.memo.includes('Gmail') || t.memo.includes('gmail')));
+          const isEmailTx = t.import_hash !== null && /^(mock_msg|[0-9a-f]{16})/.test(t.import_hash);
           return t.account_id === accountId && isEmailTx;
         });
         setEmailTransactions(emailTxs);
@@ -328,7 +328,7 @@ export default function InputScreen() {
 
       if (transactions.length > 0) {
         const emailTxs = existingTransactions.filter(t => {
-          const isEmailTx = t.import_hash !== null || (t.memo && (t.memo.includes('Gmail') || t.memo.includes('gmail')));
+          const isEmailTx = t.import_hash !== null && /^(mock_msg|[0-9a-f]{16})/.test(t.import_hash);
           return t.account_id === pendingCsvResult.accountId && isEmailTx;
         });
         setEmailTransactions(emailTxs);

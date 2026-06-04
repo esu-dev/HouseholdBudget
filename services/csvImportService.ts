@@ -157,9 +157,17 @@ export const csvImportService = {
     } else if (cardType === 'paypay') {
       amountIdx = 1; // 出金金額
       startIndex = 0;
+      if (data.length > startIndex) {
+        const checkRow = data[startIndex];
+        // If the current row contains non-numeric text in an amount column, it's likely a header
+        const amountVal = checkRow[amountIdx]?.replace(/[,円]/g, '');
+        if (!amountVal || isNaN(Number(amountVal))) {
+          startIndex++;
+        }
+      }
     }
 
-    if (data.length > startIndex) {
+    if (data.length > startIndex && cardType !== 'paypay') {
       const checkRow = data[startIndex];
       // If the current row contains non-numeric text in an amount column, it's likely a header
       const amountVal = checkRow[amountIdx]?.replace(/[,円]/g, '');
@@ -211,13 +219,18 @@ export const csvImportService = {
 
         const transactionId = (row[12] || '').trim();
         if (transactionId) {
+          const prefixedId = `csv_paypay_${transactionId}`;
           const isDuplicateInDb = existingTransactions.some(t =>
             t.import_hash === transactionId ||
-            (t.import_hash && t.import_hash.startsWith(transactionId + '_'))
+            t.import_hash === prefixedId ||
+            (t.import_hash && t.import_hash.startsWith(transactionId + '_')) ||
+            (t.import_hash && t.import_hash.startsWith(prefixedId + '_'))
           );
           const isDuplicateInBatch = transactions.some(t =>
             t.import_hash === transactionId ||
-            (t.import_hash && t.import_hash.startsWith(transactionId + '_'))
+            t.import_hash === prefixedId ||
+            (t.import_hash && t.import_hash.startsWith(transactionId + '_')) ||
+            (t.import_hash && t.import_hash.startsWith(prefixedId + '_'))
           );
 
           if (isDuplicateInDb || isDuplicateInBatch) {
@@ -233,8 +246,8 @@ export const csvImportService = {
           continue;
         }
 
-        const typeStr = (row[7] || '').trim();
         // Also skip rows that are just point acquisitions without cash movement
+        const typeStr = (row[7] || '').trim();
         if (typeStr === 'ポイント、残高の獲得' && withdrawal === 0 && deposit === 0) {
           console.log('Skipping point acquisition without cash movement');
           continue;
@@ -248,6 +261,7 @@ export const csvImportService = {
           if (sourceAccountId) {
             const amount = Number(deposit || withdrawal);
             const transferId = Date.now() + i;
+            const prefixedHash = transactionId ? `csv_paypay_${transactionId}` : null;
 
             // Side 1: Destination (PayPay)
             transactions.push({
@@ -258,7 +272,7 @@ export const csvImportService = {
               date,
               memo: `PayPayチャージ (${externalAccountName})`,
               payee: externalAccountName,
-              import_hash: transactionId ? `${transactionId}_dest` : null,
+              import_hash: prefixedHash ? `${prefixedHash}_dest` : null,
               transfer_id: transferId
             });
 
@@ -271,7 +285,7 @@ export const csvImportService = {
               date,
               memo: `PayPayチャージ`,
               payee: 'PayPay',
-              import_hash: transactionId ? `${transactionId}_src` : null,
+              import_hash: prefixedHash ? `${prefixedHash}_src` : null,
               transfer_id: transferId
             });
 
@@ -288,13 +302,14 @@ export const csvImportService = {
       const cleanAmount = amountStr.replace(/[,円]/g, '');
       let amount = Number(cleanAmount);
       if (cardType !== 'paypay') {
-        amount = -Math.abs(amount); // Credit card payments are expenses (negative)
+        if (cardType === 'jcb' && amount < 0) {
+          amount = Math.abs(amount); // Cashback (income)
+        } else {
+          amount = -Math.abs(amount); // Credit card payments are expenses (negative)
+        }
       }
 
-      console.log(row[2]);
-      console.log(date);
       if (!isNaN(amount) && date) {
-        console.log("check");
         
         let duplicateEmailCandidate: any = null;
         if (isEmailImportAccount) {
@@ -319,17 +334,27 @@ export const csvImportService = {
           continue;
         }
 
-        // Use mapping if exists, otherwise default to 'others'
-        const category_id = mappings[payee] || 'others';
-        console.log("push");
+        // Use mapping if exists, otherwise default to 'others' (or 'other_income' if amount is positive)
+        const isIncome = amount > 0;
+        const category_id = mappings[payee] || (isIncome ? 'other_income' : 'others');
+        
+        // Generate import_hash starting with csv_ for all card types
+        let finalImportHash = null;
+        const transactionId = cardType === 'paypay' ? (row[12] || '').trim() : null;
+        if (cardType === 'paypay') {
+          finalImportHash = transactionId ? `csv_paypay_${transactionId}` : null;
+        } else {
+          finalImportHash = `csv_${cardType}_${date.split('T')[0]}_${payee}_${Math.abs(amount)}_${i}`;
+        }
+
         transactions.push({
           amount,
           category_id,
           account_id: accountId,
           date,
-          memo: `${cardType.toUpperCase()} CSVインポート`,
+          memo: null,
           payee,
-          import_hash: cardType === 'paypay' ? (row[12] || '').trim() : null,
+          import_hash: finalImportHash,
           duplicateEmailCandidate: duplicateEmailCandidate || null
         });
       }

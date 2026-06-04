@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
+import { databaseService } from '../../services/database';
 import { useTransactionStore } from '../../store/useTransactionStore';
 
 export default function BudgetSettingsScreen() {
@@ -24,13 +25,15 @@ export default function BudgetSettingsScreen() {
         savingsGoal,
         updateSavingsGoal,
         incomeCategoryIdsForAverage,
-        updateIncomeCategoriesForAverage
+        updateIncomeCategoriesForAverage,
+        transactions
     } = useTransactionStore();
 
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [localBudgets, setLocalBudgets] = useState<Record<string, string>>({});
     const [localSavingsGoal, setLocalSavingsGoal] = useState('');
     const [showIncomeSettings, setShowIncomeSettings] = useState(false);
+    const [lastMonthBudgets, setLastMonthBudgets] = useState<Record<string, number>>({});
 
     const colors = {
         background: isDark ? '#0f172a' : '#f8fafc',
@@ -61,6 +64,59 @@ export default function BudgetSettingsScreen() {
         fetchBudgets(monthStr);
         fetchStatistics(monthStr + '-01');
     }, [monthStr]);
+
+    useEffect(() => {
+        const fetchLastMonthBudgets = async () => {
+            const lastMonthDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);
+            const lastMonthStr = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
+            try {
+                const dbBudgets = await databaseService.getBudgetsByMonth(lastMonthStr);
+                const budgetMap: Record<string, number> = {};
+                dbBudgets.forEach(b => {
+                    budgetMap[b.category_id] = b.amount;
+                });
+                setLastMonthBudgets(budgetMap);
+            } catch (e) {
+                console.error('Failed to fetch last month budgets:', e);
+            }
+        };
+        fetchLastMonthBudgets();
+    }, [selectedDate]);
+
+    const expenseCategories = useMemo(() => {
+        return majorCategories.filter(cat => cat.type === 'expense');
+    }, [majorCategories]);
+
+    const incomeCategories = useMemo(() => {
+        return majorCategories.filter(cat => cat.type === 'income');
+    }, [majorCategories]);
+
+    const lastMonthUsageByCategory = useMemo(() => {
+        const usage: Record<string, number> = {};
+
+        // Filter last month transactions that are expenses and not transfer/adjustment/excluded
+        const lastMonthExpenses = transactions.filter(t => {
+            if (t.amount >= 0) return false;
+            if (t.category_id === 'transfer' || t.category_id === 'adjustment') return false;
+            if (t.exclude_from_balance) return false;
+
+            const d = new Date(t.date);
+            const lastMonthDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);
+            return d.getFullYear() === lastMonthDate.getFullYear() && d.getMonth() === lastMonthDate.getMonth();
+        });
+
+        expenseCategories.forEach(category => {
+            let sum = 0;
+            lastMonthExpenses.forEach(t => {
+                if (category.subCategories.some(sub => sub.id === t.category_id)) {
+                    sum += Math.abs(t.amount);
+                }
+            });
+            usage[category.id] = sum;
+        });
+
+        return usage;
+    }, [transactions, selectedDate, expenseCategories]);
 
     useEffect(() => {
         const newLocalBudgets: Record<string, string> = {};
@@ -101,14 +157,6 @@ export default function BudgetSettingsScreen() {
         setSelectedDate(next);
     };
 
-    const expenseCategories = useMemo(() => {
-        return majorCategories.filter(cat => cat.type === 'expense');
-    }, [majorCategories]);
-
-    const incomeCategories = useMemo(() => {
-        return majorCategories.filter(cat => cat.type === 'income');
-    }, [majorCategories]);
-
     const totalBudget = useMemo(() => {
         return Object.values(localBudgets).reduce((sum, val) => sum + (parseInt(val) || 0), 0);
     }, [localBudgets]);
@@ -128,12 +176,12 @@ export default function BudgetSettingsScreen() {
                 title: '予算設定',
                 headerLeft: () => (
                     <TouchableOpacity onPress={() => router.back()} style={{ marginLeft: 8 }}>
-                        <ChevronLeft size={24} color={colors.indigo} hitSlop={{ top: 60, bottom: 60, right: 60, left: 60 }} />
+                        <ChevronLeft size={24} color={colors.indigo} hitSlop={{ top: 120, bottom: 120, right: 120, left: 120 }} />
                     </TouchableOpacity>
                 ),
                 headerRight: () => (
                     <TouchableOpacity onPress={handleSave} style={{ marginRight: 8 }}>
-                        <Save size={24} color={colors.indigo} hitSlop={{ top: 30, bottom: 30, right: 30, left: 30 }} />
+                        <Save size={24} color={colors.indigo} hitSlop={{ top: 120, bottom: 120, right: 120, left: 120 }} />
                     </TouchableOpacity>
                 ),
                 headerStyle: { backgroundColor: colors.background },
@@ -147,13 +195,13 @@ export default function BudgetSettingsScreen() {
                     <View style={{ backgroundColor: colors.card, borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 24 }}>
                             <TouchableOpacity onPress={() => changeMonth(-1)} style={{ padding: 10 }}>
-                                <ChevronLeft size={24} color={colors.indigo} />
+                                <ChevronLeft size={24} color={colors.indigo} hitSlop={{ top: 120, bottom: 120, right: 120, left: 120 }} />
                             </TouchableOpacity>
                             <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, minWidth: 150, textAlign: 'center' }}>
                                 {selectedDate.getFullYear()}年 {selectedDate.getMonth() + 1}月
                             </Text>
                             <TouchableOpacity onPress={() => changeMonth(1)} style={{ padding: 10 }}>
-                                <ChevronRight size={24} color={colors.indigo} />
+                                <ChevronRight size={24} color={colors.indigo} hitSlop={{ top: 120, bottom: 120, right: 120, left: 120 }} />
                             </TouchableOpacity>
                         </View>
 
@@ -274,6 +322,9 @@ export default function BudgetSettingsScreen() {
                                 <View style={{ flex: 1, marginLeft: 12 }}>
                                     <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.text }}>{category.label}</Text>
                                     <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>
+                                        先月予算: ¥{(lastMonthBudgets[category.id] || 0).toLocaleString()} | 使用量: ¥{(lastMonthUsageByCategory[category.id] || 0).toLocaleString()}
+                                    </Text>
+                                    <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 1 }}>
                                         過去6ヶ月平均: ¥{(averageMonthlyExpensesByCategory[category.id] || 0).toLocaleString()}
                                     </Text>
                                 </View>
