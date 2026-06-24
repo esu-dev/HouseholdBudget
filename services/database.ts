@@ -823,6 +823,44 @@ export const databaseService = {
     return averages;
   },
 
+  async getMaxMonthlyExpenseByCategory(monthsCount: number, baseDate?: string): Promise<Record<string, number>> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    
+    const referenceDate = baseDate || 'now';
+
+    const rows = await db.getAllAsync<{major_id: string, month: string, total: number}>(`
+      SELECT 
+        maj.id as major_id,
+        strftime('%Y-%m', t.date) as month,
+        SUM(ABS(t.amount)) as total
+      FROM transactions t
+      JOIN minor_categories min ON t.category_id = min.id
+      JOIN major_categories maj ON min.parent_id = maj.id
+      WHERE maj.type = 'expense'
+        AND t.amount < 0
+        AND t.transfer_id IS NULL
+        AND (t.exclude_from_balance IS NULL OR t.exclude_from_balance = 0)
+        AND t.date >= date(?, 'start of month', '-' || ? || ' months')
+        AND t.date < date(?, 'start of month')
+      GROUP BY major_id, month
+    `, referenceDate, monthsCount, referenceDate);
+
+    const categoryMonthlyTotals: Record<string, number[]> = {};
+    rows.forEach(row => {
+      if (!categoryMonthlyTotals[row.major_id]) {
+        categoryMonthlyTotals[row.major_id] = [];
+      }
+      categoryMonthlyTotals[row.major_id].push(row.total);
+    });
+
+    const maxes: Record<string, number> = {};
+    Object.entries(categoryMonthlyTotals).forEach(([id, totals]) => {
+      maxes[id] = Math.max(...totals);
+    });
+
+    return maxes;
+  },
+
   async getAverageMonthlyExpense(monthsCount: number, baseDate?: string): Promise<number> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     

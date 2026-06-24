@@ -32,9 +32,9 @@ export const creditCardPaymentService = {
 
     const allTransactions = await databaseService.getAllTransactions();
     
-    // 1. 該当アカウントの「通常の取引（振替以外）」のみを抽出
+    // 1. 該当アカウントの「通常の取引（振替以外・残高除外以外）」のみを抽出
     const cardTransactions = allTransactions.filter(t => 
-      t.account_id === accountId && t.category_id !== 'transfer'
+      t.account_id === accountId && t.category_id !== 'transfer' && !t.exclude_from_balance
     );
 
     // 2. 取引から「存在するサイクル（YYYY-MM）」を特定

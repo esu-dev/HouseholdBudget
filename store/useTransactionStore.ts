@@ -16,6 +16,7 @@ interface TransactionState {
   averageMonthlyIncome: number;
   averageMonthlyExpense: number;
   averageMonthlyExpensesByCategory: Record<string, number>;
+  maxMonthlyExpensesByCategory: Record<string, number>;
   savingsGoal: number;
   incomeCategoryIdsForAverage: string[];
   editingTransaction: Transaction | null;
@@ -67,6 +68,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   averageMonthlyIncome: 0,
   averageMonthlyExpense: 0,
   averageMonthlyExpensesByCategory: {},
+  maxMonthlyExpensesByCategory: {},
   savingsGoal: 0,
   incomeCategoryIdsForAverage: [],
   editingTransaction: null,
@@ -88,10 +90,11 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
 
       const incomeCategoryIds = incomeCats ? JSON.parse(incomeCats) : [];
       
-      const [avgIncome, avgExpense, avgExpenses] = await Promise.all([
+      const [avgIncome, avgExpense, avgExpenses, maxExpenses] = await Promise.all([
         databaseService.getAverageMonthlyIncome(6, incomeCategoryIds, baseDate),
         databaseService.getAverageMonthlyExpense(6, baseDate),
         databaseService.getAverageMonthlyExpenseByCategory(6, baseDate),
+        databaseService.getMaxMonthlyExpenseByCategory(6, baseDate),
       ]);
 
       const balanceMap: Record<string, number> = {};
@@ -107,6 +110,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         averageMonthlyIncome: avgIncome,
         averageMonthlyExpense: avgExpense,
         averageMonthlyExpensesByCategory: avgExpenses,
+        maxMonthlyExpensesByCategory: maxExpenses,
         savingsGoal: savingsGoal ? parseInt(savingsGoal) : 0,
         incomeCategoryIdsForAverage: incomeCategoryIds,
         csvAccountMappings: csvMappings || {},
@@ -129,15 +133,17 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   fetchStatistics: async (baseDate?: string) => {
     try {
       const { incomeCategoryIdsForAverage } = get();
-      const [avgIncome, avgExpense, avgExpenses] = await Promise.all([
+      const [avgIncome, avgExpense, avgExpenses, maxExpenses] = await Promise.all([
         databaseService.getAverageMonthlyIncome(6, incomeCategoryIdsForAverage, baseDate),
         databaseService.getAverageMonthlyExpense(6, baseDate),
         databaseService.getAverageMonthlyExpenseByCategory(6, baseDate),
+        databaseService.getMaxMonthlyExpenseByCategory(6, baseDate),
       ]);
       set({ 
         averageMonthlyIncome: avgIncome,
         averageMonthlyExpense: avgExpense,
-        averageMonthlyExpensesByCategory: avgExpenses
+        averageMonthlyExpensesByCategory: avgExpenses,
+        maxMonthlyExpensesByCategory: maxExpenses
       });
     } catch (error) {
       set({ error: 'Failed to fetch statistics' });

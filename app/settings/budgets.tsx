@@ -22,6 +22,7 @@ export default function BudgetSettingsScreen() {
         averageMonthlyIncome,
         averageMonthlyExpense,
         averageMonthlyExpensesByCategory,
+        maxMonthlyExpensesByCategory,
         savingsGoal,
         updateSavingsGoal,
         incomeCategoryIdsForAverage,
@@ -325,7 +326,7 @@ export default function BudgetSettingsScreen() {
                                         先月予算: ¥{(lastMonthBudgets[category.id] || 0).toLocaleString()} | 使用量: ¥{(lastMonthUsageByCategory[category.id] || 0).toLocaleString()}
                                     </Text>
                                     <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 1 }}>
-                                        過去6ヶ月平均: ¥{(averageMonthlyExpensesByCategory[category.id] || 0).toLocaleString()}
+                                        過去6ヶ月平均: ¥{(averageMonthlyExpensesByCategory[category.id] || 0).toLocaleString()} | 最大: ¥{(maxMonthlyExpensesByCategory[category.id] || 0).toLocaleString()}
                                     </Text>
                                 </View>
 

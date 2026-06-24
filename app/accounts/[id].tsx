@@ -305,8 +305,8 @@ export default function AccountHistoryScreen() {
                             </Text>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                                 {item.payee && (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                        <Store size={10} color={colors.textMuted} />
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 1 }}>
+                                        <Store size={10} color={colors.textMuted} style={{ flexShrink: 0 }} />
                                         <Text style={{ fontSize: 11, color: colors.textMuted, marginLeft: 4 }} numberOfLines={1}>{item.payee}</Text>
                                     </View>
                                 )}
@@ -327,6 +327,22 @@ export default function AccountHistoryScreen() {
                                                 : (isDark ? '#fbbf24' : '#b45309')
                                         }}>
                                             {item.import_hash.startsWith('csv_') || !/^(mock_msg|[0-9a-f]{16})/.test(item.import_hash) ? 'CSV' : 'メール'}
+                                        </Text>
+                                    </View>
+                                )}
+                                {item.exclude_from_balance && (
+                                    <View style={{
+                                        backgroundColor: isDark ? 'rgba(244, 63, 94, 0.15)' : '#ffe4e6',
+                                        paddingHorizontal: 6,
+                                        paddingVertical: 1,
+                                        borderRadius: 6
+                                    }}>
+                                        <Text style={{
+                                            fontSize: 9,
+                                            fontWeight: 'bold',
+                                            color: isDark ? '#fb7185' : '#e11d48'
+                                        }}>
+                                            残高除外
                                         </Text>
                                     </View>
                                 )}

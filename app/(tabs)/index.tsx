@@ -78,8 +78,8 @@ const TransactionItem = React.memo(({
                         {item.payee ? (
                             <>
                                 <Text className="text-slate-300 mx-1">|</Text>
-                                <View className="flex-row items-center">
-                                    <Store size={10} color="#94a3b8" />
+                                <View className="flex-row items-center flex-shrink" style={{ flexShrink: 1 }}>
+                                    <Store size={10} color="#94a3b8" style={{ flexShrink: 0 }} />
                                     <Text className="text-xs text-slate-500 dark:text-slate-400 ml-1 font-medium" numberOfLines={1}>
                                         {item.payee}
                                     </Text>
@@ -93,13 +93,23 @@ const TransactionItem = React.memo(({
                                     item.import_hash.startsWith('csv_') || !/^(mock_msg|[0-9a-f]{16})/.test(item.import_hash)
                                         ? 'bg-sky-100 dark:bg-sky-955'
                                         : 'bg-amber-100 dark:bg-amber-955'
-                                }`}>
+                                    }`}>
                                     <Text className={`text-[9px] font-bold ${
                                         item.import_hash.startsWith('csv_') || !/^(mock_msg|[0-9a-f]{16})/.test(item.import_hash)
                                             ? 'text-sky-700 dark:text-sky-300'
                                             : 'text-amber-700 dark:text-amber-300'
                                     }`}>
                                         {item.import_hash.startsWith('csv_') || !/^(mock_msg|[0-9a-f]{16})/.test(item.import_hash) ? 'CSV' : 'メール'}
+                                    </Text>
+                                </View>
+                            </>
+                        ) : null}
+                        {item.exclude_from_balance ? (
+                            <>
+                                <Text className="text-slate-300 mx-1">|</Text>
+                                <View className="px-1.5 py-0.5 rounded-md bg-rose-100 dark:bg-rose-950">
+                                    <Text className="text-[9px] font-bold text-rose-700 dark:text-rose-300">
+                                        残高除外
                                     </Text>
                                 </View>
                             </>
