@@ -71,6 +71,7 @@ export default function GmailImportScreen() {
         rakuten: '',
         vpass: '',
         jcb: '',
+        jpbank: '',
     });
 
     useEffect(() => {
@@ -82,10 +83,12 @@ export default function GmailImportScreen() {
         const rakuten = await databaseService.getSetting('gmail_account_id_rakuten');
         const vpass = await databaseService.getSetting('gmail_account_id_vpass');
         const jcb = await databaseService.getSetting('gmail_account_id_jcb');
+        const jpbank = await databaseService.getSetting('gmail_account_id_jpbank');
         setMappings({
             rakuten: rakuten || '',
             vpass: vpass || '',
             jcb: jcb || '',
+            jpbank: jpbank || '',
         });
     };
 
@@ -223,6 +226,7 @@ export default function GmailImportScreen() {
                     <MappingItem label="楽天カード" mappingKey="rakuten" title="楽天カードの設定" />
                     <MappingItem label="三井住友カード (Vpass)" mappingKey="vpass" title="三井住友カードの設定" />
                     <MappingItem label="JCBカードW" mappingKey="jcb" title="JCBカードの設定" />
+                    <MappingItem label="JP BANK カード" mappingKey="jpbank" title="JP BANK カードの設定" />
                     <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 12 }}>
                         ※設定しない場合は、口座名から自動的に判別を試みます。
                     </Text>
@@ -371,7 +375,8 @@ export default function GmailImportScreen() {
                     <Text style={{ fontSize: 12, color: colors.textMuted, lineHeight: 18 }}>
                         • 楽天カード (利用通知メール){'\n'}
                         • 三井住友カード (ご利用のお知らせ){'\n'}
-                        • JCBカードW (ショッピングご利用のお知らせ){'\n\n'}
+                        • JCBカードW (ショッピングご利用のお知らせ){'\n'}
+                        • JP BANK カード (ご利用のお知らせ【ゆうちょ銀行】){'\n\n'}
                         ※メールの形式が変更された場合、正しく解析できないことがあります。
                     </Text>
                 </View>

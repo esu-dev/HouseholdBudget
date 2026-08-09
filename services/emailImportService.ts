@@ -88,6 +88,7 @@ export const emailImportService = {
       'from:info@mail.rakuten-card.co.jp subject:"カード利用のお知らせ"',
       'from:mail@vpass.ne.jp subject:"【三井住友カード】ご利用のお知らせ"',
       'from:mail@qa.jcb.co.jp subject:"JCBカード／ショッピングご利用のお知らせ"',
+      'subject:"ご利用のお知らせ【ゆうちょ銀行】"',
     ];
 
     const affectedAccountIds = new Set<string>();
@@ -137,6 +138,8 @@ export const emailImportService = {
                   mappedId = await databaseService.getSetting('gmail_account_id_vpass');
                 } else if (fullMsg.from.includes('jcb.co.jp')) {
                   mappedId = await databaseService.getSetting('gmail_account_id_jcb');
+                } else if (fullMsg.from.includes('jpbank') || fullMsg.body.includes('ゆうちょ銀行') || fullMsg.body.includes('ＪＰ  ＢＡＮＫ')) {
+                  mappedId = await databaseService.getSetting('gmail_account_id_jpbank');
                 }
 
                 if (mappedId && accounts.some(a => a.id === mappedId)) {
@@ -148,6 +151,8 @@ export const emailImportService = {
                     accountId = accounts.find(a => a.name.includes('三井住友'))?.id || 'card';
                   } else if (fullMsg.from.includes('jcb.co.jp')) {
                     accountId = accounts.find(a => a.name.includes('JCB'))?.id || 'card';
+                  } else if (fullMsg.from.includes('jpbank') || fullMsg.body.includes('ゆうちょ銀行') || fullMsg.body.includes('ＪＰ  ＢＡＮＫ')) {
+                    accountId = accounts.find(a => a.name.includes('ゆうちょ') || a.name.includes('JP'))?.id || 'card';
                   }
                 }
 
@@ -190,6 +195,7 @@ export const emailImportService = {
       await databaseService.getSetting('gmail_account_id_rakuten'),
       await databaseService.getSetting('gmail_account_id_vpass'),
       await databaseService.getSetting('gmail_account_id_jcb'),
+      await databaseService.getSetting('gmail_account_id_jpbank'),
     ].filter(id => id !== null) as string[];
 
     // 実際に取引があったアカウントも追加（マッピングがない場合のフォールバック等）

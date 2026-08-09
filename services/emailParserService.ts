@@ -123,17 +123,43 @@ class JCBCardWParser implements EmailParser {
   }
 }
 
+class JPBankCardParser implements EmailParser {
+  name = 'JP BANK カード';
+  fromAddress = 'jpbank-card.jp';
+
+  parse(body: string, messageId: string): ParsedEmailTransaction[] {
+    const amountMatch = body.match(/◇利用金額：\s*([\d,]+)\s*円/);
+    const dateMatch = body.match(/◇利用日：\s*(\d{4}\/\d{2}\/\d{2})/);
+    const merchantMatch = body.match(/◇利用先：\s*(.*)/);
+
+    if (amountMatch && dateMatch && merchantMatch) {
+      const dateStr = dateMatch[1].replace(/\//g, '-');
+      return [{
+        amount: -parseInt(amountMatch[1].replace(/,/g, ''), 10),
+        date: new Date(dateStr).toISOString(),
+        payee: merchantMatch[1].trim(),
+        gmail_message_id: messageId,
+      }];
+    }
+    return [];
+  }
+}
+
 export const emailParserService = {
   parsers: [
     new RakutenCardParser(),
     new VpassParser(),
     new JCBCardWParser(),
+    new JPBankCardParser(),
   ] as EmailParser[],
 
   parseEmail(from: string, body: string, messageId: string): ParsedEmailTransaction[] {
     const logger = useDeveloperStore.getState();
     logger.addLog('debug', `Searching parser for: ${from}`);
-    const parser = this.parsers.find(p => from.includes(p.fromAddress));
+    let parser = this.parsers.find(p => from.includes(p.fromAddress));
+    if (!parser && (body.includes('ゆうちょ銀行') || body.includes('ＪＰ  ＢＡＮＫ') || body.includes('JP BANK'))) {
+      parser = this.parsers.find(p => p instanceof JPBankCardParser);
+    }
     if (parser) {
       logger.addLog('debug', `Using parser: ${parser.name}`);
       try {
