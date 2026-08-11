@@ -1,6 +1,6 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import { ArrowDownCircle, ArrowUpCircle, Building2, CreditCard, EyeOff, Mail, RefreshCw, Smartphone, Wallet, ExternalLink, FileUp, X } from 'lucide-react-native';
+import { ArrowDownCircle, ArrowUpCircle, Building2, ChevronRight, CreditCard, EyeOff, Mail, RefreshCw, Smartphone, Wallet, ExternalLink, FileUp, X } from 'lucide-react-native';
 
 // Expo Goで実行されているかを判別
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -462,11 +462,15 @@ export default function BalanceScreen() {
                     </View>
 
                     {/* 純資産カード */}
-                    <View style={{ backgroundColor: colors.indigo, padding: 24, borderRadius: 32, marginBottom: 24, shadowColor: colors.indigo, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}>
+                    <TouchableOpacity
+                        onPress={() => router.push('/accounts/all')}
+                        activeOpacity={0.85}
+                        style={{ backgroundColor: colors.indigo, padding: 24, borderRadius: 32, marginBottom: 24, shadowColor: colors.indigo, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
+                    >
                         <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1 }}>現在の合計純資産</Text>
                         <Text style={{ color: 'white', fontSize: 36, fontWeight: 'bold', marginTop: 8 }}>¥{netWorth.toLocaleString()}</Text>
                         <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 16 }} />
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                             <View>
                                 <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>今月の収支</Text>
                                 <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold', marginTop: 4 }}>
@@ -478,7 +482,11 @@ export default function BalanceScreen() {
                                 <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold', marginTop: 4 }}>{accounts.filter(a => !a.isHidden).length} 口座</Text>
                             </View>
                         </View>
-                    </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 16 }}>
+                            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 'bold', letterSpacing: 0.5 }}>全取引一覧を表示</Text>
+                            <ChevronRight size={14} color="rgba(255,255,255,0.6)" />
+                        </View>
+                    </TouchableOpacity>
 
                     {/* 口座別残高一覧 */}
                     <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 }}>口座別残高</Text>
@@ -533,52 +541,8 @@ export default function BalanceScreen() {
                                         )}
                                     </View>
                                 </View>
-                                <View style={{ alignItems: 'flex-end', minWidth: 100 }}>
+                                <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
                                     <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>¥{balance.toLocaleString()}</Text>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                                        {account.cardType && account.cardType !== 'none' && (
-                                            <TouchableOpacity
-                                                onPress={(e) => {
-                                                    e.stopPropagation();
-                                                    handleCsvImport(account.id, account.cardType);
-                                                }}
-                                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                                                style={{ padding: 4 }}
-                                            >
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                                    <FileUp size={12} color={colors.primary} />
-                                                    <Text style={{ fontSize: 10, color: colors.primary, fontWeight: 'bold' }}>CSV読込</Text>
-                                                </View>
-                                            </TouchableOpacity>
-                                        )}
-                                        {account.cardType && account.loginUrl && (
-                                            <TouchableOpacity
-                                                onPress={(e) => {
-                                                    e.stopPropagation();
-                                                    Linking.openURL(account.loginUrl!);
-                                                }}
-                                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                                                style={{ padding: 4 }}
-                                            >
-                                                <ExternalLink size={12} color={colors.primary} />
-                                            </TouchableOpacity>
-                                        )}
-                                        {account.type === 'card' && account.withdrawalAccountId && (
-                                            <TouchableOpacity
-                                                onPress={(e) => {
-                                                    e.stopPropagation();
-                                                    handleSync(account.id);
-                                                }}
-                                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                                                style={{ padding: 4 }}
-                                            >
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                                    <RefreshCw size={12} color={colors.indigo} />
-                                                    <Text style={{ fontSize: 10, color: colors.indigo, fontWeight: 'bold' }}>振替更新</Text>
-                                                </View>
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
                                 </View>
                             </TouchableOpacity>
                         );

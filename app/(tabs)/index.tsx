@@ -167,6 +167,7 @@ const TransactionItem = React.memo(({
 
 const HeaderContent = React.memo(({
     totalBudget,
+    budgetExpense,
     totals,
     monthTransactions,
     selectedMajorId,
@@ -177,8 +178,8 @@ const HeaderContent = React.memo(({
     availableMinors,
     setIsBudgetModalVisible
 }: any) => {
-    const remainingBudget = totalBudget - totals.expense;
-    const progress = totalBudget > 0 ? Math.min(totals.expense / totalBudget, 1) : 0;
+    const remainingBudget = totalBudget - budgetExpense;
+    const progress = totalBudget > 0 ? Math.min(budgetExpense / totalBudget, 1) : 0;
     const progressColor = progress > 0.9 ? 'bg-rose-500' : progress > 0.7 ? 'bg-amber-500' : 'bg-indigo-500';
 
     return (
@@ -214,7 +215,7 @@ const HeaderContent = React.memo(({
                         />
                     </View>
                     <View className="flex-row justify-between mt-2">
-                        <Text className="text-[10px] text-slate-400 font-medium">支出: ¥{totals.expense.toLocaleString()}</Text>
+                        <Text className="text-[10px] text-slate-400 font-medium">支出: ¥{budgetExpense.toLocaleString()}</Text>
                         <Text className="text-[10px] text-slate-400 font-medium">{Math.round(progress * 100)}%</Text>
                     </View>
 
@@ -528,6 +529,16 @@ export default function HomeScreen() {
             .sort((a, b) => b.budget - a.budget);
     }, [majorCategories, budgets, monthTransactions]);
 
+    const budgetExpense = useMemo(() => {
+        let sum = 0;
+        monthTransactions.forEach(t => {
+            if (t.amount < 0 && t.category_id !== 'transfer' && t.category_id !== 'adjustment' && !t.exclude_from_balance && !t.exclude_from_budget) {
+                sum += Math.abs(t.amount);
+            }
+        });
+        return sum;
+    }, [monthTransactions]);
+
 
 
     const sectionedTransactions = useMemo(() => {
@@ -697,6 +708,7 @@ export default function HomeScreen() {
             <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
                 <HeaderContent
                     totalBudget={totalBudget}
+                    budgetExpense={budgetExpense}
                     totals={totals}
                     monthTransactions={monthTransactions}
                     selectedMajorId={selectedMajorId}

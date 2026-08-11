@@ -11,11 +11,12 @@ export const dataManagementService = {
       const accounts = await databaseService.getAllAccounts();
       const majorCategories = await databaseService.getAllMajorCategories();
 
-      // ヘッダー
-      let csvContent = '日付,支払先,カテゴリ,大カテゴリ,金額,口座,メモ,振替先,手数料\n';
+      // ヘッダー (最新の取引データ構造に対応)
+      let csvContent = 'ID,日付,支払先,カテゴリ,大カテゴリ,カテゴリID,金額,口座,口座ID,振替先,振替先口座ID,手数料,メモ,タグ,後払い・繰越,残高計算から除外,予算計算から除外,インポートID\n';
 
       for (const tx of transactions) {
-        const date = tx.date.split('T')[0];
+        const id = tx.id;
+        const date = tx.date;
         const payee = tx.payee || '';
         
         // カテゴリ名取得
@@ -30,22 +31,31 @@ export const dataManagementService = {
           }
         }
 
+        const categoryId = tx.category_id || '';
         const amount = tx.amount;
         const account = accounts.find(a => a.id === tx.account_id)?.name || tx.account_id;
+        const accountId = tx.account_id || '';
         const memo = tx.memo || '';
         const toAccount = tx.to_account_id ? (accounts.find(a => a.id === tx.to_account_id)?.name || tx.to_account_id) : '';
+        const toAccountId = tx.to_account_id || '';
         const fee = tx.fee || 0;
+        const tagsStr = tx.tags && Array.isArray(tx.tags) && tx.tags.length > 0 ? tx.tags.join(', ') : '';
+        const isDeferred = tx.is_deferred ? 1 : 0;
+        const excludeFromBalance = tx.exclude_from_balance ? 1 : 0;
+        const excludeFromBudget = tx.exclude_from_budget ? 1 : 0;
+        const importHash = tx.import_hash || '';
 
         // カンマや改行をエスケープ
         const escape = (str: any) => {
+          if (str === null || str === undefined) return '';
           const s = String(str);
-          if (s.includes(',') || s.includes('\n') || s.includes('"')) {
+          if (s.includes(',') || s.includes('\n') || s.includes('\r') || s.includes('"')) {
             return `"${s.replace(/"/g, '""')}"`;
           }
           return s;
         };
 
-        csvContent += `${date},${escape(payee)},${escape(minorLabel)},${escape(majorLabel)},${amount},${escape(account)},${escape(memo)},${escape(toAccount)},${fee}\n`;
+        csvContent += `${id},${escape(date)},${escape(payee)},${escape(minorLabel)},${escape(majorLabel)},${escape(categoryId)},${amount},${escape(account)},${escape(accountId)},${escape(toAccount)},${escape(toAccountId)},${fee},${escape(memo)},${escape(tagsStr)},${isDeferred},${excludeFromBalance},${excludeFromBudget},${escape(importHash)}\n`;
       }
 
       const fileName = `household_budget_${new Date().toISOString().split('T')[0]}.csv`;

@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Tag } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { CategoryDonutChart } from '../../components/CategoryDonutChart';
@@ -14,10 +14,21 @@ export default function AnalysisScreen() {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [timeScale, setTimeScale] = useState<TimeScale>('day');
     const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+    const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
     }, []);
+
+    const availableTags = useMemo(() => {
+        const tagSet = new Set<string>();
+        transactions.forEach(t => {
+            if (t.tags && Array.isArray(t.tags)) {
+                t.tags.forEach(tag => tagSet.add(tag));
+            }
+        });
+        return Array.from(tagSet);
+    }, [transactions]);
 
     const changeDate = (offset: number) => {
         const next = new Date(selectedDate);
@@ -35,6 +46,10 @@ export default function AnalysisScreen() {
         const activeTransactions = transactions.filter(t => !excludedAccountIds.has(t.account_id));
 
         return activeTransactions.filter(t => {
+            if (selectedTag && (!t.tags || !t.tags.includes(selectedTag))) {
+                return false;
+            }
+
             const d = new Date(t.date);
             if (timeScale === 'day') {
                 return d.getMonth() === selectedDate.getMonth() && d.getFullYear() === selectedDate.getFullYear();
@@ -43,7 +58,7 @@ export default function AnalysisScreen() {
             }
             return true; // Year view uses all
         });
-    }, [transactions, selectedDate, timeScale, accounts]);
+    }, [transactions, selectedDate, timeScale, accounts, selectedTag]);
 
     const groupedTransactions = useMemo(() => {
         const groups: Record<string, typeof transactions> = {};
@@ -131,6 +146,39 @@ export default function AnalysisScreen() {
 
                 <View className="mb-8">
                     <Text className="text-sm font-bold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-wide">カテゴリ別支出</Text>
+
+                    {/* タグ選択フィルター */}
+                    {availableTags.length > 0 && (
+                        <View className="mb-4">
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={{ gap: 8, paddingVertical: 2 }}
+                            >
+                                <TouchableOpacity
+                                    onPress={() => setSelectedTag(null)}
+                                    className={`flex-row items-center px-3 py-1.5 rounded-full border ${selectedTag === null ? 'bg-indigo-600 border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}
+                                >
+                                    <Tag size={12} color={selectedTag === null ? 'white' : '#64748b'} />
+                                    <Text className={`text-xs font-bold ml-1.5 ${selectedTag === null ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`}>
+                                        すべてのタグ
+                                    </Text>
+                                </TouchableOpacity>
+                                {availableTags.map(tag => (
+                                    <TouchableOpacity
+                                        key={tag}
+                                        onPress={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                                        className={`flex-row items-center px-3 py-1.5 rounded-full border ${selectedTag === tag ? 'bg-indigo-600 border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}
+                                    >
+                                        <Text className={`text-xs font-bold ${selectedTag === tag ? 'text-white' : 'text-indigo-500'}`}>
+                                            #{tag}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+                    )}
+
                     <CategoryDonutChart transactions={filteredTransactions} />
 
                     {/* カテゴリ別取引一覧（アコーディオン） */}
