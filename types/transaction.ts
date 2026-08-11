@@ -12,6 +12,8 @@ export type Transaction = {
   import_hash: string | null;
   is_deferred: boolean;
   exclude_from_balance: boolean;
+  exclude_from_budget: boolean;
+  tags?: string[];
 };
 
 export type CreateTransactionInput = {
@@ -27,5 +29,7 @@ export type CreateTransactionInput = {
   import_hash?: string | null;
   is_deferred?: boolean;
   exclude_from_balance?: boolean;
+  exclude_from_budget?: boolean;
+  tags?: string[];
   duplicateEmailCandidate?: any;
 };

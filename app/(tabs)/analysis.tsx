@@ -167,7 +167,9 @@ export default function AnalysisScreen() {
                                         <View className="border-t border-slate-50 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-900/10 p-2">
                                             {txs.map((t, idx) => {
                                                 const d = new Date(t.date);
-                                                const dateStr = `${d.getMonth() + 1}/${d.getDate()}`;
+                                                const dateStr = timeScale === 'day'
+                                                    ? `${d.getMonth() + 1}/${d.getDate()}`
+                                                    : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
                                                 const minorCat = major?.subCategories.find(s => s.id === t.category_id);
 
                                                 return (

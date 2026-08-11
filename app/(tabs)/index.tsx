@@ -1,6 +1,6 @@
 import { CategoryDonutChart } from '@/components/CategoryDonutChart';
 import { useRouter } from 'expo-router';
-import { CalendarIcon, ChevronLeft, ChevronRight, CircleEllipsis, List, MessageSquare, Store, X } from 'lucide-react-native';
+import { CalendarIcon, ChevronLeft, ChevronRight, CircleEllipsis, List, MessageSquare, Plus, Store, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
@@ -114,6 +114,16 @@ const TransactionItem = React.memo(({
                                 </View>
                             </>
                         ) : null}
+                        {item.exclude_from_budget ? (
+                            <>
+                                <Text className="text-slate-300 mx-1">|</Text>
+                                <View className="px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950">
+                                    <Text className="text-[9px] font-bold text-amber-700 dark:text-amber-300">
+                                        予算除外
+                                    </Text>
+                                </View>
+                            </>
+                        ) : null}
                     </View>
                 </View>
 
@@ -123,6 +133,27 @@ const TransactionItem = React.memo(({
                         <Text className="text-[10px] text-slate-400 dark:text-slate-500 ml-1" numberOfLines={1}>
                             {item.memo}
                         </Text>
+                    </View>
+                ) : null}
+                {item.tags && item.tags.length > 0 ? (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                        {item.tags.map((tag: string) => (
+                            <View
+                                key={tag}
+                                style={{
+                                    backgroundColor: '#6366f115',
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 2,
+                                    borderRadius: 10,
+                                    borderWidth: 1,
+                                    borderColor: '#6366f130'
+                                }}
+                            >
+                                <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#6366f1' }}>
+                                    #{tag}
+                                </Text>
+                            </View>
+                        ))}
                     </View>
                 ) : null}
             </View>
@@ -475,7 +506,7 @@ export default function HomeScreen() {
 
         // 実際の支出を合算
         monthTransactions.forEach(t => {
-            if (t.amount < 0 && t.category_id !== 'transfer' && t.category_id !== 'adjustment' && !t.exclude_from_balance) {
+            if (t.amount < 0 && t.category_id !== 'transfer' && t.category_id !== 'adjustment' && !t.exclude_from_balance && !t.exclude_from_budget) {
                 // 小カテゴリから親の大カテゴリを探す
                 let parentMajId = null;
                 for (const maj of majorCategories) {
@@ -542,6 +573,13 @@ export default function HomeScreen() {
         const month = String(next.getMonth() + 1).padStart(2, '0');
         setSelectedDate(`${year}-${month}-01`);
     };
+
+    const handleAddTransactionForSelectedDate = useCallback(() => {
+        router.push({
+            pathname: '/(tabs)/input',
+            params: { date: selectedDay }
+        });
+    }, [router, selectedDay]);
 
     const handleTransactionPress = useCallback((item: any) => {
         setEditingTransaction(item);
@@ -694,28 +732,38 @@ export default function HomeScreen() {
                         </View>
 
                         <View className="mb-10">
-                            <View className="flex-row justify-between items-center pr-6">
-                                <Text className="text-sm font-bold text-slate-400 dark:text-slate-500 mb-4 ml-6 uppercase tracking-widest">
+                            <View className="flex-row justify-between items-center pr-6 mb-2">
+                                <Text className="text-sm font-bold text-slate-400 dark:text-slate-500 ml-6 uppercase tracking-widest">
                                     {selectedDay.replace(/-/g, '/')} の履歴
                                 </Text>
-                                {(() => {
-                                    const dailyBalance = dayTransactions.reduce((acc, t) => {
-                                        if (t.category_id === 'transfer' || t.category_id === 'adjustment') return acc;
-                                        if (t.exclude_from_balance) return acc;
-                                        return acc + t.amount;
-                                    }, 0);
-                                    if (dayTransactions.length === 0) return null;
-                                    return (
-                                        <Text style={{
-                                            fontSize: 12,
-                                            fontWeight: 'bold',
-                                            color: dailyBalance > 0 ? '#22c55e' : (dailyBalance < 0 ? (isDark ? '#fb7185' : '#e11d48') : '#94a3b8'),
-                                            marginBottom: 16
-                                        }}>
-                                            収支: {dailyBalance > 0 ? '+' : ''}¥{dailyBalance.toLocaleString()}
+                                <View className="flex-row items-center gap-3">
+                                    {(() => {
+                                        const dailyBalance = dayTransactions.reduce((acc, t) => {
+                                            if (t.category_id === 'transfer' || t.category_id === 'adjustment') return acc;
+                                            if (t.exclude_from_balance) return acc;
+                                            return acc + t.amount;
+                                        }, 0);
+                                        if (dayTransactions.length === 0) return null;
+                                        return (
+                                            <Text style={{
+                                                fontSize: 12,
+                                                fontWeight: 'bold',
+                                                color: dailyBalance > 0 ? '#22c55e' : (dailyBalance < 0 ? (isDark ? '#fb7185' : '#e11d48') : '#94a3b8'),
+                                            }}>
+                                                収支: {dailyBalance > 0 ? '+' : ''}¥{dailyBalance.toLocaleString()}
+                                            </Text>
+                                        );
+                                    })()}
+                                    <TouchableOpacity
+                                        onPress={handleAddTransactionForSelectedDate}
+                                        className="flex-row items-center bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 rounded-full border border-indigo-200 dark:border-indigo-800"
+                                    >
+                                        <Plus size={14} color={isDark ? '#818cf8' : '#4f46e5'} />
+                                        <Text className="text-xs font-bold text-indigo-600 dark:text-indigo-400 ml-1">
+                                            追加
                                         </Text>
-                                    );
-                                })()}
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                             {dayTransactions.length > 0 ? (
                                 dayTransactions.map(t => (
@@ -728,8 +776,17 @@ export default function HomeScreen() {
                                     />
                                 ))
                             ) : (
-                                <View className="bg-white dark:bg-slate-800 p-8 rounded-2xl mx-4 items-center">
-                                    <Text className="text-slate-400">この日の取引はありません</Text>
+                                <View className="bg-white dark:bg-slate-800 p-6 rounded-2xl mx-4 items-center">
+                                    <Text className="text-slate-400 mb-3">この日の取引はありません</Text>
+                                    <TouchableOpacity
+                                        onPress={handleAddTransactionForSelectedDate}
+                                        className="flex-row items-center bg-indigo-600 px-4 py-2.5 rounded-xl shadow-sm"
+                                    >
+                                        <Plus size={16} color="white" />
+                                        <Text className="text-sm font-bold text-white ml-1.5">
+                                            この日に取引を追加
+                                        </Text>
+                                    </TouchableOpacity>
                                 </View>
                             )}
                         </View>

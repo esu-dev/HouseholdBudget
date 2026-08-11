@@ -100,6 +100,7 @@ export default function BudgetSettingsScreen() {
             if (t.amount >= 0) return false;
             if (t.category_id === 'transfer' || t.category_id === 'adjustment') return false;
             if (t.exclude_from_balance) return false;
+            if (t.exclude_from_budget) return false;
 
             const d = new Date(t.date);
             const lastMonthDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);

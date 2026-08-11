@@ -346,6 +346,22 @@ export default function AccountHistoryScreen() {
                                         </Text>
                                     </View>
                                 )}
+                                {item.exclude_from_budget && (
+                                    <View style={{
+                                        backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
+                                        paddingHorizontal: 6,
+                                        paddingVertical: 1,
+                                        borderRadius: 6
+                                    }}>
+                                        <Text style={{
+                                            fontSize: 9,
+                                            fontWeight: 'bold',
+                                            color: isDark ? '#fbbf24' : '#d97706'
+                                        }}>
+                                            予算除外
+                                        </Text>
+                                    </View>
+                                )}
                             </View>
                             {item.memo && (
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
@@ -353,6 +369,27 @@ export default function AccountHistoryScreen() {
                                     <Text style={{ fontSize: 10, color: colors.textMuted, marginLeft: 4 }} numberOfLines={1}>
                                         {item.memo}
                                     </Text>
+                                </View>
+                            )}
+                            {item.tags && item.tags.length > 0 && (
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                                    {item.tags.map((tag: string) => (
+                                        <View
+                                            key={tag}
+                                            style={{
+                                                backgroundColor: isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff',
+                                                paddingHorizontal: 6,
+                                                paddingVertical: 2,
+                                                borderRadius: 10,
+                                                borderWidth: 1,
+                                                borderColor: isDark ? 'rgba(99, 102, 241, 0.4)' : '#c7d2fe'
+                                            }}
+                                        >
+                                            <Text style={{ fontSize: 9, fontWeight: 'bold', color: isDark ? '#818cf8' : '#4f46e5' }}>
+                                                #{tag}
+                                            </Text>
+                                        </View>
+                                    ))}
                                 </View>
                             )}
                         </View>

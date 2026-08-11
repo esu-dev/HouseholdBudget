@@ -65,6 +65,8 @@ export const initDatabase = async () => {
       import_hash TEXT UNIQUE,
       is_deferred INTEGER DEFAULT 0,
       exclude_from_balance INTEGER DEFAULT 0,
+      exclude_from_budget INTEGER DEFAULT 0,
+      tags TEXT,
       FOREIGN KEY (account_id) REFERENCES accounts(id)
     );
 
@@ -177,6 +179,16 @@ export const initDatabase = async () => {
   // Migration: Add exclude_from_balance to transactions if it doesn't exist
   try {
     await db.execAsync('ALTER TABLE transactions ADD COLUMN exclude_from_balance INTEGER DEFAULT 0');
+  } catch (e) {}
+
+  // Migration: Add exclude_from_budget to transactions if it doesn't exist
+  try {
+    await db.execAsync('ALTER TABLE transactions ADD COLUMN exclude_from_budget INTEGER DEFAULT 0');
+  } catch (e) {}
+
+  // Migration: Add tags to transactions if it doesn't exist
+  try {
+    await db.execAsync('ALTER TABLE transactions ADD COLUMN tags TEXT');
   } catch (e) {}
 
   // Migration: Add billing_start_date to accounts if it doesn't exist
@@ -325,8 +337,9 @@ export const databaseService = {
   // Transactions
   async addTransaction(transaction: CreateTransactionInput): Promise<number> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    const tagsJson = transaction.tags && transaction.tags.length > 0 ? JSON.stringify(transaction.tags) : null;
     const result = await db.runAsync(
-      'INSERT INTO transactions (amount, category_id, account_id, to_account_id, date, memo, payee, transfer_id, fee, import_hash, is_deferred, exclude_from_balance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO transactions (amount, category_id, account_id, to_account_id, date, memo, payee, transfer_id, fee, import_hash, is_deferred, exclude_from_balance, exclude_from_budget, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       transaction.amount,
       transaction.category_id,
       transaction.account_id,
@@ -338,7 +351,9 @@ export const databaseService = {
       transaction.fee ?? 0,
       transaction.import_hash ?? null,
       transaction.is_deferred ? 1 : 0,
-      transaction.exclude_from_balance ? 1 : 0
+      transaction.exclude_from_balance ? 1 : 0,
+      transaction.exclude_from_budget ? 1 : 0,
+      tagsJson
     );
 
     if (transaction.payee) {
@@ -353,8 +368,9 @@ export const databaseService = {
 
   async updateTransaction(transaction: Transaction): Promise<void> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    const tagsJson = transaction.tags && transaction.tags.length > 0 ? JSON.stringify(transaction.tags) : null;
     await db.runAsync(
-      'UPDATE transactions SET amount = ?, category_id = ?, account_id = ?, to_account_id = ?, date = ?, memo = ?, payee = ?, transfer_id = ?, fee = ?, import_hash = ?, is_deferred = ?, exclude_from_balance = ? WHERE id = ?',
+      'UPDATE transactions SET amount = ?, category_id = ?, account_id = ?, to_account_id = ?, date = ?, memo = ?, payee = ?, transfer_id = ?, fee = ?, import_hash = ?, is_deferred = ?, exclude_from_balance = ?, exclude_from_budget = ?, tags = ? WHERE id = ?',
       transaction.amount,
       transaction.category_id,
       transaction.account_id,
@@ -367,6 +383,8 @@ export const databaseService = {
       transaction.import_hash ?? null,
       transaction.is_deferred ? 1 : 0,
       transaction.exclude_from_balance ? 1 : 0,
+      transaction.exclude_from_budget ? 1 : 0,
+      tagsJson,
       transaction.id
     );
 
@@ -383,11 +401,23 @@ export const databaseService = {
     const rows = await db.getAllAsync<any>(
       'SELECT t.* FROM transactions t JOIN accounts a ON t.account_id = a.id ORDER BY t.date DESC'
     );
-    return rows.map(row => ({
-      ...row,
-      is_deferred: row.is_deferred === 1,
-      exclude_from_balance: row.exclude_from_balance === 1
-    }));
+    return rows.map(row => {
+      let parsedTags: string[] = [];
+      if (row.tags) {
+        try {
+          parsedTags = JSON.parse(row.tags);
+        } catch (e) {
+          parsedTags = [];
+        }
+      }
+      return {
+        ...row,
+        is_deferred: row.is_deferred === 1,
+        exclude_from_balance: row.exclude_from_balance === 1,
+        exclude_from_budget: row.exclude_from_budget === 1,
+        tags: parsedTags
+      };
+    });
   },
 
   async deleteTransaction(id: number): Promise<void> {

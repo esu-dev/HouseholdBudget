@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useNavigation, useRouter } from 'expo-router';
-import { ArrowDownCircle, ArrowUpCircle, Building2, Calendar, ChevronLeft, CircleEllipsis, Clock3, Coins, CreditCard, ExternalLink, Plus, Smartphone, Store, Trash2, Wallet, X, ZapOff } from 'lucide-react-native';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { ArrowDownCircle, ArrowUpCircle, Building2, Calendar, ChevronLeft, CircleEllipsis, Clock3, Coins, CreditCard, ExternalLink, Plus, Smartphone, Store, Tag, Trash2, Wallet, X, ZapOff } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Alert, InputAccessoryView, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -26,6 +26,8 @@ const schema = z.object({
   ignore_learning: z.boolean().optional(),
   is_deferred: z.boolean().optional(),
   exclude_from_balance: z.boolean().optional(),
+  exclude_from_budget: z.boolean().optional(),
+  tags: z.array(z.string()).optional(),
 }).refine(data => {
   if (data.type === 'transfer') return !!data.to_account_id && data.account_id !== data.to_account_id;
   return !!data.category_id;
@@ -39,10 +41,12 @@ type FormData = z.infer<typeof schema>;
 export default function InputScreen() {
   const router = useRouter();
   const navigation = useNavigation();
+  const params = useLocalSearchParams<{ date?: string }>();
   const colorScheme = useAppColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const { addTransaction, addTransactions, updateTransaction, deleteTransaction, accounts, fetchData, editingTransaction, setEditingTransaction, majorCategories, addTransfer, addMinorCategory, addMajorCategory } = useTransactionStore();
+  const { transactions, addTransaction, addTransactions, updateTransaction, deleteTransaction, accounts, fetchData, editingTransaction, setEditingTransaction, majorCategories, addTransfer, addMinorCategory, addMajorCategory } = useTransactionStore();
+  const [tagInput, setTagInput] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedMajorId, setSelectedMajorId] = useState<string | null>(null);
   const [isNewCategoryModalVisible, setIsNewCategoryModalVisible] = useState(false);
@@ -83,6 +87,8 @@ export default function InputScreen() {
       ignore_learning: false,
       is_deferred: false,
       exclude_from_balance: false,
+      exclude_from_budget: false,
+      tags: [],
     },
   });
 
@@ -136,8 +142,9 @@ export default function InputScreen() {
 
   // 取引データの初期化ロジック
   useEffect(() => {
-    // すでにこの取引データを反映済みなら何もしない
-    if (lastResolvedId.current === (editingTransaction?.id || null)) return;
+    const resolvedKey = editingTransaction ? editingTransaction.id : (params.date ? `new_${params.date}` : 'new');
+    // すでにこの取引データまたは日付を反映済みなら何もしない
+    if (lastResolvedId.current === resolvedKey) return;
 
     if (editingTransaction) {
       const type = editingTransaction.amount > 0 ? 'income' : 'expense';
@@ -152,6 +159,8 @@ export default function InputScreen() {
       setValue('fee', editingTransaction.fee ? editingTransaction.fee.toString() : '');
       setValue('is_deferred', editingTransaction.is_deferred || false);
       setValue('exclude_from_balance', editingTransaction.exclude_from_balance || false);
+      setValue('exclude_from_budget', editingTransaction.exclude_from_budget || false);
+      setValue('tags', editingTransaction.tags || []);
 
       if (editingTransaction.transfer_id) {
         setValue('type', 'transfer');
@@ -161,23 +170,33 @@ export default function InputScreen() {
       const major = majorCategories.find(maj => maj.subCategories.some(min => min.id === editingTransaction.category_id));
       if (major) setSelectedMajorId(major.id);
     } else {
+      let initDate = new Date();
+      if (params.date) {
+        const parsed = new Date(params.date.includes('T') ? params.date : params.date + 'T00:00:00');
+        if (!isNaN(parsed.getTime())) {
+          initDate = parsed;
+        }
+      }
+
       reset({
         type: 'expense',
         amount: '',
         category_id: '',
         account_id: 'cash',
-        date: new Date(),
+        date: initDate,
         payee: '',
         memo: '',
         fee: '',
         is_deferred: false,
         exclude_from_balance: false,
+        exclude_from_budget: false,
+        tags: [],
       });
       setSelectedMajorId(null);
     }
 
-    lastResolvedId.current = editingTransaction?.id || null;
-  }, [editingTransaction]); // majorCategoriesを依存関係から外す
+    lastResolvedId.current = resolvedKey;
+  }, [editingTransaction, params.date]); // majorCategoriesを依存関係から外す
 
   const navigateAfterAction = () => {
     reset();
@@ -224,7 +243,9 @@ export default function InputScreen() {
           transfer_id: null,
           fee: feeNum,
           is_deferred: !!data.is_deferred,
-          exclude_from_balance: !!data.exclude_from_balance
+          exclude_from_balance: !!data.exclude_from_balance,
+          exclude_from_budget: !!data.exclude_from_budget,
+          tags: data.tags || []
         });
       }
     } else {
@@ -240,7 +261,9 @@ export default function InputScreen() {
           memo: data.memo || null,
           fee: feeNum,
           is_deferred: !!data.is_deferred,
-          exclude_from_balance: !!data.exclude_from_balance
+          exclude_from_balance: !!data.exclude_from_balance,
+          exclude_from_budget: !!data.exclude_from_budget,
+          tags: data.tags || []
         });
       }
     }
@@ -593,7 +616,7 @@ export default function InputScreen() {
             >
               <Calendar size={20} color={colors.textMuted} />
               <Text style={{ marginLeft: 12, fontSize: 18, color: colors.text }}>
-                {selectedDate.toLocaleDateString()}
+                {selectedDate.toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric', weekday: 'short' })}
               </Text>
             </TouchableOpacity>
             {showDatePicker && (
@@ -744,6 +767,41 @@ export default function InputScreen() {
                     </View>
                   )}
                 />
+
+                <Controller
+                  control={control}
+                  name="exclude_from_budget"
+                  render={({ field: { onChange, value } }) => (
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: colors.inputBg,
+                      padding: 12,
+                      borderRadius: 12,
+                      marginTop: 8
+                    }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                        <Coins size={16} color={value ? colors.primary : colors.textMuted} />
+                        <View style={{ marginLeft: 12, flex: 1 }}>
+                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: value ? colors.primary : colors.text }}>
+                            予算計算から除外する
+                          </Text>
+                          <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>
+                            収支・残高には含めますが、予算管理・進捗から除外します
+                          </Text>
+                        </View>
+                      </View>
+                      <Switch
+                        value={value}
+                        onValueChange={onChange}
+                        trackColor={{ false: isDark ? '#334155' : '#e2e8f0', true: colors.primary + '80' }}
+                        thumbColor={value ? colors.primary : '#f4f3f4'}
+                        ios_backgroundColor={isDark ? '#334155' : '#e2e8f0'}
+                      />
+                    </View>
+                  )}
+                />
               </>
             )}
 
@@ -762,6 +820,122 @@ export default function InputScreen() {
                   multiline
                 />
               )}
+            />
+
+            {/* タグ入力セクション */}
+            <Text style={{ color: colors.textMuted, marginTop: 24, marginBottom: 8, fontWeight: '500' }}>タグ（任意）</Text>
+            <Controller
+              control={control}
+              name="tags"
+              render={({ field: { onChange, value = [] } }) => {
+                const currentTags: string[] = value || [];
+
+                const addTag = (text: string) => {
+                  const trimmed = text.trim().replace(/^#/, '');
+                  if (trimmed && !currentTags.includes(trimmed)) {
+                    onChange([...currentTags, trimmed]);
+                  }
+                  setTagInput('');
+                };
+
+                const removeTag = (tagToRemove: string) => {
+                  onChange(currentTags.filter(t => t !== tagToRemove));
+                };
+
+                const allExistingTags = Array.from(
+                  new Set(
+                    transactions.flatMap(t => t.tags || [])
+                  )
+                ).filter(t => !currentTags.includes(t));
+
+                return (
+                  <View>
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: colors.inputBg,
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                      borderRadius: 12
+                    }}>
+                      <Tag size={20} color={colors.textMuted} />
+                      <TextInput
+                        style={{ marginLeft: 12, flex: 1, fontSize: 16, color: colors.text, paddingVertical: 8 }}
+                        placeholder="タグを入力 (例: 旅行, 立替)"
+                        placeholderTextColor={colors.textMuted}
+                        value={tagInput}
+                        onChangeText={setTagInput}
+                        onSubmitEditing={() => addTag(tagInput)}
+                        returnKeyType="done"
+                      />
+                      {tagInput.trim().length > 0 && (
+                        <TouchableOpacity
+                          onPress={() => addTag(tagInput)}
+                          style={{
+                            backgroundColor: colors.primary,
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 8
+                          }}
+                        >
+                          <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>追加</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {currentTags.length > 0 && (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                        {currentTags.map(tag => (
+                          <View
+                            key={tag}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: colors.primarySub,
+                              paddingHorizontal: 10,
+                              paddingVertical: 5,
+                              borderRadius: 16,
+                              borderWidth: 1,
+                              borderColor: colors.primary + '40'
+                            }}
+                          >
+                            <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.primary }}>
+                              #{tag}
+                            </Text>
+                            <TouchableOpacity onPress={() => removeTag(tag)} style={{ marginLeft: 6 }}>
+                              <X size={14} color={colors.primary} />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {allExistingTags.length > 0 && (
+                      <View style={{ marginTop: 10 }}>
+                        <Text style={{ fontSize: 11, color: colors.textMuted, marginBottom: 6 }}>既存のタグから選択:</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                          {allExistingTags.map(tag => (
+                            <TouchableOpacity
+                              key={tag}
+                              onPress={() => addTag(tag)}
+                              style={{
+                                backgroundColor: isDark ? '#334155' : '#e2e8f0',
+                                paddingHorizontal: 10,
+                                paddingVertical: 4,
+                                borderRadius: 12
+                              }}
+                            >
+                              <Text style={{ fontSize: 11, color: colors.text, fontWeight: '500' }}>
+                                + #{tag}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </View>
+                );
+              }}
             />
           </View>
         </ScrollView>
