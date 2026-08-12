@@ -723,8 +723,8 @@ export const databaseService = {
   async isImportHashExists(hash: string): Promise<boolean> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     const result = await db.getFirstAsync<{count: number}>(
-      'SELECT COUNT(*) as count FROM transactions WHERE import_hash = ?',
-      hash
+      'SELECT COUNT(*) as count FROM transactions WHERE import_hash = ? OR import_hash = ?',
+      [hash, `csv_replaced_${hash}`]
     );
     return (result?.count ?? 0) > 0;
   },

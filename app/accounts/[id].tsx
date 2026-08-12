@@ -23,6 +23,9 @@ export default function AccountHistoryScreen() {
     const [newActualBalance, setNewActualBalance] = useState('');
     const [isMenuModalVisible, setIsMenuModalVisible] = useState(false);
 
+    // Swipeableのref管理（FlashListのセルリサイクル時に開起状態が引き継がれないようにする）
+    const swipeableRefs = useRef<Map<number, Swipeable | null>>(new Map());
+
     // CSV import state
     const [isCsvImporting, setIsCsvImporting] = useState(false);
     const [missingAccountMappings, setMissingAccountMappings] = useState<string[]>([]);
@@ -336,9 +339,12 @@ export default function AccountHistoryScreen() {
                         const existingTx = candidate.existingTx;
                         const finalCategory = (existingTx.category_id && existingTx.category_id !== 'others') ? existingTx.category_id : t.category_id;
                         const finalMemo = (existingTx.memo && existingTx.memo !== 'Gmail自動インポート' && existingTx.memo !== 'Gmail自動インポート(Mock)') ? existingTx.memo : t.memo;
-                        // 置換時は元のメール取引のimport_hashを保持する（CSVハッシュで上書きしない）
-                        // こうすることで次回メール読み込み時に重複として正しく検知される
-                        await databaseService.updateTransaction({ ...existingTx, amount: t.amount, date: t.date, payee: t.payee, memo: finalMemo, category_id: finalCategory, import_hash: existingTx.import_hash });
+                        // 置換時は 'csv_replaced_' プレフィックス付きのハッシュを保存する
+                        // これにより：① CSVバッジが表示される ② 次回CSV読込時に重複候補に挙がらない ③ メール再読み込み時にも重複検知される
+                        const replacedHash = existingTx.import_hash
+                            ? (existingTx.import_hash.startsWith('csv_replaced_') ? existingTx.import_hash : `csv_replaced_${existingTx.import_hash}`)
+                            : t.import_hash;
+                        await databaseService.updateTransaction({ ...existingTx, amount: t.amount, date: t.date, payee: t.payee, memo: finalMemo, category_id: finalCategory, import_hash: replacedHash });
                         replacedCount++;
                     } else {
                         await databaseService.addTransaction({ amount: t.amount, category_id: t.category_id, account_id: t.account_id, date: t.date, memo: t.memo, payee: t.payee, import_hash: t.import_hash });
@@ -498,6 +504,9 @@ export default function AccountHistoryScreen() {
                                     text: '削除する',
                                     style: 'destructive',
                                     onPress: async () => {
+                                        // 先に全Swipeableを閉じてからリスト更新（セルリサイクル対策）
+                                        swipeableRefs.current.forEach(ref => ref?.close());
+                                        swipeableRefs.current.clear();
                                         await deleteTransaction(item.id);
                                         await fetchData();
                                     },
@@ -521,12 +530,26 @@ export default function AccountHistoryScreen() {
             </View>
         );
 
+        const closeAllSwipeables = () => {
+            swipeableRefs.current.forEach(ref => ref?.close());
+        };
+
         return (
             <Swipeable
+                ref={(ref) => { swipeableRefs.current.set(item.id, ref); }}
                 renderRightActions={renderRightActions}
                 overshootRight={false}
                 friction={2}
                 rightThreshold={40}
+                onSwipeableOpen={() => {
+                    // 自分以外の全Swipeableを閉じる
+                    swipeableRefs.current.forEach((ref, id) => {
+                        if (id !== item.id) ref?.close();
+                    });
+                }}
+                onSwipeableClose={() => {
+                    swipeableRefs.current.delete(item.id);
+                }}
             >
                 <TouchableOpacity
                     onPress={() => {
