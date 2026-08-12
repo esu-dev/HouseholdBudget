@@ -311,16 +311,13 @@ export const csvImportService = {
 
       if (!isNaN(amount) && date) {
         
-        let duplicateEmailCandidate: any = null;
-        if (isEmailImportAccount) {
-          // 日付と金額が一致し、かつメールから生成された可能性が高い取引（ハッシュがある、またはメモにGmailと記載されている）を特定
-          duplicateEmailCandidate = accountTransactions.find(t => {
-            const tDate = t.date.split('T')[0];
-            const importDate = date.split('T')[0];
-            const isEmailTx = t.import_hash !== null || (t.memo && (t.memo.includes('Gmail') || t.memo.includes('gmail')));
-            return tDate === importDate && t.amount === amount && isEmailTx;
-          });
-        }
+        // 日付と金額が一致し、かつメールから取り込まれた取引（import_hashがメール形式）を特定
+        const duplicateEmailCandidate = accountTransactions.find(t => {
+          const tDate = t.date.split('T')[0];
+          const importDate = date.split('T')[0];
+          const isEmailTx = t.import_hash !== null && /^(mock_msg|[0-9a-f]{16})/.test(t.import_hash);
+          return tDate === importDate && t.amount === amount && isEmailTx;
+        }) || null;
 
         // 重複チェック (通常のアカウントの場合、またはメール重複候補以外の完全一致)
         const isStandardDuplicate = accountTransactions.some(t => {
