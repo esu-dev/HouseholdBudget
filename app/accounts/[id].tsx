@@ -1,8 +1,9 @@
 import { FlashList } from '@shopify/flash-list';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Calendar, CircleEllipsis, EyeOff, ExternalLink, FileUp, MessageSquare, Plus, RefreshCw, RotateCcw, Store, Wallet, X } from 'lucide-react-native';
+import { ArrowLeft, Calendar, CircleEllipsis, EyeOff, ExternalLink, FileUp, MessageSquare, MoreVertical, Plus, RefreshCw, RotateCcw, Store, Trash2, Wallet, X } from 'lucide-react-native';
 import React, { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Modal, ScrollView, Text, TextInput, TouchableOpacity, View, Keyboard, Platform, InputAccessoryView } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { csvImportService } from '../../services/csvImportService';
@@ -14,12 +15,13 @@ export default function AccountHistoryScreen() {
     const router = useRouter();
     const colorScheme = useAppColorScheme();
     const isDark = colorScheme === 'dark';
-    const { transactions, accounts, accountBalances, setEditingTransaction, majorCategories, addTransaction, addTransactions, fetchData, syncCardTransfers } = useTransactionStore();
+    const { transactions, accounts, accountBalances, setEditingTransaction, majorCategories, addTransaction, addTransactions, deleteTransaction, fetchData, syncCardTransfers } = useTransactionStore();
 
     const isAllAccounts = id === 'all';
 
     const [isAdjustModalVisible, setIsAdjustModalVisible] = useState(false);
     const [newActualBalance, setNewActualBalance] = useState('');
+    const [isMenuModalVisible, setIsMenuModalVisible] = useState(false);
 
     // CSV import state
     const [isCsvImporting, setIsCsvImporting] = useState(false);
@@ -334,7 +336,9 @@ export default function AccountHistoryScreen() {
                         const existingTx = candidate.existingTx;
                         const finalCategory = (existingTx.category_id && existingTx.category_id !== 'others') ? existingTx.category_id : t.category_id;
                         const finalMemo = (existingTx.memo && existingTx.memo !== 'Gmail自動インポート' && existingTx.memo !== 'Gmail自動インポート(Mock)') ? existingTx.memo : t.memo;
-                        await databaseService.updateTransaction({ ...existingTx, amount: t.amount, date: t.date, payee: t.payee, memo: finalMemo, category_id: finalCategory, import_hash: t.import_hash || existingTx.import_hash });
+                        // 置換時は元のメール取引のimport_hashを保持する（CSVハッシュで上書きしない）
+                        // こうすることで次回メール読み込み時に重複として正しく検知される
+                        await databaseService.updateTransaction({ ...existingTx, amount: t.amount, date: t.date, payee: t.payee, memo: finalMemo, category_id: finalCategory, import_hash: existingTx.import_hash });
                         replacedCount++;
                     } else {
                         await databaseService.addTransaction({ amount: t.amount, category_id: t.category_id, account_id: t.account_id, date: t.date, memo: t.memo, payee: t.payee, import_hash: t.import_hash });
@@ -474,135 +478,185 @@ export default function AccountHistoryScreen() {
         const IconComp = CATEGORY_ICONS[majorCategory?.icon || 'others'] || CircleEllipsis;
         const amount = item.amount ?? 0;
 
-        return (
-            <TouchableOpacity
-                onPress={() => {
-                    setEditingTransaction(item);
-                    router.push('/edit-transaction');
-                }}
+        const renderRightActions = () => (
+            <View
                 style={{
-                    backgroundColor: colors.card,
-                    padding: 16,
-                    borderRadius: 20,
+                    justifyContent: 'center',
+                    alignItems: 'flex-end',
                     marginBottom: 8,
-                    marginHorizontal: 16,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.05,
-                    shadowRadius: 2,
-                    elevation: 1
+                    marginRight: 16,
                 }}
             >
-                <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: color + '20', alignItems: 'center', justifyContent: 'center' }}>
-                    <IconComp size={22} color={color} />
-                </View>
+                <TouchableOpacity
+                    onPress={() => {
+                        Alert.alert(
+                            '取引の削除',
+                            'この取引を削除してもよいですか？\nこの操作は取り消すことができません。',
+                            [
+                                { text: 'キャンセル', style: 'cancel' },
+                                {
+                                    text: '削除する',
+                                    style: 'destructive',
+                                    onPress: async () => {
+                                        await deleteTransaction(item.id);
+                                        await fetchData();
+                                    },
+                                },
+                            ]
+                        );
+                    }}
+                    style={{
+                        width: 72,
+                        height: '100%',
+                        backgroundColor: '#ef4444',
+                        borderRadius: 20,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: 4,
+                    }}
+                >
+                    <Trash2 size={20} color="white" />
+                    <Text style={{ color: 'white', fontSize: 11, fontWeight: 'bold' }}>削除</Text>
+                </TouchableOpacity>
+            </View>
+        );
 
-                <View style={{ flex: 1, marginLeft: 16 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <View style={{ flex: 1, marginRight: 8 }}>
-                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }} numberOfLines={1}>
-                                {item.category_id === 'transfer' && toAccount
-                                    ? `${item.amount > 0 ? '←' : '→'} ${toAccount.name}`
-                                    : label}
-                            </Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                                {item.payee && (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 1 }}>
-                                        <Store size={10} color={colors.textMuted} style={{ flexShrink: 0 }} />
-                                        <Text style={{ fontSize: 11, color: colors.textMuted, marginLeft: 4 }} numberOfLines={1}>{item.payee}</Text>
-                                    </View>
-                                )}
-                                {item.import_hash && (
-                                    <View style={{
-                                        backgroundColor: item.import_hash.startsWith('csv_') || !/^(mock_msg|[0-9a-f]{16})/.test(item.import_hash)
-                                            ? (isDark ? 'rgba(56, 189, 248, 0.15)' : '#e0f2fe')
-                                            : (isDark ? 'rgba(251, 191, 36, 0.15)' : '#fef3c7'),
-                                        paddingHorizontal: 6,
-                                        paddingVertical: 1,
-                                        borderRadius: 6
-                                    }}>
-                                        <Text style={{
-                                            fontSize: 9,
-                                            fontWeight: 'bold',
-                                            color: item.import_hash.startsWith('csv_') || !/^(mock_msg|[0-9a-f]{16})/.test(item.import_hash)
-                                                ? (isDark ? '#38bdf8' : '#0369a1')
-                                                : (isDark ? '#fbbf24' : '#b45309')
+        return (
+            <Swipeable
+                renderRightActions={renderRightActions}
+                overshootRight={false}
+                friction={2}
+                rightThreshold={40}
+            >
+                <TouchableOpacity
+                    onPress={() => {
+                        setEditingTransaction(item);
+                        router.push('/edit-transaction');
+                    }}
+                    style={{
+                        backgroundColor: colors.card,
+                        padding: 16,
+                        borderRadius: 20,
+                        marginBottom: 8,
+                        marginHorizontal: 16,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.05,
+                        shadowRadius: 2,
+                        elevation: 1
+                    }}
+                >
+                    <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: color + '20', alignItems: 'center', justifyContent: 'center' }}>
+                        <IconComp size={22} color={color} />
+                    </View>
+
+                    <View style={{ flex: 1, marginLeft: 16 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <View style={{ flex: 1, marginRight: 8 }}>
+                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }} numberOfLines={1}>
+                                    {item.category_id === 'transfer' && toAccount
+                                        ? `${item.amount > 0 ? '←' : '→'} ${toAccount.name}`
+                                        : label}
+                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                    {item.payee && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 1 }}>
+                                            <Store size={10} color={colors.textMuted} style={{ flexShrink: 0 }} />
+                                            <Text style={{ fontSize: 11, color: colors.textMuted, marginLeft: 4 }} numberOfLines={1}>{item.payee}</Text>
+                                        </View>
+                                    )}
+                                    {item.import_hash && (
+                                        <View style={{
+                                            backgroundColor: item.import_hash.startsWith('csv_') || !/^(mock_msg|[0-9a-f]{16})/.test(item.import_hash)
+                                                ? (isDark ? 'rgba(56, 189, 248, 0.15)' : '#e0f2fe')
+                                                : (isDark ? 'rgba(251, 191, 36, 0.15)' : '#fef3c7'),
+                                            paddingHorizontal: 6,
+                                            paddingVertical: 1,
+                                            borderRadius: 6
                                         }}>
-                                            {item.import_hash.startsWith('csv_') || !/^(mock_msg|[0-9a-f]{16})/.test(item.import_hash) ? 'CSV' : 'メール'}
+                                            <Text style={{
+                                                fontSize: 9,
+                                                fontWeight: 'bold',
+                                                color: item.import_hash.startsWith('csv_') || !/^(mock_msg|[0-9a-f]{16})/.test(item.import_hash)
+                                                    ? (isDark ? '#38bdf8' : '#0369a1')
+                                                    : (isDark ? '#fbbf24' : '#b45309')
+                                            }}>
+                                                {item.import_hash.startsWith('csv_') || !/^(mock_msg|[0-9a-f]{16})/.test(item.import_hash) ? 'CSV' : 'メール'}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {item.exclude_from_balance && (
+                                        <View style={{
+                                            backgroundColor: isDark ? 'rgba(244, 63, 94, 0.15)' : '#ffe4e6',
+                                            paddingHorizontal: 6,
+                                            paddingVertical: 1,
+                                            borderRadius: 6
+                                        }}>
+                                            <Text style={{
+                                                fontSize: 9,
+                                                fontWeight: 'bold',
+                                                color: isDark ? '#fb7185' : '#e11d48'
+                                            }}>
+                                                残高除外
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {item.exclude_from_budget && (
+                                        <View style={{
+                                            backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
+                                            paddingHorizontal: 6,
+                                            paddingVertical: 1,
+                                            borderRadius: 6
+                                        }}>
+                                            <Text style={{
+                                                fontSize: 9,
+                                                fontWeight: 'bold',
+                                                color: isDark ? '#fbbf24' : '#d97706'
+                                            }}>
+                                                予算除外
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                                {item.memo && (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                                        <MessageSquare size={10} color={colors.textMuted} />
+                                        <Text style={{ fontSize: 10, color: colors.textMuted, marginLeft: 4 }} numberOfLines={1}>
+                                            {item.memo}
                                         </Text>
                                     </View>
                                 )}
-                                {item.exclude_from_balance && (
-                                    <View style={{
-                                        backgroundColor: isDark ? 'rgba(244, 63, 94, 0.15)' : '#ffe4e6',
-                                        paddingHorizontal: 6,
-                                        paddingVertical: 1,
-                                        borderRadius: 6
-                                    }}>
-                                        <Text style={{
-                                            fontSize: 9,
-                                            fontWeight: 'bold',
-                                            color: isDark ? '#fb7185' : '#e11d48'
-                                        }}>
-                                            残高除外
-                                        </Text>
-                                    </View>
-                                )}
-                                {item.exclude_from_budget && (
-                                    <View style={{
-                                        backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
-                                        paddingHorizontal: 6,
-                                        paddingVertical: 1,
-                                        borderRadius: 6
-                                    }}>
-                                        <Text style={{
-                                            fontSize: 9,
-                                            fontWeight: 'bold',
-                                            color: isDark ? '#fbbf24' : '#d97706'
-                                        }}>
-                                            予算除外
-                                        </Text>
+                                {item.tags && item.tags.length > 0 && (
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                                        {item.tags.map((tag: string) => (
+                                            <View
+                                                key={tag}
+                                                style={{
+                                                    backgroundColor: isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff',
+                                                    paddingHorizontal: 6,
+                                                    paddingVertical: 2,
+                                                    borderRadius: 10,
+                                                    borderWidth: 1,
+                                                    borderColor: isDark ? 'rgba(99, 102, 241, 0.4)' : '#c7d2fe'
+                                                }}
+                                            >
+                                                <Text style={{ fontSize: 9, fontWeight: 'bold', color: isDark ? '#818cf8' : '#4f46e5' }}>
+                                                    #{tag}
+                                                </Text>
+                                            </View>
+                                        ))}
                                     </View>
                                 )}
                             </View>
-                            {item.memo && (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                                    <MessageSquare size={10} color={colors.textMuted} />
-                                    <Text style={{ fontSize: 10, color: colors.textMuted, marginLeft: 4 }} numberOfLines={1}>
-                                        {item.memo}
-                                    </Text>
-                                </View>
-                            )}
-                            {item.tags && item.tags.length > 0 && (
-                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-                                    {item.tags.map((tag: string) => (
-                                        <View
-                                            key={tag}
-                                            style={{
-                                                backgroundColor: isDark ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff',
-                                                paddingHorizontal: 6,
-                                                paddingVertical: 2,
-                                                borderRadius: 10,
-                                                borderWidth: 1,
-                                                borderColor: isDark ? 'rgba(99, 102, 241, 0.4)' : '#c7d2fe'
-                                            }}
-                                        >
-                                            <Text style={{ fontSize: 9, fontWeight: 'bold', color: isDark ? '#818cf8' : '#4f46e5' }}>
-                                                #{tag}
-                                            </Text>
-                                        </View>
-                                    ))}
-                                </View>
-                            )}
+                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: amount > 0 ? '#22c55e' : colors.text, minWidth: 80, textAlign: 'right' }}>
+                                {amount > 0 ? '+' : ''}¥{amount.toLocaleString()}
+                            </Text>
                         </View>
-                        <Text style={{ fontSize: 16, fontWeight: 'bold', color: amount > 0 ? '#22c55e' : colors.text, minWidth: 80, textAlign: 'right' }}>
-                            {amount > 0 ? '+' : ''}¥{amount.toLocaleString()}
-                        </Text>
                     </View>
-                </View>
-            </TouchableOpacity>
+                </TouchableOpacity>
+            </Swipeable>
         );
     };
 
@@ -612,13 +666,31 @@ export default function AccountHistoryScreen() {
 
             {/* Header Area */}
             <View style={{ backgroundColor: colors.indigo, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 }}>
-                <TouchableOpacity
-                    onPress={() => router.back()}
-                    style={{ marginBottom: 12 }}
-                    hitSlop={{ top: 10, bottom: 10, left: 20, right: 10 }}
-                >
-                    <ArrowLeft size={24} color="white" />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        hitSlop={{ top: 10, bottom: 10, left: 20, right: 10 }}
+                    >
+                        <ArrowLeft size={24} color="white" />
+                    </TouchableOpacity>
+                    {!isAllAccounts && (account?.cardType && account.cardType !== 'none' || account?.loginUrl || (account?.type === 'card' && account?.withdrawalAccountId)) && (
+                        <TouchableOpacity
+                            onPress={() => setIsMenuModalVisible(true)}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 20 }}
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: 'rgba(255,255,255,0.2)',
+                                paddingHorizontal: 12,
+                                paddingVertical: 6,
+                                borderRadius: 16
+                            }}
+                        >
+                            <MoreVertical size={16} color="white" />
+                            <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold', marginLeft: 4 }}>メニュー</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         {isAllAccounts ? (
@@ -686,84 +758,14 @@ export default function AccountHistoryScreen() {
                 )}
             </View>
 
-            {/* アクションボタン行 (CSV読込・外部リンク・振替更新) */}
-            {!isAllAccounts && (
-                <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                    {account?.cardType && account.cardType !== 'none' && (
-                        <TouchableOpacity
-                            onPress={handleCsvImport}
-                            disabled={isCsvImporting}
-                            style={{
-                                flex: 1,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: isDark ? 'rgba(99,102,241,0.15)' : '#eef2ff',
-                                paddingVertical: 10,
-                                borderRadius: 14,
-                                gap: 6,
-                                borderWidth: 1,
-                                borderColor: colors.indigo + '30'
-                            }}
-                        >
-                            {isCsvImporting ? (
-                                <ActivityIndicator size="small" color={colors.indigo} />
-                            ) : (
-                                <FileUp size={15} color={colors.indigo} />
-                            )}
-                            <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.indigo }}>
-                                {isCsvImporting ? '読込中' : 'CSV読込'}
-                            </Text>
-                        </TouchableOpacity>
-                    )}
-                    {account?.cardType && account.loginUrl && (
-                        <TouchableOpacity
-                            onPress={() => Linking.openURL(account.loginUrl!)}
-                            style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: isDark ? 'rgba(99,102,241,0.15)' : '#eef2ff',
-                                paddingVertical: 10,
-                                paddingHorizontal: 14,
-                                borderRadius: 14,
-                                gap: 6,
-                                borderWidth: 1,
-                                borderColor: colors.indigo + '30'
-                            }}
-                        >
-                            <ExternalLink size={15} color={colors.indigo} />
-                            <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.indigo }}>サイト</Text>
-                        </TouchableOpacity>
-                    )}
-                    {account?.type === 'card' && account.withdrawalAccountId && (
-                        <TouchableOpacity
-                            onPress={handleSync}
-                            style={{
-                                flex: 1,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: isDark ? 'rgba(99,102,241,0.15)' : '#eef2ff',
-                                paddingVertical: 10,
-                                borderRadius: 14,
-                                gap: 6,
-                                borderWidth: 1,
-                                borderColor: colors.indigo + '30'
-                            }}
-                        >
-                            <RefreshCw size={15} color={colors.indigo} />
-                            <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.indigo }}>振替更新</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-            )}
+            {/* FlashList Transaction List */}
 
             <FlashList
                 data={sectionedTransactions}
                 renderItem={renderItem}
                 keyExtractor={(item, index) => item.type === 'header' ? `header-${item.date}-${index}` : `item-${item.id}-${index}`}
-                //estimatedItemSize={80}
+                getItemType={(item) => item.type}
+                drawDistance={1000}
                 ListHeaderComponent={() => (
                     <View style={{ paddingTop: 16, paddingBottom: 4 }}>
                         <View style={{ paddingHorizontal: 24, marginBottom: 10 }}>
@@ -1196,6 +1198,123 @@ export default function AccountHistoryScreen() {
                         )}
                     </View>
                 </View>
+            </Modal>
+            {/* 操作メニューポップアップモーダル */}
+            <Modal
+                visible={isMenuModalVisible}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setIsMenuModalVisible(false)}
+            >
+                <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={() => setIsMenuModalVisible(false)}
+                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={(e) => e.stopPropagation()}
+                        style={{
+                            backgroundColor: colors.background,
+                            borderTopLeftRadius: 32,
+                            borderTopRightRadius: 32,
+                            padding: 24,
+                            paddingBottom: Platform.OS === 'ios' ? 40 : 24
+                        }}
+                    >
+                        <View style={{ width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>
+                                {account?.name} の操作メニュー
+                            </Text>
+                            <TouchableOpacity onPress={() => setIsMenuModalVisible(false)}>
+                                <X size={20} color={colors.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={{ gap: 12, marginBottom: 12 }}>
+                            {account?.cardType && account.cardType !== 'none' && (
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setIsMenuModalVisible(false);
+                                        setTimeout(() => handleCsvImport(), 300);
+                                    }}
+                                    disabled={isCsvImporting}
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        backgroundColor: colors.card,
+                                        padding: 16,
+                                        borderRadius: 20,
+                                        borderWidth: 1,
+                                        borderColor: colors.border
+                                    }}
+                                >
+                                    <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: isDark ? 'rgba(99,102,241,0.15)' : '#eef2ff', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
+                                        <FileUp size={20} color={colors.indigo} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>CSVファイルの読み込み</Text>
+                                        <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>カードの明細CSVを取り込みます</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            )}
+
+                            {account?.cardType && account.loginUrl && (
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setIsMenuModalVisible(false);
+                                        Linking.openURL(account.loginUrl!);
+                                    }}
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        backgroundColor: colors.card,
+                                        padding: 16,
+                                        borderRadius: 20,
+                                        borderWidth: 1,
+                                        borderColor: colors.border
+                                    }}
+                                >
+                                    <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: isDark ? 'rgba(99,102,241,0.15)' : '#eef2ff', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
+                                        <ExternalLink size={20} color={colors.indigo} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>会員サイトを開く</Text>
+                                        <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>Webブラウザで公式サイトにアクセスします</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            )}
+
+                            {account?.type === 'card' && account.withdrawalAccountId && (
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setIsMenuModalVisible(false);
+                                        setTimeout(() => handleSync(), 300);
+                                    }}
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        backgroundColor: colors.card,
+                                        padding: 16,
+                                        borderRadius: 20,
+                                        borderWidth: 1,
+                                        borderColor: colors.border
+                                    }}
+                                >
+                                    <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: isDark ? 'rgba(99,102,241,0.15)' : '#eef2ff', justifyContent: 'center', alignItems: 'center', marginRight: 16 }}>
+                                        <RefreshCw size={20} color={colors.indigo} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>引き落とし振替の更新</Text>
+                                        <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>引落日・確定額の最新データを反映します</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    </TouchableOpacity>
+                </TouchableOpacity>
             </Modal>
         </View>
     );

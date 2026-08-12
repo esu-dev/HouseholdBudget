@@ -202,6 +202,8 @@ export default function ImportSharedScreen() {
                         const finalCategory = (existingTx.category_id && existingTx.category_id !== 'others') ? existingTx.category_id : t.category_id;
                         const finalMemo = (existingTx.memo && existingTx.memo !== 'Gmail自動インポート' && existingTx.memo !== 'Gmail自動インポート(Mock)') ? existingTx.memo : t.memo;
 
+                        // 置換時は元のメール取引のimport_hashを保持する（CSVハッシュで上書きしない）
+                        // こうすることで次回メール読み込み時に重複として正しく検知される
                         await databaseService.updateTransaction({
                             ...existingTx,
                             amount: t.amount,
@@ -209,7 +211,7 @@ export default function ImportSharedScreen() {
                             payee: t.payee,
                             memo: finalMemo,
                             category_id: finalCategory,
-                            import_hash: t.import_hash || existingTx.import_hash
+                            import_hash: existingTx.import_hash
                         });
                         replacedCount++;
                     } else {
