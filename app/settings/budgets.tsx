@@ -23,6 +23,8 @@ export default function BudgetSettingsScreen() {
         averageMonthlyExpense,
         averageMonthlyExpensesByCategory,
         maxMonthlyExpensesByCategory,
+        expectedMonthlyIncome,
+        updateExpectedMonthlyIncome,
         savingsGoal,
         updateSavingsGoal,
         incomeCategoryIdsForAverage,
@@ -32,6 +34,7 @@ export default function BudgetSettingsScreen() {
 
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [localBudgets, setLocalBudgets] = useState<Record<string, string>>({});
+    const [localExpectedMonthlyIncome, setLocalExpectedMonthlyIncome] = useState('');
     const [localSavingsGoal, setLocalSavingsGoal] = useState('');
     const [showIncomeSettings, setShowIncomeSettings] = useState(false);
     const [lastMonthBudgets, setLastMonthBudgets] = useState<Record<string, number>>({});
@@ -129,11 +132,19 @@ export default function BudgetSettingsScreen() {
     }, [budgets]);
 
     useEffect(() => {
+        setLocalExpectedMonthlyIncome(expectedMonthlyIncome ? expectedMonthlyIncome.toString() : '');
+    }, [expectedMonthlyIncome]);
+
+    useEffect(() => {
         setLocalSavingsGoal(savingsGoal.toString());
     }, [savingsGoal]);
 
     const handleSave = async () => {
         try {
+            // 月収予想の保存
+            const expectedIncome = parseInt(localExpectedMonthlyIncome) || 0;
+            await updateExpectedMonthlyIncome(expectedIncome);
+
             // 希望貯金額の保存
             const savingsAmount = parseInt(localSavingsGoal) || 0;
             await updateSavingsGoal(savingsAmount);
@@ -164,9 +175,10 @@ export default function BudgetSettingsScreen() {
     }, [localBudgets]);
 
     const targetBudget = useMemo(() => {
+        const expectedIncome = parseInt(localExpectedMonthlyIncome) || 0;
         const savings = parseInt(localSavingsGoal) || 0;
-        return Math.max(0, averageMonthlyIncome - savings);
-    }, [averageMonthlyIncome, localSavingsGoal]);
+        return Math.max(0, (expectedIncome || averageMonthlyIncome) - savings);
+    }, [averageMonthlyIncome, localExpectedMonthlyIncome, localSavingsGoal]);
 
     return (
         <KeyboardAvoidingView
@@ -229,6 +241,25 @@ export default function BudgetSettingsScreen() {
                             </View>
                         </View>
 
+                        <View style={{ backgroundColor: colors.greenSub, padding: 16, borderRadius: 20, marginBottom: 12 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                <TrendingUp size={16} color={colors.green} />
+                                <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.green, marginLeft: 6 }}>自身の月収予想</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Text style={{ fontSize: 14, color: isDark ? '#fff' : '#064e3b', marginRight: 4 }}>¥</Text>
+                                <TextInput
+                                    style={{ fontSize: 18, fontWeight: 'black', color: isDark ? '#fff' : '#064e3b', flex: 1, padding: 0 }}
+                                    keyboardType="numeric"
+                                    value={localExpectedMonthlyIncome}
+                                    onChangeText={(text) => setLocalExpectedMonthlyIncome(text.replace(/[^0-9]/g, ''))}
+                                    placeholder="未設定（平均月収を使用）"
+                                    placeholderTextColor={isDark ? '#94a3b8' : '#6ee7b7'}
+                                />
+                                <Text style={{ fontSize: 12, color: isDark ? '#fff' : '#064e3b', marginLeft: 2 }}>円 / 月</Text>
+                            </View>
+                        </View>
+
                         <TouchableOpacity
                             onPress={() => setShowIncomeSettings(true)}
                             style={{
@@ -273,7 +304,7 @@ export default function BudgetSettingsScreen() {
                                         ¥{targetBudget.toLocaleString()}
                                     </Text>
                                     <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>
-                                        (平均月収 - 希望貯金額)
+                                        (月収予想 - 希望貯金額)
                                     </Text>
                                 </View>
                             </View>

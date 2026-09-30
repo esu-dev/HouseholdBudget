@@ -1,7 +1,7 @@
 import { useFont } from '@shopify/react-native-skia';
 import React from 'react';
 import { Text, View } from 'react-native';
-import { Area, CartesianChart, Line } from 'victory-native';
+import { Area, CartesianChart, Line, useChartPressState } from 'victory-native';
 import { useAppColorScheme } from '../hooks/useAppColorScheme';
 import { TimeScale, useTransactionAnalysis } from '../hooks/useTransactionAnalysis';
 import { Transaction } from '../types/transaction';
@@ -20,14 +20,10 @@ export const NetWorthTrendChart = ({ transactions, allTransactions, targetDate, 
 
   // 追加された Roboto フォントを読み込む
   const font = useFont(require('../assets/fonts/Roboto.ttf'), 12);
-
-  if (netWorthTrendData.length === 0) {
-    return (
-      <View className="p-8 items-center justify-center bg-white dark:bg-slate-800 rounded-3xl mb-6 shadow-sm">
-        <Text className="text-slate-400">データが不足しています。</Text>
-      </View>
-    );
-  }
+  const { state: chartPressState, isActive: isChartPressed } = useChartPressState({
+    x: '',
+    y: { amount: 0 },
+  });
 
   // データの統計情報を計算（ラベルが表示されない時の補助用）
   const stats = React.useMemo(() => {
@@ -53,6 +49,14 @@ export const NetWorthTrendChart = ({ transactions, allTransactions, targetDate, 
     return { min, max, start, end, periodLabel };
   }, [netWorthTrendData, timeScale]);
 
+  if (netWorthTrendData.length === 0) {
+    return (
+      <View className="p-8 items-center justify-center bg-white dark:bg-slate-800 rounded-3xl mb-6 shadow-sm">
+        <Text className="text-slate-400">データが不足しています。</Text>
+      </View>
+    );
+  }
+
   const formatXLabel = (value: any) => {
     const label = String(value);
     if (!label || label === "undefined") return '';
@@ -69,6 +73,9 @@ export const NetWorthTrendChart = ({ transactions, allTransactions, targetDate, 
   };
 
   const formatAmount = (val: number) => `¥${val.toLocaleString()}`;
+  const selectedPoint = isChartPressed && chartPressState.matchedIndex.value >= 0
+    ? netWorthTrendData[chartPressState.matchedIndex.value]
+    : null;
 
   return (
     <View className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm mb-6 border-l-4 border-emerald-500">
@@ -89,6 +96,7 @@ export const NetWorthTrendChart = ({ transactions, allTransactions, targetDate, 
           data={netWorthTrendData}
           xKey="date"
           yKeys={["amount"]}
+          chartPressState={chartPressState}
           domainPadding={{ right: 15 }}
           axisOptions={{
             font: font ?? undefined,
@@ -122,6 +130,16 @@ export const NetWorthTrendChart = ({ transactions, allTransactions, targetDate, 
           )}
         </CartesianChart>
       </View>
+
+      {selectedPoint && (
+        <View className="mt-3 px-4 py-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
+          <Text className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">選択した時点</Text>
+          <View className="flex-row justify-between items-center mt-1">
+            <Text className="text-xs text-slate-600 dark:text-slate-300">{selectedPoint.date}</Text>
+            <Text className="text-base font-bold text-emerald-700 dark:text-emerald-300">{formatAmount(selectedPoint.amount)}</Text>
+          </View>
+        </View>
+      )}
 
       <View className="mt-4 p-4 bg-slate-50 dark:bg-slate-700/30 rounded-2xl">
         <View className="mb-3 items-center">

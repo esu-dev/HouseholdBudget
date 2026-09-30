@@ -1,6 +1,14 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import { ArrowDownCircle, ArrowUpCircle, Building2, ChevronRight, CreditCard, EyeOff, Mail, RefreshCw, Smartphone, Wallet, ExternalLink, FileUp, X } from 'lucide-react-native';
+import { ArrowDownCircle, ArrowUpCircle, Building2, ChevronRight, CreditCard, EyeOff, Mail, Smartphone, Wallet, X } from 'lucide-react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useAppColorScheme } from '../../hooks/useAppColorScheme';
+import { csvImportService } from '../../services/csvImportService';
+import { databaseService } from '../../services/database';
+import { emailImportService } from '../../services/emailImportService';
+import { gmailService } from '../../services/gmailService';
+import { useTransactionStore } from '../../store/useTransactionStore';
 
 // Expo Goで実行されているかを判別
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -14,14 +22,6 @@ if (!isExpoGo) {
         console.warn('GoogleSignin module could not be loaded', e);
     }
 }
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View, Modal, TextInput, Linking } from 'react-native';
-import { useAppColorScheme } from '../../hooks/useAppColorScheme';
-import { emailImportService } from '../../services/emailImportService';
-import { gmailService } from '../../services/gmailService';
-import { useTransactionStore } from '../../store/useTransactionStore';
-import { csvImportService } from '../../services/csvImportService';
-import { databaseService } from '../../services/database';
 
 const ACCOUNT_TYPE_INFO: Record<string, { label: string; icon: any; color: string }> = {
     cash: { label: '現金', icon: Wallet, color: '#f59e0b' },
@@ -38,6 +38,7 @@ export default function BalanceScreen() {
     const { transactions, accounts, accountBalances, fetchData, syncCardTransfers, addTransactions } = useTransactionStore();
     const [gmailToken, setGmailToken] = React.useState<string | null>(null);
     const [isImporting, setIsImporting] = React.useState(false);
+    const [isNetWorthVisible, setIsNetWorthVisible] = useState(false);
 
     // CSV Import State
     const [isCsvImporting, setIsCsvImporting] = useState(false);
@@ -468,7 +469,16 @@ export default function BalanceScreen() {
                         style={{ backgroundColor: colors.indigo, padding: 24, borderRadius: 32, marginBottom: 24, shadowColor: colors.indigo, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
                     >
                         <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1 }}>現在の合計純資産</Text>
-                        <Text style={{ color: 'white', fontSize: 36, fontWeight: 'bold', marginTop: 8 }}>¥{netWorth.toLocaleString()}</Text>
+                        <TouchableOpacity
+                            onPress={() => setIsNetWorthVisible(prev => !prev)}
+                            activeOpacity={0.7}
+                            accessibilityRole="button"
+                            accessibilityLabel="合計純資産の表示切替"
+                        >
+                            <Text style={{ color: 'white', fontSize: 36, fontWeight: 'bold', marginTop: 8 }}>
+                                {isNetWorthVisible ? `¥${netWorth.toLocaleString()}` : '¥＊＊＊'}
+                            </Text>
+                        </TouchableOpacity>
                         <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 16 }} />
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                             <View>

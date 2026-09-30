@@ -1,8 +1,8 @@
 import { FlashList } from '@shopify/flash-list';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Calendar, CircleEllipsis, EyeOff, ExternalLink, FileUp, MessageSquare, MoreVertical, Plus, RefreshCw, RotateCcw, Store, Trash2, Wallet, X } from 'lucide-react-native';
+import { ArrowLeft, Calendar, CircleEllipsis, ExternalLink, EyeOff, FileUp, MessageSquare, MoreVertical, RefreshCw, RotateCcw, Store, Trash2, Wallet, X } from 'lucide-react-native';
 import React, { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Modal, ScrollView, Text, TextInput, TouchableOpacity, View, Keyboard, Platform, InputAccessoryView } from 'react-native';
+import { Alert, InputAccessoryView, Keyboard, Linking, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
@@ -44,8 +44,8 @@ export default function AccountHistoryScreen() {
     const balance = accountBalances[id as string] ?? 0;
     const totalNetWorth = Object.values(accountBalances).reduce((sum, b) => sum + b, 0);
 
-    const nextWithdrawal = useMemo(() => {
-        if (!account || account.type !== 'card' || account.withdrawalDay == null) return null;
+    const nextWithdrawals = useMemo(() => {
+        if (!account || account.type !== 'card' || account.withdrawalDay == null) return [];
 
         const closingDay = account.closingDay || 0;
         const normalizeYearMonth = (str: string | undefined) => {
@@ -128,17 +128,14 @@ export default function AccountHistoryScreen() {
             .filter(w => w.date > today && w.amount > 0)
             .sort((a, b) => a.date.getTime() - b.date.getTime());
 
-        if (futureWithdrawals.length === 0) return null;
-
-        const next = futureWithdrawals[0];
-        return {
-            amount: next.amount,
-            dateStr: next.date.toLocaleDateString('ja-JP', {
+        return futureWithdrawals.slice(0, 2).map(withdrawal => ({
+            amount: withdrawal.amount,
+            dateStr: withdrawal.date.toLocaleDateString('ja-JP', {
                 month: 'long',
                 day: 'numeric',
                 weekday: 'short'
             })
-        };
+        }));
     }, [transactions, id, account]);
 
     const colors = {
@@ -540,6 +537,7 @@ export default function AccountHistoryScreen() {
                 renderRightActions={renderRightActions}
                 overshootRight={false}
                 friction={2}
+                dragOffsetFromLeftEdge={24}
                 rightThreshold={40}
                 onSwipeableOpen={() => {
                     // 自分以外の全Swipeableを閉じる
@@ -761,22 +759,29 @@ export default function AccountHistoryScreen() {
                         </>
                     )}
                 </View>
-                {account?.type === 'card' && nextWithdrawal && (
-                    <View style={{
-                        marginTop: 10,
-                        backgroundColor: 'rgba(255,255,255,0.15)',
-                        paddingVertical: 10,
-                        paddingHorizontal: 14,
-                        borderRadius: 16,
-                        borderWidth: 1,
-                        borderColor: 'rgba(255,255,255,0.1)'
-                    }}>
-                        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: 'bold' }}>
-                            直近の引き落とし額 ({nextWithdrawal.dateStr})
-                        </Text>
-                        <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold', marginTop: 2 }}>
-                            ¥{nextWithdrawal.amount.toLocaleString()}
-                        </Text>
+                {account?.type === 'card' && nextWithdrawals.length > 0 && (
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                        {nextWithdrawals.map((withdrawal, index) => (
+                            <View
+                                key={withdrawal.dateStr}
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: 'rgba(255,255,255,0.15)',
+                                    paddingVertical: 10,
+                                    paddingHorizontal: 14,
+                                    borderRadius: 16,
+                                    borderWidth: 1,
+                                    borderColor: 'rgba(255,255,255,0.1)'
+                                }}
+                            >
+                                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: 'bold' }}>
+                                    {index === 0 ? '直近' : '翌月'}の引き落とし額 ({withdrawal.dateStr})
+                                </Text>
+                                <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold', marginTop: 2 }}>
+                                    ¥{withdrawal.amount.toLocaleString()}
+                                </Text>
+                            </View>
+                        ))}
                     </View>
                 )}
             </View>

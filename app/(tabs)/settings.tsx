@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { Stack, useRouter } from 'expo-router';
 import { Bell, ChevronRight, FileDown, FileUp, ListTree, Palette, PieChart, PiggyBank, Save, Shield, Trash2, Wallet, ZapOff } from 'lucide-react-native';
 import React from 'react';
@@ -11,6 +12,7 @@ export default function SettingsScreen() {
     const router = useRouter();
     const colorScheme = useAppColorScheme();
     const isDark = colorScheme === 'dark';
+    const appVersion = Constants.expoConfig?.version ?? '不明';
     const { deleteAllData, fetchData } = useTransactionStore();
     const { isDeveloperMode, setDeveloperMode } = useDeveloperStore();
     const [tapCount, setTapCount] = React.useState(0);
@@ -270,7 +272,7 @@ export default function SettingsScreen() {
                     style={{ alignItems: 'center', marginTop: 32, marginBottom: 60 }}
                     hitSlop={{ top: 20, bottom: 20, right: 20, left: 20 }}
                 >
-                    <Text style={{ fontSize: 12, color: colors.textMuted }}>My家計簿 v1.7.3</Text>
+                    <Text style={{ fontSize: 12, color: colors.textMuted }}>My家計簿 v{appVersion}</Text>
                 </TouchableOpacity>
             </View>
         </ScrollView>

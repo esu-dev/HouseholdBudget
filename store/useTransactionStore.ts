@@ -17,6 +17,7 @@ interface TransactionState {
   averageMonthlyExpense: number;
   averageMonthlyExpensesByCategory: Record<string, number>;
   maxMonthlyExpensesByCategory: Record<string, number>;
+  expectedMonthlyIncome: number;
   savingsGoal: number;
   incomeCategoryIdsForAverage: string[];
   editingTransaction: Transaction | null;
@@ -25,6 +26,7 @@ interface TransactionState {
   fetchData: (baseDate?: string) => Promise<void>;
   fetchBudgets: (month: string) => Promise<void>;
   fetchStatistics: (baseDate?: string) => Promise<void>;
+  updateExpectedMonthlyIncome: (amount: number) => Promise<void>;
   updateSavingsGoal: (amount: number) => Promise<void>;
   updateIncomeCategoriesForAverage: (categoryIds: string[]) => Promise<void>;
   addTransaction: (transaction: CreateTransactionInput) => Promise<void>;
@@ -69,6 +71,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   averageMonthlyExpense: 0,
   averageMonthlyExpensesByCategory: {},
   maxMonthlyExpensesByCategory: {},
+  expectedMonthlyIncome: 0,
   savingsGoal: 0,
   incomeCategoryIdsForAverage: [],
   editingTransaction: null,
@@ -78,11 +81,12 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   fetchData: async (baseDate?: string) => {
     set({ isLoading: true });
     try {
-      const [transactions, accounts, balances, categories, savingsGoal, incomeCats, csvMappings] = await Promise.all([
+      const [transactions, accounts, balances, categories, expectedMonthlyIncome, savingsGoal, incomeCats, csvMappings] = await Promise.all([
         databaseService.getAllTransactions(),
         databaseService.getAllAccounts(),
         databaseService.getAccountBalances(),
         databaseService.getAllMajorCategories(),
+        databaseService.getSetting('expected_monthly_income'),
         databaseService.getSetting('savings_goal'),
         databaseService.getSetting('income_categories_for_average'),
         databaseService.getAllCsvAccountMappings(),
@@ -111,6 +115,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         averageMonthlyExpense: avgExpense,
         averageMonthlyExpensesByCategory: avgExpenses,
         maxMonthlyExpensesByCategory: maxExpenses,
+        expectedMonthlyIncome: expectedMonthlyIncome ? parseInt(expectedMonthlyIncome) : 0,
         savingsGoal: savingsGoal ? parseInt(savingsGoal) : 0,
         incomeCategoryIdsForAverage: incomeCategoryIds,
         csvAccountMappings: csvMappings || {},
@@ -147,6 +152,15 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
       });
     } catch (error) {
       set({ error: 'Failed to fetch statistics' });
+    }
+  },
+
+  updateExpectedMonthlyIncome: async (amount: number) => {
+    try {
+      await databaseService.updateSetting('expected_monthly_income', amount.toString());
+      set({ expectedMonthlyIncome: amount });
+    } catch (error) {
+      set({ error: 'Failed to update expected monthly income' });
     }
   },
 
