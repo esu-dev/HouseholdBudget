@@ -57,8 +57,17 @@ jobs:
             COMPILER_INDEX_STORE_ENABLE=NO \
             IPHONEOS_DEPLOYMENT_TARGET=15.1 | xcbeautify || { echo "Build Failed"; exit 1; }
 
+      - name: Get version from app.json
+        id: get_version
+        run: |
+          VERSION=$(cat app.json | jq -r '.expo.version')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "App version: $VERSION"
+
       - name: Create Payload and IPA
         run: |
+          VERSION=${{ steps.get_version.outputs.version }}
+
           # 1. きれいな作業場を作る
           rm -rf Payload HouseholdBudget.ipa export_app
           mkdir -p export_app/Payload
@@ -70,13 +79,13 @@ jobs:
           # 3. フォルダの中に移動してからzipする（これが重要！）
           # フォルダの外側からzipすると、余計なパスが含まれて "vector too long" の原因になります
           cd export_app
-          zip -qr ../HouseholdBudget.ipa Payload
+          zip -qr "../HouseholdBudget_v${VERSION}.ipa" Payload
           cd ..
 
-          echo "IPA creation complete."
+          echo "IPA creation complete: HouseholdBudget_v${VERSION}.ipa"
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-ipa
-          path: HouseholdBudget.ipa
+          name: ios-ipa-v${{ steps.get_version.outputs.version }}
+          path: HouseholdBudget_v${{ steps.get_version.outputs.version }}.ipa
