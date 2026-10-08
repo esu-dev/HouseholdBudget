@@ -210,11 +210,15 @@ export default function GmailImportScreen() {
             <Stack.Screen options={{ headerShown: false }} />
 
             {/* Header */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.card }}>
-                <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 15, bottom: 15, left: 30, right: 15 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.card }}>
+                <TouchableOpacity
+                    onPress={() => router.back()}
+                    hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                    style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                >
                     <ChevronLeft size={28} color={colors.text} />
                 </TouchableOpacity>
-                <Text style={{ flex: 1, textAlign: 'center', fontSize: 18, fontWeight: 'bold', color: colors.text, marginRight: 28 }}>
+                <Text style={{ flex: 1, textAlign: 'center', fontSize: 18, fontWeight: 'bold', color: colors.text, marginRight: 44 }}>
                     Gmail自動インポート
                 </Text>
             </View>

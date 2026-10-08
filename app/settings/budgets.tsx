@@ -189,13 +189,43 @@ export default function BudgetSettingsScreen() {
                 headerShown: true,
                 title: '予算設定',
                 headerLeft: () => (
-                    <TouchableOpacity onPress={() => router.back()} style={{ marginLeft: 8 }}>
-                        <ChevronLeft size={24} color={colors.indigo} hitSlop={{ top: 120, bottom: 120, right: 120, left: 120 }} />
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                        style={{
+                            minWidth: 44,
+                            minHeight: 44,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginLeft: 4,
+                        }}
+                    >
+                        <ChevronLeft size={24} color={colors.indigo} />
                     </TouchableOpacity>
                 ),
                 headerRight: () => (
-                    <TouchableOpacity onPress={handleSave} style={{ marginRight: 8 }}>
-                        <Save size={24} color={colors.indigo} hitSlop={{ top: 120, bottom: 120, right: 120, left: 120 }} />
+                    <TouchableOpacity
+                        onPress={handleSave}
+                        hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                        activeOpacity={0.7}
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: colors.indigo,
+                            paddingHorizontal: 14,
+                            paddingVertical: 7,
+                            borderRadius: 18,
+                            minHeight: 36,
+                            marginRight: 4,
+                            shadowColor: colors.indigo,
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.2,
+                            shadowRadius: 3,
+                            elevation: 2,
+                        }}
+                    >
+                        <Save size={16} color="white" />
+                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 13, marginLeft: 5 }}>保存</Text>
                     </TouchableOpacity>
                 ),
                 headerStyle: { backgroundColor: colors.background },
@@ -208,14 +238,22 @@ export default function BudgetSettingsScreen() {
                 <View style={{ padding: 20 }}>
                     <View style={{ backgroundColor: colors.card, borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 24 }}>
-                            <TouchableOpacity onPress={() => changeMonth(-1)} style={{ padding: 10 }}>
-                                <ChevronLeft size={24} color={colors.indigo} hitSlop={{ top: 120, bottom: 120, right: 120, left: 120 }} />
+                            <TouchableOpacity
+                                onPress={() => changeMonth(-1)}
+                                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                                style={{ padding: 10, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                            >
+                                <ChevronLeft size={24} color={colors.indigo} />
                             </TouchableOpacity>
                             <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, minWidth: 150, textAlign: 'center' }}>
                                 {selectedDate.getFullYear()}年 {selectedDate.getMonth() + 1}月
                             </Text>
-                            <TouchableOpacity onPress={() => changeMonth(1)} style={{ padding: 10 }}>
-                                <ChevronRight size={24} color={colors.indigo} hitSlop={{ top: 120, bottom: 120, right: 120, left: 120 }} />
+                            <TouchableOpacity
+                                onPress={() => changeMonth(1)}
+                                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                                style={{ padding: 10, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                            >
+                                <ChevronRight size={24} color={colors.indigo} />
                             </TouchableOpacity>
                         </View>
 
@@ -336,8 +374,6 @@ export default function BudgetSettingsScreen() {
                         const IconComp = CATEGORY_ICONS[category.icon] || Save;
                         return (
                             <View key={category.id} style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
                                 backgroundColor: colors.card,
                                 padding: 16,
                                 borderRadius: 20,
@@ -348,42 +384,67 @@ export default function BudgetSettingsScreen() {
                                 shadowRadius: 2,
                                 elevation: 1
                             }}>
-                                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: category.color + '20', alignItems: 'center', justifyContent: 'center' }}>
-                                    <IconComp size={20} color={category.color} />
+                                {/* 上段: カテゴリ情報と予算入力欄 */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                                        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: category.color + '20', alignItems: 'center', justifyContent: 'center' }}>
+                                            <IconComp size={20} color={category.color} />
+                                        </View>
+                                        <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginLeft: 12 }} numberOfLines={1}>
+                                            {category.label}
+                                        </Text>
+                                    </View>
+
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <TextInput
+                                            style={{
+                                                backgroundColor: colors.inputBg,
+                                                color: colors.text,
+                                                paddingHorizontal: 12,
+                                                paddingVertical: 8,
+                                                borderRadius: 10,
+                                                textAlign: 'right',
+                                                fontSize: 16,
+                                                fontWeight: 'bold',
+                                                width: 110,
+                                            }}
+                                            keyboardType="numeric"
+                                            value={localBudgets[category.id] || ''}
+                                            onChangeText={(text) => {
+                                                setLocalBudgets(prev => ({ ...prev, [category.id]: text.replace(/[^0-9]/g, '') }));
+                                            }}
+                                            placeholder="0"
+                                            placeholderTextColor={colors.textMuted}
+                                        />
+                                        <Text style={{ marginLeft: 6, color: colors.textMuted, fontSize: 13, fontWeight: 'bold' }}>円</Text>
+                                    </View>
                                 </View>
 
-                                <View style={{ flex: 1, marginLeft: 12 }}>
-                                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.text }}>{category.label}</Text>
-                                    <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>
-                                        先月予算: ¥{(lastMonthBudgets[category.id] || 0).toLocaleString()} | 使用量: ¥{(lastMonthUsageByCategory[category.id] || 0).toLocaleString()}
-                                    </Text>
-                                    <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 1 }}>
-                                        過去6ヶ月平均: ¥{(averageMonthlyExpensesByCategory[category.id] || 0).toLocaleString()} | 最大: ¥{(maxMonthlyExpensesByCategory[category.id] || 0).toLocaleString()}
-                                    </Text>
+                                {/* 下段: 過去実績（先月予算/使用量、6ヶ月平均/最大） */}
+                                <View style={{
+                                    marginTop: 12,
+                                    paddingTop: 10,
+                                    borderTopWidth: 1,
+                                    borderTopColor: isDark ? '#334155' : '#f1f5f9',
+                                    gap: 5
+                                }}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                                            先月予算: <Text style={{ color: colors.text, fontWeight: '600' }}>¥{(lastMonthBudgets[category.id] || 0).toLocaleString()}</Text>
+                                        </Text>
+                                        <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                                            先月使用量: <Text style={{ color: colors.text, fontWeight: '600' }}>¥{(lastMonthUsageByCategory[category.id] || 0).toLocaleString()}</Text>
+                                        </Text>
+                                    </View>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                                            過去6ヶ月平均: <Text style={{ color: colors.text, fontWeight: '600' }}>¥{(averageMonthlyExpensesByCategory[category.id] || 0).toLocaleString()}</Text>
+                                        </Text>
+                                        <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                                            最大: <Text style={{ color: colors.text, fontWeight: '600' }}>¥{(maxMonthlyExpensesByCategory[category.id] || 0).toLocaleString()}</Text>
+                                        </Text>
+                                    </View>
                                 </View>
-
-                                <View style={{ width: 120 }}>
-                                    <TextInput
-                                        style={{
-                                            backgroundColor: colors.inputBg,
-                                            color: colors.text,
-                                            paddingHorizontal: 12,
-                                            paddingVertical: 8,
-                                            borderRadius: 10,
-                                            textAlign: 'right',
-                                            fontSize: 16,
-                                            fontWeight: 'bold'
-                                        }}
-                                        keyboardType="numeric"
-                                        value={localBudgets[category.id] || ''}
-                                        onChangeText={(text) => {
-                                            setLocalBudgets(prev => ({ ...prev, [category.id]: text.replace(/[^0-9]/g, '') }));
-                                        }}
-                                        placeholder="0"
-                                        placeholderTextColor={colors.textMuted}
-                                    />
-                                </View>
-                                <Text style={{ marginLeft: 4, color: colors.textMuted, fontSize: 12 }}>円</Text>
                             </View>
                         );
                     })}

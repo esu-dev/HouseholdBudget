@@ -82,7 +82,11 @@ export default function IgnoredPayeesScreen() {
                 borderBottomWidth: 1,
                 borderBottomColor: colors.border
             }}>
-                <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 16 }}>
+                <TouchableOpacity
+                    onPress={() => router.back()}
+                    hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                    style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}
+                >
                     <ChevronLeft size={24} color={colors.indigo} />
                 </TouchableOpacity>
                 <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>自動学習の除外設定</Text>

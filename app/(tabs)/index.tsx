@@ -656,7 +656,11 @@ export default function HomeScreen() {
         <View className="flex-1 bg-slate-50 dark:bg-slate-900">
             <View className="bg-white dark:bg-slate-800 px-4 pt-[30px] pb-4 flex-row justify-between items-center shadow-sm z-10">
                 <View className="flex-row items-center">
-                    <TouchableOpacity onPress={() => changeMonth(-1)} className="p-2" hitSlop={{ top: 60, bottom: 60, left: 60, right: 60 }}>
+                    <TouchableOpacity
+                        onPress={() => changeMonth(-1)}
+                        hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                        style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                    >
                         <ChevronLeft size={24} color="#6366f1" />
                     </TouchableOpacity>
 
@@ -664,7 +668,11 @@ export default function HomeScreen() {
                         {monthLabel}
                     </Text>
 
-                    <TouchableOpacity onPress={() => changeMonth(1)} className="p-2" hitSlop={{ top: 60, bottom: 60, left: 60, right: 60 }}>
+                    <TouchableOpacity
+                        onPress={() => changeMonth(1)}
+                        hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                        style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                    >
                         <ChevronRight size={24} color="#6366f1" />
                     </TouchableOpacity>
                 </View>

@@ -729,6 +729,19 @@ export const databaseService = {
     return (result?.count ?? 0) > 0;
   },
 
+  async isMessageAlreadyImported(messageId: string): Promise<boolean> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    const result = await db.getFirstAsync<{count: number}>(
+      `SELECT COUNT(*) as count FROM transactions 
+       WHERE import_hash = ? 
+          OR import_hash LIKE ? 
+          OR import_hash = ? 
+          OR import_hash LIKE ?`,
+      [messageId, `${messageId}_%`, `csv_replaced_${messageId}`, `csv_replaced_${messageId}_%`]
+    );
+    return (result?.count ?? 0) > 0;
+  },
+
   // Budgets
   async getBudgetsByMonth(month: string): Promise<Budget[]> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
@@ -790,6 +803,7 @@ export const databaseService = {
         AND t.to_account_id IS NULL
         AND t.transfer_id IS NULL
         AND (t.exclude_from_balance IS NULL OR t.exclude_from_balance = 0)
+        AND (t.exclude_from_budget IS NULL OR t.exclude_from_budget = 0)
         AND t.date >= date(?, 'start of month', '-' || ? || ' months')
         AND t.date < date(?, 'start of month')
     `;
@@ -828,8 +842,10 @@ export const databaseService = {
       JOIN major_categories maj ON min.parent_id = maj.id
       WHERE maj.type = 'expense'
         AND t.amount < 0
+        AND t.to_account_id IS NULL
         AND t.transfer_id IS NULL
         AND (t.exclude_from_balance IS NULL OR t.exclude_from_balance = 0)
+        AND (t.exclude_from_budget IS NULL OR t.exclude_from_budget = 0)
         AND t.date >= date(?, 'start of month', '-' || ? || ' months')
         AND t.date < date(?, 'start of month')
       GROUP BY major_id, month
@@ -868,8 +884,10 @@ export const databaseService = {
       JOIN major_categories maj ON min.parent_id = maj.id
       WHERE maj.type = 'expense'
         AND t.amount < 0
+        AND t.to_account_id IS NULL
         AND t.transfer_id IS NULL
         AND (t.exclude_from_balance IS NULL OR t.exclude_from_balance = 0)
+        AND (t.exclude_from_budget IS NULL OR t.exclude_from_budget = 0)
         AND t.date >= date(?, 'start of month', '-' || ? || ' months')
         AND t.date < date(?, 'start of month')
       GROUP BY major_id, month
@@ -908,6 +926,7 @@ export const databaseService = {
         AND t.to_account_id IS NULL
         AND t.transfer_id IS NULL
         AND (t.exclude_from_balance IS NULL OR t.exclude_from_balance = 0)
+        AND (t.exclude_from_budget IS NULL OR t.exclude_from_budget = 0)
         AND t.date >= date(?, 'start of month', '-' || ? || ' months')
         AND t.date < date(?, 'start of month')
       GROUP BY month

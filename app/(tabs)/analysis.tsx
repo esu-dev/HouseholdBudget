@@ -116,7 +116,11 @@ export default function AnalysisScreen() {
             <View className="bg-white dark:bg-slate-800 px-4 pt-[30px] pb-4 flex-row justify-between items-center shadow-sm z-10">
                 {timeScale !== 'year' ? (
                     <>
-                        <TouchableOpacity onPress={() => changeDate(-1)} className="p-2" hitSlop={{ top: 30, bottom: 30, left: 30, right: 30 }}>
+                        <TouchableOpacity
+                            onPress={() => changeDate(-1)}
+                            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                            style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                        >
                             <ChevronLeft size={24} color="#6366f1" />
                         </TouchableOpacity>
 
@@ -124,7 +128,11 @@ export default function AnalysisScreen() {
                             {dateLabel}
                         </Text>
 
-                        <TouchableOpacity onPress={() => changeDate(1)} className="p-2" hitSlop={{ top: 30, bottom: 30, left: 30, right: 30 }}>
+                        <TouchableOpacity
+                            onPress={() => changeDate(1)}
+                            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                            style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                        >
                             <ChevronRight size={24} color="#6366f1" />
                         </TouchableOpacity>
                     </>

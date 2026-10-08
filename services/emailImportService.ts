@@ -83,12 +83,48 @@ export const emailImportService = {
     const logger = useDeveloperStore.getState();
     logger.addLog('info', 'Starting Gmail import...');
 
-    // クレジットカードごとに検索クエリを実行
+    // 各口座の最終メール読み込み日時を取得して after: フィルタ用日付を生成
+    const store = useTransactionStore.getState();
+    const accounts = store.accounts;
+
+    // lastEmailImportedAt が設定されていれば「1日前」の日付を返し、未設定なら null（全期間検索）
+    const getAfterDate = (accountId: string | null): string | null => {
+      if (accountId) {
+        const account = accounts.find(a => a.id === accountId);
+        if (account?.lastEmailImportedAt) {
+          // Gmail の after: フィルタは YYYY/MM/DD 形式
+          // 取りこぼし防止のため1日余裕を持たせる
+          const d = new Date(account.lastEmailImportedAt);
+          d.setDate(d.getDate() - 1);
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${y}/${m}/${day}`;
+        }
+      }
+      // 未設定の場合は全期間検索（after: フィルタなし）
+      return null;
+    };
+
+    const rakutenAccountId = await databaseService.getSetting('gmail_account_id_rakuten');
+    const vpassAccountId = await databaseService.getSetting('gmail_account_id_vpass');
+    const jcbAccountId = await databaseService.getSetting('gmail_account_id_jcb');
+    const jpbankAccountId = await databaseService.getSetting('gmail_account_id_jpbank');
+
+    const rakutenAfter = getAfterDate(rakutenAccountId);
+    const vpassAfter = getAfterDate(vpassAccountId);
+    const jcbAfter = getAfterDate(jcbAccountId);
+    const jpbankAfter = getAfterDate(jpbankAccountId);
+
+    logger.addLog('info', `Gmail検索範囲: 楽天=${rakutenAfter ?? '全期間'}, 三井住友=${vpassAfter ?? '全期間'}, JCB=${jcbAfter ?? '全期間'}, ゆうちょ=${jpbankAfter ?? '全期間'}`);
+
+    // クレジットカードごとに検索クエリを実行（after: フィルタは設定済みの場合のみ付与）
+    const buildQuery = (base: string, after: string | null) => after ? `${base} after:${after}` : base;
     const queries = [
-      'from:info@mail.rakuten-card.co.jp subject:"カード利用のお知らせ"',
-      'from:mail@vpass.ne.jp subject:"【三井住友カード】ご利用のお知らせ"',
-      'from:mail@qa.jcb.co.jp subject:"JCBカード／ショッピングご利用のお知らせ"',
-      'subject:"ご利用のお知らせ【ゆうちょ銀行】"',
+      buildQuery('from:info@mail.rakuten-card.co.jp subject:"カード利用のお知らせ"', rakutenAfter),
+      buildQuery('from:mail@vpass.ne.jp subject:"【三井住友カード】ご利用のお知らせ"', vpassAfter),
+      buildQuery('from:mail@qa.jcb.co.jp subject:"JCBカード／ショッピングご利用のお知らせ"', jcbAfter),
+      buildQuery('subject:"ご利用のお知らせ【ゆうちょ銀行】"', jpbankAfter),
     ];
 
     const affectedAccountIds = new Set<string>();
@@ -128,18 +164,16 @@ export const emailImportService = {
                 logger.addLog('info', `Parsed transaction: ${parsed.payee}, ${parsed.amount}円`);
                 
                 let accountId = 'card';
-                const store = useTransactionStore.getState();
-                const accounts = store.accounts;
 
-                let mappedId = null;
+                let mappedId: string | null = null;
                 if (fullMsg.from.includes('rakuten-card')) {
-                  mappedId = await databaseService.getSetting('gmail_account_id_rakuten');
+                  mappedId = rakutenAccountId;
                 } else if (fullMsg.from.includes('vpass')) {
-                  mappedId = await databaseService.getSetting('gmail_account_id_vpass');
+                  mappedId = vpassAccountId;
                 } else if (fullMsg.from.includes('jcb.co.jp')) {
-                  mappedId = await databaseService.getSetting('gmail_account_id_jcb');
+                  mappedId = jcbAccountId;
                 } else if (fullMsg.from.includes('jpbank') || fullMsg.body.includes('ゆうちょ銀行') || fullMsg.body.includes('ＪＰ  ＢＡＮＫ')) {
-                  mappedId = await databaseService.getSetting('gmail_account_id_jpbank');
+                  mappedId = jpbankAccountId;
                 }
 
                 if (mappedId && accounts.some(a => a.id === mappedId)) {

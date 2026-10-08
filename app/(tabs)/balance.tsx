@@ -39,6 +39,7 @@ export default function BalanceScreen() {
     const [gmailToken, setGmailToken] = React.useState<string | null>(null);
     const [isImporting, setIsImporting] = React.useState(false);
     const [isNetWorthVisible, setIsNetWorthVisible] = useState(false);
+    const [isSyncingAll, setIsSyncingAll] = useState(false);
 
     // CSV Import State
     const [isCsvImporting, setIsCsvImporting] = useState(false);
@@ -136,10 +137,10 @@ export default function BalanceScreen() {
         }
     };
 
-    const handleSync = async (accountId: string) => {
+    const handleSync = async (accountId: string, silent = false) => {
         const account = accounts.find(a => a.id === accountId);
         if (!account || !account.withdrawalAccountId || account.withdrawalDay == null) {
-            Alert.alert('設定不足', '引き落とし口座と引き落とし日が設定されている必要があります。');
+            if (!silent) Alert.alert('設定不足', '引き落とし口座と引き落とし日が設定されている必要があります。');
             return;
         }
 
@@ -153,9 +154,33 @@ export default function BalanceScreen() {
             await syncCardTransfers(accountId, lastMonth.toISOString());
             await syncCardTransfers(accountId, nextMonth.toISOString());
 
-            Alert.alert('同期完了', `${account.name} の最近の振替を更新しました。`);
+            if (!silent) Alert.alert('同期完了', `${account.name} の最近の振替を更新しました。`);
         } catch (e) {
-            Alert.alert('エラー', '振替の同期に失敗しました');
+            if (!silent) Alert.alert('エラー', '振替の同期に失敗しました');
+            else throw e;
+        }
+    };
+
+    const handleSyncAll = async () => {
+        if (isSyncingAll) return;
+        // 自動振替対象：カード型 かつ 引き落とし口座・引き落とし日が設定済み
+        const cardAccounts = accounts.filter(
+            a => a.type === 'card' && a.withdrawalAccountId && a.withdrawalDay != null
+        );
+        if (cardAccounts.length === 0) {
+            Alert.alert('対象なし', '自動振替を設定しているカード口座がありません。\n口座設定で引き落とし口座と引き落とし日を設定してください。');
+            return;
+        }
+        setIsSyncingAll(true);
+        try {
+            for (const account of cardAccounts) {
+                await handleSync(account.id, true); // silent=true で個別アラートを抑制
+            }
+            Alert.alert('完了', `${cardAccounts.length} 口座の振替を更新しました。`);
+        } catch (e) {
+            Alert.alert('エラー', '振替の更新に失敗しました');
+        } finally {
+            setIsSyncingAll(false);
         }
     };
 
@@ -389,6 +414,7 @@ export default function BalanceScreen() {
     const formatLastImported = (dateStr: string | undefined) => {
         if (!dateStr) return null;
         const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return null;
         const month = date.getMonth() + 1;
         const day = date.getDate();
         const hours = date.getHours();
@@ -434,32 +460,60 @@ export default function BalanceScreen() {
                 <View style={{ padding: 20, paddingTop: 10 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingTop: 10 }}>
                         <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.text }}>資産状況</Text>
-                        {gmailToken && (
+                        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                             <TouchableOpacity
-                                onPress={handleQuickImport}
-                                disabled={isImporting}
+                                onPress={handleSyncAll}
+                                disabled={isSyncingAll}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                                 style={{
                                     paddingVertical: 6,
                                     paddingHorizontal: 12,
                                     borderRadius: 12,
-                                    backgroundColor: isDark ? 'rgba(99, 102, 241, 0.1)' : '#eef2ff',
+                                    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.1)' : '#ecfdf5',
                                     flexDirection: 'row',
                                     alignItems: 'center',
                                     gap: 6,
                                     borderWidth: 1,
-                                    borderColor: colors.indigo + '30'
+                                    borderColor: '#10b981' + '40',
                                 }}
                             >
-                                {isImporting ? (
-                                    <ActivityIndicator size="small" color={colors.indigo} />
+                                {isSyncingAll ? (
+                                    <ActivityIndicator size="small" color="#10b981" />
                                 ) : (
-                                    <Mail size={16} color={colors.indigo} />
+                                    <ArrowDownCircle size={16} color="#10b981" />
                                 )}
-                                <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.indigo }}>
-                                    {isImporting ? '読込中' : 'メール読込'}
+                                <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#10b981' }}>
+                                    {isSyncingAll ? '更新中' : '振替更新'}
                                 </Text>
                             </TouchableOpacity>
-                        )}
+                            {gmailToken && (
+                                <TouchableOpacity
+                                    onPress={handleQuickImport}
+                                    disabled={isImporting}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                    style={{
+                                        paddingVertical: 6,
+                                        paddingHorizontal: 12,
+                                        borderRadius: 12,
+                                        backgroundColor: isDark ? 'rgba(99, 102, 241, 0.1)' : '#eef2ff',
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                        borderWidth: 1,
+                                        borderColor: colors.indigo + '30'
+                                    }}
+                                >
+                                    {isImporting ? (
+                                        <ActivityIndicator size="small" color={colors.indigo} />
+                                    ) : (
+                                        <Mail size={16} color={colors.indigo} />
+                                    )}
+                                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.indigo }}>
+                                        {isImporting ? '読込中' : 'メール読込'}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
                     </View>
 
                     {/* 純資産カード */}
@@ -529,20 +583,10 @@ export default function BalanceScreen() {
                                 </View>
                                 <View style={{ flex: 1, marginLeft: 16, marginRight: 8 }}>
                                     <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }} numberOfLines={1}>{account.name}</Text>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
                                         <Text style={{ fontSize: 12, color: colors.textMuted }}>
                                             {typeInfo.label}
                                         </Text>
-                                        {account.lastImportedAt && (
-                                            <Text style={{ fontSize: 10, color: colors.textMuted }}>
-                                                • CSV:{formatLastImported(account.lastImportedAt)}
-                                            </Text>
-                                        )}
-                                        {account.lastEmailImportedAt && (
-                                            <Text style={{ fontSize: 10, color: colors.textMuted }}>
-                                                • メール:{formatLastImported(account.lastEmailImportedAt)}
-                                            </Text>
-                                        )}
                                         {account.excludeFromNetWorth && (
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
                                                 <EyeOff size={10} color="#f43f5e" />
@@ -550,8 +594,22 @@ export default function BalanceScreen() {
                                             </View>
                                         )}
                                     </View>
+                                    {(account.lastImportedAt || account.lastEmailImportedAt) && (
+                                        <View style={{ marginTop: 4, gap: 2 }}>
+                                            {account.lastImportedAt && (
+                                                <Text style={{ fontSize: 10, color: colors.textMuted }}>
+                                                    CSV: {formatLastImported(account.lastImportedAt)}
+                                                </Text>
+                                            )}
+                                            {account.lastEmailImportedAt && (
+                                                <Text style={{ fontSize: 10, color: colors.textMuted }}>
+                                                    メール: {formatLastImported(account.lastEmailImportedAt)}
+                                                </Text>
+                                            )}
+                                        </View>
+                                    )}
                                 </View>
-                                <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
+                                <View style={{ alignItems: 'flex-end', justifyContent: 'center', flexShrink: 0 }}>
                                     <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>¥{balance.toLocaleString()}</Text>
                                 </View>
                             </TouchableOpacity>

@@ -354,8 +354,9 @@ export default function InputScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 {editingTransaction && (
                   <TouchableOpacity
-                    onPress={handleCancel} style={{ marginRight: 12 }}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    onPress={handleCancel}
+                    style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}
+                    hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
                   >
                     <ChevronLeft size={24} color={colors.text} />
                   </TouchableOpacity>
@@ -846,7 +847,7 @@ export default function InputScreen() {
                   new Set(
                     transactions.flatMap(t => t.tags || [])
                   )
-                ).filter(t => !currentTags.includes(t));
+                );
 
                 return (
                   <View>
@@ -886,14 +887,17 @@ export default function InputScreen() {
                     {currentTags.length > 0 && (
                       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
                         {currentTags.map(tag => (
-                          <View
+                          <TouchableOpacity
                             key={tag}
+                            onPress={() => removeTag(tag)}
+                            activeOpacity={0.7}
+                            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                             style={{
                               flexDirection: 'row',
                               alignItems: 'center',
                               backgroundColor: colors.primarySub,
-                              paddingHorizontal: 10,
-                              paddingVertical: 5,
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
                               borderRadius: 16,
                               borderWidth: 1,
                               borderColor: colors.primary + '40'
@@ -902,10 +906,7 @@ export default function InputScreen() {
                             <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.primary }}>
                               #{tag}
                             </Text>
-                            <TouchableOpacity onPress={() => removeTag(tag)} style={{ marginLeft: 6 }}>
-                              <X size={14} color={colors.primary} />
-                            </TouchableOpacity>
-                          </View>
+                          </TouchableOpacity>
                         ))}
                       </View>
                     )}
@@ -914,22 +915,35 @@ export default function InputScreen() {
                       <View style={{ marginTop: 10 }}>
                         <Text style={{ fontSize: 11, color: colors.textMuted, marginBottom: 6 }}>既存のタグから選択:</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                          {allExistingTags.map(tag => (
-                            <TouchableOpacity
-                              key={tag}
-                              onPress={() => addTag(tag)}
-                              style={{
-                                backgroundColor: isDark ? '#334155' : '#e2e8f0',
-                                paddingHorizontal: 10,
-                                paddingVertical: 4,
-                                borderRadius: 12
-                              }}
-                            >
-                              <Text style={{ fontSize: 11, color: colors.text, fontWeight: '500' }}>
-                                + #{tag}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
+                          {allExistingTags.map(tag => {
+                            const isSelected = currentTags.includes(tag);
+                            return (
+                              <TouchableOpacity
+                                key={tag}
+                                onPress={() => (isSelected ? removeTag(tag) : addTag(tag))}
+                                activeOpacity={0.7}
+                                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                                style={{
+                                  backgroundColor: isSelected
+                                    ? colors.primarySub
+                                    : isDark ? '#334155' : '#e2e8f0',
+                                  borderColor: isSelected ? colors.primary + '60' : 'transparent',
+                                  borderWidth: isSelected ? 1 : 0,
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 4,
+                                  borderRadius: 12
+                                }}
+                              >
+                                <Text style={{
+                                  fontSize: 11,
+                                  color: isSelected ? colors.primary : colors.text,
+                                  fontWeight: isSelected ? '700' : '500'
+                                }}>
+                                  {isSelected ? `✓ #${tag}` : `+ #${tag}`}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
                         </ScrollView>
                       </View>
                     )}

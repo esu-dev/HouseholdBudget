@@ -2,6 +2,12 @@ name: Build iOS IPA (Unsigned)
 on:
   workflow_dispatch:
     # 手動実行用ボタンを出す設定
+  push:
+    branches:
+      - main  # main ブランチへの push 時
+    paths:
+      - 'package.json'  # バージョン変更時のみ起動
+      - 'app.json'
 
 jobs:
   build:

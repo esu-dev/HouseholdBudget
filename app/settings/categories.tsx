@@ -130,14 +130,15 @@ export default function CategoryManagementScreen() {
             <Stack.Screen options={{ headerShown: false }} />
 
             {/* Header */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 60, backgroundColor: colors.card }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 52, paddingBottom: 12, backgroundColor: colors.card }}>
                 <TouchableOpacity
                     onPress={() => router.back()}
-                    hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+                    hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                    style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
                 >
                     <ChevronLeft size={24} color={colors.text} />
                 </TouchableOpacity>
-                <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, flex: 1, textAlign: 'center', marginRight: 24 }}>カテゴリ設定</Text>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, flex: 1, textAlign: 'center', marginRight: 44 }}>カテゴリ設定</Text>
             </View>
 
             {/* 支出と収入の切り替えボタン */}

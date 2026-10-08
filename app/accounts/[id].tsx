@@ -690,7 +690,8 @@ export default function AccountHistoryScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                     <TouchableOpacity
                         onPress={() => router.back()}
-                        hitSlop={{ top: 10, bottom: 10, left: 20, right: 10 }}
+                        hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                        style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
                     >
                         <ArrowLeft size={24} color="white" />
                     </TouchableOpacity>
