@@ -28,6 +28,8 @@ const schema = z.object({
   is_deferred: z.boolean().optional(),
   exclude_from_balance: z.boolean().optional(),
   exclude_from_budget: z.boolean().optional(),
+  is_planned: z.boolean().optional(),
+  auto_delete_date: z.date().optional(),
   tags: z.array(z.string()).optional(),
 }).refine(data => {
   if (data.type === 'transfer') return !!data.to_account_id && data.account_id !== data.to_account_id;
@@ -48,6 +50,7 @@ export default function EditTransactionScreen() {
   const { transactions, addTransaction, addTransactions, updateTransaction, deleteTransaction, accounts, fetchData, editingTransaction, setEditingTransaction, majorCategories, addTransfer, addMinorCategory, addMajorCategory } = useTransactionStore();
   const [tagInput, setTagInput] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showAutoDeleteDatePicker, setShowAutoDeleteDatePicker] = useState(false);
   const [selectedMajorId, setSelectedMajorId] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isNewCategoryModalVisible, setIsNewCategoryModalVisible] = useState(false);
@@ -129,6 +132,8 @@ export default function EditTransactionScreen() {
       is_deferred: false,
       exclude_from_balance: false,
       exclude_from_budget: false,
+      is_planned: false,
+      auto_delete_date: new Date(),
       tags: [],
     },
   });
@@ -140,6 +145,8 @@ export default function EditTransactionScreen() {
   const selectedDate = watch('date');
   const payee = watch('payee');
   const isDeferred = watch('is_deferred');
+  const isPlanned = watch('is_planned');
+  const autoDeleteDate = watch('auto_delete_date') || new Date();
 
   const selectedAccount = accounts.find(a => a.id === selectedAccountId);
   const isCardAccount = selectedAccount?.type === 'card';
@@ -200,6 +207,8 @@ export default function EditTransactionScreen() {
       setValue('is_deferred', editingTransaction.is_deferred || false);
       setValue('exclude_from_balance', editingTransaction.exclude_from_balance || false);
       setValue('exclude_from_budget', editingTransaction.exclude_from_budget || false);
+      setValue('is_planned', editingTransaction.is_planned || false);
+      setValue('auto_delete_date', editingTransaction.auto_delete_date ? new Date(editingTransaction.auto_delete_date + 'T00:00:00') : new Date(editingTransaction.date));
       setValue('tags', editingTransaction.tags || []);
 
       if (editingTransaction.transfer_id) {
@@ -222,6 +231,8 @@ export default function EditTransactionScreen() {
         is_deferred: false,
         exclude_from_balance: false,
         exclude_from_budget: false,
+        is_planned: false,
+        auto_delete_date: new Date(),
         tags: [],
       });
       setSelectedMajorId(null);
@@ -483,6 +494,7 @@ export default function EditTransactionScreen() {
         await deleteTransaction(editingTransaction.id);
         await addTransfer(data.account_id, data.to_account_id, amountNum, data.date.toISOString(), data.memo || null, feeNum);
       } else {
+        const formatLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         await updateTransaction({
           ...editingTransaction,
           amount,
@@ -496,6 +508,8 @@ export default function EditTransactionScreen() {
           is_deferred: !!data.is_deferred,
           exclude_from_balance: !!data.exclude_from_balance,
           exclude_from_budget: !!data.exclude_from_budget,
+          is_planned: !!data.is_planned,
+          auto_delete_date: data.is_planned && data.auto_delete_date ? formatLocalDate(data.auto_delete_date) : null,
           tags: data.tags || []
         });
       }
@@ -503,6 +517,7 @@ export default function EditTransactionScreen() {
       if (data.type === 'transfer' && data.to_account_id) {
         await addTransfer(data.account_id, data.to_account_id, amountNum, data.date.toISOString(), data.memo || null, feeNum);
       } else {
+        const formatLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         await addTransaction({
           amount,
           category_id: data.category_id || 'others',
@@ -514,6 +529,8 @@ export default function EditTransactionScreen() {
           is_deferred: !!data.is_deferred,
           exclude_from_balance: !!data.exclude_from_balance,
           exclude_from_budget: !!data.exclude_from_budget,
+          is_planned: !!data.is_planned,
+          auto_delete_date: data.is_planned && data.auto_delete_date ? formatLocalDate(data.auto_delete_date) : null,
           tags: data.tags || []
         });
       }
@@ -926,7 +943,12 @@ export default function EditTransactionScreen() {
                   themeVariant={isDark ? 'dark' : 'light'}
                   onChange={(event, date) => {
                     if (Platform.OS === 'android') setShowDatePicker(false);
-                    if (date) setValue('date', date);
+                    if (date) {
+                      setValue('date', date);
+                      if (!isPlanned) {
+                        setValue('auto_delete_date', date);
+                      }
+                    }
                   }}
                 />
               </View>
@@ -1091,6 +1113,109 @@ export default function EditTransactionScreen() {
                         thumbColor={value ? colors.primary : '#f4f3f4'}
                         ios_backgroundColor={isDark ? '#334155' : '#e2e8f0'}
                       />
+                    </View>
+                  )}
+                />
+
+                <Controller
+                  control={control}
+                  name="is_planned"
+                  render={({ field: { onChange, value } }) => (
+                    <View style={{
+                      backgroundColor: colors.inputBg,
+                      borderRadius: 12,
+                      marginTop: 8,
+                      overflow: 'hidden'
+                    }}>
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: 12,
+                      }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                          <Clock3 size={16} color={value ? colors.primary : colors.textMuted} />
+                          <View style={{ marginLeft: 12, flex: 1 }}>
+                            <Text style={{ fontSize: 13, fontWeight: 'bold', color: value ? colors.primary : colors.text }}>
+                              先入れ（予定取引）として登録
+                            </Text>
+                            <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>
+                              期日を迎えると起動時に自動削除の確認が表示されます
+                            </Text>
+                          </View>
+                        </View>
+                        <Switch
+                          value={value}
+                          onValueChange={(val) => {
+                            onChange(val);
+                            if (val && !watch('auto_delete_date')) {
+                              setValue('auto_delete_date', selectedDate || new Date());
+                            }
+                          }}
+                          trackColor={{ false: isDark ? '#334155' : '#e2e8f0', true: colors.primary + '80' }}
+                          thumbColor={value ? colors.primary : '#f4f3f4'}
+                          ios_backgroundColor={isDark ? '#334155' : '#e2e8f0'}
+                        />
+                      </View>
+
+                      {value && (
+                        <View style={{
+                          paddingHorizontal: 12,
+                          paddingBottom: 12,
+                          paddingTop: 4,
+                          borderTopWidth: 1,
+                          borderTopColor: isDark ? '#334155' : '#e2e8f0'
+                        }}>
+                          <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.textMuted, marginBottom: 6 }}>
+                            自動削除日
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => setShowAutoDeleteDatePicker(!showAutoDeleteDatePicker)}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              backgroundColor: isDark ? '#1e293b' : 'white',
+                              paddingVertical: 10,
+                              paddingHorizontal: 12,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: colors.border
+                            }}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <Calendar size={16} color={colors.primary} />
+                              <Text style={{ marginLeft: 8, fontSize: 14, fontWeight: '600', color: colors.text }}>
+                                {autoDeleteDate.toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric', weekday: 'short' })}
+                              </Text>
+                            </View>
+                            <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '600' }}>変更</Text>
+                          </TouchableOpacity>
+                          {showAutoDeleteDatePicker && (
+                            <View style={{ marginTop: 8 }}>
+                              {Platform.OS === 'ios' && (
+                                <TouchableOpacity onPress={() => setShowAutoDeleteDatePicker(false)} style={{ alignItems: 'flex-end', padding: 4 }}>
+                                  <Text style={{ color: colors.primary, fontWeight: 'bold' }}>完了</Text>
+                                </TouchableOpacity>
+                              )}
+                              <DateTimePicker
+                                value={autoDeleteDate}
+                                mode="date"
+                                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                locale="ja-JP"
+                                themeVariant={isDark ? 'dark' : 'light'}
+                                onChange={(event, date) => {
+                                  if (Platform.OS === 'android') setShowAutoDeleteDatePicker(false);
+                                  if (date) setValue('auto_delete_date', date);
+                                }}
+                              />
+                            </View>
+                          )}
+                          <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 6 }}>
+                            指定した日付を迎えると、アプリ起動時に削除確認が表示されます。
+                          </Text>
+                        </View>
+                      )}
                     </View>
                   )}
                 />

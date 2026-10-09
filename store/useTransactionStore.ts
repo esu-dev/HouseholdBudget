@@ -33,6 +33,7 @@ interface TransactionState {
   addTransactions: (transactions: CreateTransactionInput[]) => Promise<void>;
   updateTransaction: (transaction: Transaction) => Promise<void>;
   deleteTransaction: (id: number) => Promise<void>;
+  deletePlannedTransactions: (ids: number[]) => Promise<void>;
   addTransfer: (fromAccountId: string, toAccountId: string, amount: number, date: string, memo: string | null, fee?: number) => Promise<void>;
   addAccount: (account: Omit<Account, 'balance'>) => Promise<void>;
   updateAccount: (account: Omit<Account, 'balance'>) => Promise<void>;
@@ -251,6 +252,23 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
     }
   },
 
+  deletePlannedTransactions: async (ids: number[]) => {
+    try {
+      const txs = get().transactions.filter(t => ids.includes(t.id));
+      await databaseService.deletePlannedTransactions(ids);
+
+      // クレジットカード振替の更新
+      const affectedAccountIds = new Set(txs.map(t => t.account_id));
+      for (const accountId of affectedAccountIds) {
+        await creditCardPaymentService.updateTransferForDate(accountId);
+      }
+
+      await get().fetchData();
+    } catch (error) {
+      set({ error: 'Failed to delete planned transactions' });
+    }
+  },
+
   addTransfer: async (fromAccountId, toAccountId, amount, date, memo, fee = 0) => {
     try {
       const transferId = Date.now();
@@ -463,6 +481,10 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
     try {
       await databaseService.deleteAllData();
       await get().fetchData();
+      try {
+        const { useWishlistStore } = require('./useWishlistStore');
+        useWishlistStore.getState().fetchWishlist();
+      } catch (e) {}
       set({ isLoading: false });
     } catch (error) {
       set({ error: 'Failed to delete all data', isLoading: false });

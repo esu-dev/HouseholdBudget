@@ -1,6 +1,6 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import { ArrowDownCircle, ArrowUpCircle, Building2, ChevronRight, CreditCard, EyeOff, Mail, Smartphone, Wallet, X } from 'lucide-react-native';
+import { ArrowDownCircle, ArrowUpCircle, Building2, ChevronRight, CreditCard, EyeOff, Gift, Mail, Smartphone, Sparkles, Wallet, X } from 'lucide-react-native';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
@@ -9,6 +9,7 @@ import { databaseService } from '../../services/database';
 import { emailImportService } from '../../services/emailImportService';
 import { gmailService } from '../../services/gmailService';
 import { useTransactionStore } from '../../store/useTransactionStore';
+import { useWishlistStore } from '../../store/useWishlistStore';
 
 // Expo Goで実行されているかを判別
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -36,6 +37,7 @@ export default function BalanceScreen() {
     const colorScheme = useAppColorScheme();
     const isDark = colorScheme === 'dark';
     const { transactions, accounts, accountBalances, fetchData, syncCardTransfers, addTransactions } = useTransactionStore();
+    const { items: wishlistItems, fetchWishlist } = useWishlistStore();
     const [gmailToken, setGmailToken] = React.useState<string | null>(null);
     const [isImporting, setIsImporting] = React.useState(false);
     const [isNetWorthVisible, setIsNetWorthVisible] = useState(false);
@@ -100,6 +102,7 @@ export default function BalanceScreen() {
         useCallback(() => {
             fetchData();
             checkGmailStatus();
+            fetchWishlist();
         }, [])
     );
 
@@ -551,6 +554,120 @@ export default function BalanceScreen() {
                             <ChevronRight size={14} color="rgba(255,255,255,0.6)" />
                         </View>
                     </TouchableOpacity>
+
+                    {/* 欲しいもの・目的別貯金 カード */}
+                    {(() => {
+                        const activeWishlistItems = wishlistItems.filter(i => i.status === 'saving');
+                        const wishlistTotalSaved = wishlistItems.reduce((acc, i) => acc + i.saved_amount, 0);
+                        const wishlistTotalTarget = wishlistItems.reduce((acc, i) => acc + i.target_amount, 0);
+                        const wishlistProgress = wishlistTotalTarget > 0 ? Math.min(100, Math.round((wishlistTotalSaved / wishlistTotalTarget) * 100)) : 0;
+
+                        return (
+                            <TouchableOpacity
+                                onPress={() => router.push('/wishlist')}
+                                activeOpacity={0.85}
+                                style={{
+                                    backgroundColor: colors.card,
+                                    padding: 20,
+                                    borderRadius: 28,
+                                    marginBottom: 24,
+                                    borderWidth: 1,
+                                    borderColor: isDark ? 'rgba(236, 72, 153, 0.25)' : 'rgba(236, 72, 153, 0.15)',
+                                    shadowColor: '#ec4899',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.06,
+                                    shadowRadius: 8,
+                                    elevation: 2,
+                                }}
+                            >
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                        <View style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: isDark ? '#831843' : '#fce7f3', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Gift size={20} color="#ec4899" />
+                                        </View>
+                                        <View>
+                                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>
+                                                欲しいもの・目的別貯金
+                                            </Text>
+                                            <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                                                {activeWishlistItems.length > 0 ? `${activeWishlistItems.length}件の目標を積立中` : '欲しいものを設定して積立貯金'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <ChevronRight size={18} color={colors.textMuted} />
+                                </View>
+
+                                {wishlistItems.length > 0 ? (
+                                    <>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8, marginTop: 4 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+                                                <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#ec4899' }}>
+                                                    ¥{wishlistTotalSaved.toLocaleString()}
+                                                </Text>
+                                                <Text style={{ fontSize: 12, color: colors.textMuted }}>
+                                                    / ¥{wishlistTotalTarget.toLocaleString()}
+                                                </Text>
+                                            </View>
+                                            <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#ec4899' }}>
+                                                {wishlistProgress}%
+                                            </Text>
+                                        </View>
+
+                                        <View style={{ height: 8, backgroundColor: isDark ? '#334155' : '#f1f5f9', borderRadius: 4, overflow: 'hidden', marginBottom: 12 }}>
+                                            <View style={{ width: `${wishlistProgress}%`, height: '100%', backgroundColor: '#ec4899', borderRadius: 4 }} />
+                                        </View>
+
+                                        {activeWishlistItems.length > 0 && (
+                                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                                                {activeWishlistItems.slice(0, 3).map(item => {
+                                                    const itemProg = item.target_amount > 0 ? Math.min(100, Math.round((item.saved_amount / item.target_amount) * 100)) : 0;
+                                                    return (
+                                                        <View
+                                                            key={item.id}
+                                                            style={{
+                                                                backgroundColor: isDark ? '#273549' : '#f8fafc',
+                                                                paddingHorizontal: 10,
+                                                                paddingVertical: 4,
+                                                                borderRadius: 8,
+                                                                borderWidth: 1,
+                                                                borderColor: colors.border,
+                                                                flexDirection: 'row',
+                                                                alignItems: 'center',
+                                                                gap: 6
+                                                            }}
+                                                        >
+                                                            <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.text }} numberOfLines={1}>
+                                                                {item.name}
+                                                            </Text>
+                                                            <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#ec4899' }}>
+                                                                {itemProg}%
+                                                            </Text>
+                                                        </View>
+                                                    );
+                                                })}
+                                                {activeWishlistItems.length > 3 && (
+                                                    <View style={{ justifyContent: 'center' }}>
+                                                        <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                                                            他 {activeWishlistItems.length - 3} 件
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
+                                    </>
+                                ) : (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: isDark ? '#273549' : '#f8fafc', padding: 12, borderRadius: 16, marginTop: 4 }}>
+                                        <Text style={{ fontSize: 12, color: colors.textMuted }}>
+                                            口座からお金を移して計画的に貯金を始めましょう
+                                        </Text>
+                                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#ec4899' }}>
+                                            始める →
+                                        </Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        );
+                    })()}
 
                     {/* 口座別残高一覧 */}
                     <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 }}>口座別残高</Text>

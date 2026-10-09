@@ -12,7 +12,7 @@ export const dataManagementService = {
       const majorCategories = await databaseService.getAllMajorCategories();
 
       // ヘッダー (最新の取引データ構造に対応)
-      let csvContent = 'ID,日付,支払先,カテゴリ,大カテゴリ,カテゴリID,金額,口座,口座ID,振替先,振替先口座ID,手数料,メモ,タグ,後払い・繰越,残高計算から除外,予算計算から除外,インポートID\n';
+      let csvContent = 'ID,日付,支払先,カテゴリ,大カテゴリ,カテゴリID,金額,口座,口座ID,振替先,振替先口座ID,手数料,メモ,タグ,後払い・繰越,残高計算から除外,予算計算から除外,インポートID,先入れ,自動削除日\n';
 
       for (const tx of transactions) {
         const id = tx.id;
@@ -44,6 +44,8 @@ export const dataManagementService = {
         const excludeFromBalance = tx.exclude_from_balance ? 1 : 0;
         const excludeFromBudget = tx.exclude_from_budget ? 1 : 0;
         const importHash = tx.import_hash || '';
+        const isPlanned = tx.is_planned ? 1 : 0;
+        const autoDeleteDate = tx.auto_delete_date || '';
 
         // カンマや改行をエスケープ
         const escape = (str: any) => {
@@ -55,7 +57,7 @@ export const dataManagementService = {
           return s;
         };
 
-        csvContent += `${id},${escape(date)},${escape(payee)},${escape(minorLabel)},${escape(majorLabel)},${escape(categoryId)},${amount},${escape(account)},${escape(accountId)},${escape(toAccount)},${escape(toAccountId)},${fee},${escape(memo)},${escape(tagsStr)},${isDeferred},${excludeFromBalance},${excludeFromBudget},${escape(importHash)}\n`;
+        csvContent += `${id},${escape(date)},${escape(payee)},${escape(minorLabel)},${escape(majorLabel)},${escape(categoryId)},${amount},${escape(account)},${escape(accountId)},${escape(toAccount)},${escape(toAccountId)},${fee},${escape(memo)},${escape(tagsStr)},${isDeferred},${excludeFromBalance},${excludeFromBudget},${escape(importHash)},${isPlanned},${escape(autoDeleteDate)}\n`;
       }
 
       const fileName = `household_budget_${new Date().toISOString().split('T')[0]}.csv`;

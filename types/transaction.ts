@@ -14,6 +14,8 @@ export type Transaction = {
   exclude_from_balance: boolean;
   exclude_from_budget: boolean;
   tags?: string[];
+  is_planned?: boolean;
+  auto_delete_date?: string | null;
 };
 
 export type CreateTransactionInput = {
@@ -32,4 +34,6 @@ export type CreateTransactionInput = {
   exclude_from_budget?: boolean;
   tags?: string[];
   duplicateEmailCandidate?: any;
+  is_planned?: boolean;
+  auto_delete_date?: string | null;
 };

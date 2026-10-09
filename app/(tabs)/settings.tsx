@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { Stack, useRouter } from 'expo-router';
-import { Bell, ChevronRight, FileDown, FileUp, ListTree, Palette, PieChart, PiggyBank, Save, Shield, Trash2, Wallet, ZapOff } from 'lucide-react-native';
+import { Bell, ChevronRight, FileDown, FileUp, Gift, ListTree, Palette, PieChart, PiggyBank, Save, Shield, Trash2, Wallet, ZapOff } from 'lucide-react-native';
 import React from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
@@ -146,6 +146,15 @@ export default function SettingsScreen() {
                     title="予算設定"
                     subtitle="月ごとのカテゴリ別予算を管理"
                     onPress={() => router.push('/settings/budgets')}
+                />
+
+                <MenuItem
+                    icon={Gift}
+                    title="欲しいものリスト"
+                    subtitle="欲しいものの記録と計画的な積立貯金"
+                    iconColor="#ec4899"
+                    iconBgColor={isDark ? '#831843' : '#fce7f3'}
+                    onPress={() => router.push('/wishlist')}
                 />
 
                 <MenuItem

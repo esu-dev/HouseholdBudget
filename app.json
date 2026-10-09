@@ -2,7 +2,7 @@
   "expo": {
     "name": "My家計簿",
     "slug": "my-app",
-    "version": "1.7.6",
+    "version": "1.7.7",
     "orientation": "portrait",
     "icon": "./assets/images/appicon.png",
     "scheme": "myapp",

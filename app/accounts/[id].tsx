@@ -1,6 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Calendar, CircleEllipsis, ExternalLink, EyeOff, FileUp, MessageSquare, MoreVertical, RefreshCw, RotateCcw, Store, Trash2, Wallet, X } from 'lucide-react-native';
+import { ArrowLeft, Calendar, CircleEllipsis, Clock3, ExternalLink, EyeOff, FileUp, MessageSquare, MoreVertical, RefreshCw, RotateCcw, Store, Trash2, Wallet, X } from 'lucide-react-native';
 import React, { useMemo, useRef, useState } from 'react';
 import { Alert, InputAccessoryView, Keyboard, Linking, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -637,6 +637,25 @@ export default function AccountHistoryScreen() {
                                                 color: isDark ? '#fbbf24' : '#d97706'
                                             }}>
                                                 予算除外
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {item.is_planned && (
+                                        <View style={{
+                                            backgroundColor: isDark ? 'rgba(168, 85, 247, 0.15)' : '#f3e8ff',
+                                            paddingHorizontal: 6,
+                                            paddingVertical: 1,
+                                            borderRadius: 6,
+                                            flexDirection: 'row',
+                                            alignItems: 'center'
+                                        }}>
+                                            <Clock3 size={9} color={isDark ? '#c084fc' : '#9333ea'} style={{ marginRight: 2 }} />
+                                            <Text style={{
+                                                fontSize: 9,
+                                                fontWeight: 'bold',
+                                                color: isDark ? '#c084fc' : '#9333ea'
+                                            }}>
+                                                先入れ{item.auto_delete_date ? ` (${item.auto_delete_date.slice(5).replace('-', '/')})` : ''}
                                             </Text>
                                         </View>
                                     )}

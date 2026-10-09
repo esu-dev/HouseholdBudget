@@ -1,8 +1,8 @@
 import { CategoryDonutChart } from '@/components/CategoryDonutChart';
 import { useRouter } from 'expo-router';
-import { CalendarIcon, ChevronLeft, ChevronRight, CircleEllipsis, List, MessageSquare, Plus, Store, X } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { CalendarIcon, ChevronLeft, ChevronRight, CircleEllipsis, Clock3, List, MessageSquare, Plus, Store, X } from 'lucide-react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
@@ -120,6 +120,17 @@ const TransactionItem = React.memo(({
                                 <View className="px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950">
                                     <Text className="text-[9px] font-bold text-amber-700 dark:text-amber-300">
                                         予算除外
+                                    </Text>
+                                </View>
+                            </>
+                        ) : null}
+                        {item.is_planned ? (
+                            <>
+                                <Text className="text-slate-300 mx-1">|</Text>
+                                <View className="px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950 flex-row items-center">
+                                    <Clock3 size={10} color="#a855f7" style={{ marginRight: 2 }} />
+                                    <Text className="text-[9px] font-bold text-purple-700 dark:text-purple-300">
+                                        先入れ{item.auto_delete_date ? ` (${item.auto_delete_date.slice(5).replace('-', '/')})` : ''}
                                     </Text>
                                 </View>
                             </>
@@ -341,17 +352,46 @@ export default function HomeScreen() {
     const router = useRouter();
     const colorScheme = useAppColorScheme();
     const isDark = colorScheme === 'dark';
-    const { transactions, accounts, fetchData, fetchBudgets, budgets, setEditingTransaction, majorCategories } = useTransactionStore();
+    const { transactions, accounts, fetchData, fetchBudgets, budgets, setEditingTransaction, majorCategories, deletePlannedTransactions } = useTransactionStore();
     const [selectedMonth, setSelectedMonth] = useState(new Date());
     const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
     const [selectedDay, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const [isBudgetModalVisible, setIsBudgetModalVisible] = useState(false);
     const [selectedMajorId, setSelectedMajorId] = useState<string | null>(null);
     const [selectedMinorId, setSelectedMinorId] = useState<string | null>(null);
+    const hasCheckedExpired = useRef(false);
 
     useEffect(() => {
         fetchData();
     }, []);
+
+    useEffect(() => {
+        if (hasCheckedExpired.current || transactions.length === 0) return;
+
+        const todayStr = (() => {
+            const now = new Date();
+            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        })();
+
+        const expired = transactions.filter(t => t.is_planned && t.auto_delete_date && t.auto_delete_date <= todayStr);
+        if (expired.length > 0) {
+            hasCheckedExpired.current = true;
+            Alert.alert(
+                '期日を迎えた予定取引',
+                `期日を迎えた先入れ取引が ${expired.length}件 あります。\n削除しますか？`,
+                [
+                    { text: '後で', style: 'cancel' },
+                    {
+                        text: '削除する',
+                        style: 'destructive',
+                        onPress: async () => {
+                            await deletePlannedTransactions(expired.map(t => t.id));
+                        }
+                    }
+                ]
+            );
+        }
+    }, [transactions]);
 
     useEffect(() => {
         const year = selectedMonth.getFullYear();

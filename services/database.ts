@@ -4,6 +4,7 @@ import { CATEGORIES, MajorCategory, MinorCategory } from '../constants/categorie
 import { Account } from '../types/account';
 import { Budget, CreateBudgetInput } from '../types/budget';
 import { CreateTransactionInput, Transaction } from '../types/transaction';
+import { AddSavingInput, CreateWishlistInput, UpdateWishlistInput, WishlistItem, WishlistSaving } from '../types/wishlist';
 
 const DATABASE_NAME = 'household_budget.db';
 
@@ -67,6 +68,8 @@ export const initDatabase = async () => {
       exclude_from_balance INTEGER DEFAULT 0,
       exclude_from_budget INTEGER DEFAULT 0,
       tags TEXT,
+      is_planned INTEGER DEFAULT 0,
+      auto_delete_date TEXT,
       FOREIGN KEY (account_id) REFERENCES accounts(id)
     );
 
@@ -100,6 +103,32 @@ export const initDatabase = async () => {
 
     CREATE TABLE IF NOT EXISTS ignored_payees (
       payee TEXT PRIMARY KEY
+    );
+
+    CREATE TABLE IF NOT EXISTS wishlists (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      target_amount INTEGER NOT NULL,
+      saved_amount INTEGER DEFAULT 0,
+      memo TEXT,
+      category_id TEXT,
+      target_date TEXT,
+      status TEXT DEFAULT 'saving',
+      display_order INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS wishlist_savings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      wishlist_id INTEGER NOT NULL,
+      account_id TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      memo TEXT,
+      transaction_id INTEGER,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (wishlist_id) REFERENCES wishlists(id) ON DELETE CASCADE,
+      FOREIGN KEY (account_id) REFERENCES accounts(id)
     );
   `);
 
@@ -189,6 +218,16 @@ export const initDatabase = async () => {
   // Migration: Add tags to transactions if it doesn't exist
   try {
     await db.execAsync('ALTER TABLE transactions ADD COLUMN tags TEXT');
+  } catch (e) {}
+
+  // Migration: Add is_planned to transactions if it doesn't exist
+  try {
+    await db.execAsync('ALTER TABLE transactions ADD COLUMN is_planned INTEGER DEFAULT 0');
+  } catch (e) {}
+
+  // Migration: Add auto_delete_date to transactions if it doesn't exist
+  try {
+    await db.execAsync('ALTER TABLE transactions ADD COLUMN auto_delete_date TEXT');
   } catch (e) {}
 
   // Migration: Add billing_start_date to accounts if it doesn't exist
@@ -339,7 +378,7 @@ export const databaseService = {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     const tagsJson = transaction.tags && transaction.tags.length > 0 ? JSON.stringify(transaction.tags) : null;
     const result = await db.runAsync(
-      'INSERT INTO transactions (amount, category_id, account_id, to_account_id, date, memo, payee, transfer_id, fee, import_hash, is_deferred, exclude_from_balance, exclude_from_budget, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO transactions (amount, category_id, account_id, to_account_id, date, memo, payee, transfer_id, fee, import_hash, is_deferred, exclude_from_balance, exclude_from_budget, tags, is_planned, auto_delete_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       transaction.amount,
       transaction.category_id,
       transaction.account_id,
@@ -353,7 +392,9 @@ export const databaseService = {
       transaction.is_deferred ? 1 : 0,
       transaction.exclude_from_balance ? 1 : 0,
       transaction.exclude_from_budget ? 1 : 0,
-      tagsJson
+      tagsJson,
+      transaction.is_planned ? 1 : 0,
+      transaction.auto_delete_date ?? null
     );
 
     if (transaction.payee) {
@@ -370,7 +411,7 @@ export const databaseService = {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     const tagsJson = transaction.tags && transaction.tags.length > 0 ? JSON.stringify(transaction.tags) : null;
     await db.runAsync(
-      'UPDATE transactions SET amount = ?, category_id = ?, account_id = ?, to_account_id = ?, date = ?, memo = ?, payee = ?, transfer_id = ?, fee = ?, import_hash = ?, is_deferred = ?, exclude_from_balance = ?, exclude_from_budget = ?, tags = ? WHERE id = ?',
+      'UPDATE transactions SET amount = ?, category_id = ?, account_id = ?, to_account_id = ?, date = ?, memo = ?, payee = ?, transfer_id = ?, fee = ?, import_hash = ?, is_deferred = ?, exclude_from_balance = ?, exclude_from_budget = ?, tags = ?, is_planned = ?, auto_delete_date = ? WHERE id = ?',
       transaction.amount,
       transaction.category_id,
       transaction.account_id,
@@ -385,6 +426,8 @@ export const databaseService = {
       transaction.exclude_from_balance ? 1 : 0,
       transaction.exclude_from_budget ? 1 : 0,
       tagsJson,
+      transaction.is_planned ? 1 : 0,
+      transaction.auto_delete_date ?? null,
       transaction.id
     );
 
@@ -415,7 +458,9 @@ export const databaseService = {
         is_deferred: row.is_deferred === 1,
         exclude_from_balance: row.exclude_from_balance === 1,
         exclude_from_budget: row.exclude_from_budget === 1,
-        tags: parsedTags
+        tags: parsedTags,
+        is_planned: row.is_planned === 1,
+        auto_delete_date: row.auto_delete_date || null
       };
     });
   },
@@ -435,6 +480,33 @@ export const databaseService = {
     } else {
       await db.runAsync('DELETE FROM transactions WHERE id = ?', id);
     }
+  },
+
+  async deletePlannedTransactions(ids: number[]): Promise<void> {
+    if (ids.length === 0) return;
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    const placeholders = ids.map(() => '?').join(',');
+
+    // 振替の関連取引も検索して一括削除
+    const transfers = await db.getAllAsync<{transfer_id: number}>(
+      `SELECT DISTINCT transfer_id FROM transactions WHERE id IN (${placeholders}) AND transfer_id IS NOT NULL`,
+      ...ids
+    );
+    if (transfers.length > 0) {
+      const transferIds = transfers.map(t => t.transfer_id);
+      const tPlaceholders = transferIds.map(() => '?').join(',');
+      await db.runAsync(`DELETE FROM transactions WHERE transfer_id IN (${tPlaceholders})`, ...transferIds);
+    }
+    await db.runAsync(`DELETE FROM transactions WHERE id IN (${placeholders})`, ...ids);
+  },
+
+  async getExpiredPlannedTransactions(currentDateStr?: string): Promise<Transaction[]> {
+    const today = currentDateStr || (() => {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    })();
+    const all = await this.getAllTransactions();
+    return all.filter(t => t.is_planned && t.auto_delete_date && t.auto_delete_date <= today);
   },
 
   // Accounts
@@ -945,6 +1017,8 @@ export const databaseService = {
     await db.execAsync('BEGIN TRANSACTION;');
     try {
       // 全テーブルのデータを削除
+      await db.execAsync('DELETE FROM wishlist_savings;');
+      await db.execAsync('DELETE FROM wishlists;');
       await db.execAsync('DELETE FROM transactions;');
       await db.execAsync('DELETE FROM budgets;');
       await db.execAsync('DELETE FROM settings;');
@@ -1007,6 +1081,185 @@ export const databaseService = {
         'INSERT OR REPLACE INTO csv_account_mappings (external_name, internal_id) VALUES (?, ?)',
         externalName, internalId
       );
+    }
+  },
+
+  // Wishlist
+  async getAllWishlistItems(): Promise<WishlistItem[]> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    return await db.getAllAsync<WishlistItem>(
+      'SELECT * FROM wishlists ORDER BY CASE WHEN status = "saving" THEN 0 ELSE 1 END, display_order ASC, id DESC'
+    );
+  },
+
+  async getWishlistItemById(id: number): Promise<WishlistItem | null> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    return await db.getFirstAsync<WishlistItem>(
+      'SELECT * FROM wishlists WHERE id = ?',
+      id
+    );
+  },
+
+  async createWishlistItem(input: CreateWishlistInput): Promise<number> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    const now = new Date().toISOString();
+    const result = await db.runAsync(
+      'INSERT INTO wishlists (name, target_amount, saved_amount, memo, category_id, target_date, status, display_order, created_at) VALUES (?, ?, 0, ?, ?, ?, ?, 0, ?)',
+      input.name,
+      input.target_amount,
+      input.memo ?? null,
+      input.category_id ?? null,
+      input.target_date ?? null,
+      'saving',
+      now
+    );
+    return result.lastInsertRowId;
+  },
+
+  async updateWishlistItem(input: UpdateWishlistInput): Promise<void> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    const current = await this.getWishlistItemById(input.id);
+    if (!current) return;
+    await db.runAsync(
+      'UPDATE wishlists SET name = ?, target_amount = ?, memo = ?, category_id = ?, target_date = ?, status = ?, display_order = ? WHERE id = ?',
+      input.name ?? current.name,
+      input.target_amount ?? current.target_amount,
+      input.memo !== undefined ? input.memo : current.memo,
+      input.category_id !== undefined ? input.category_id : current.category_id,
+      input.target_date !== undefined ? input.target_date : current.target_date,
+      input.status ?? current.status,
+      input.display_order ?? current.display_order,
+      input.id
+    );
+  },
+
+  async deleteWishlistItem(id: number): Promise<{ affectedAccountIds: string[] }> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    await db.execAsync('BEGIN TRANSACTION;');
+    try {
+      // 1. 紐づく積立履歴と取引IDを取得
+      const savings = await db.getAllAsync<{ id: number, transaction_id: number | null, account_id: string }>(
+        'SELECT id, transaction_id, account_id FROM wishlist_savings WHERE wishlist_id = ?',
+        id
+      );
+
+      const affectedAccountIds = Array.from(new Set(savings.map(s => s.account_id)));
+      const txIds = savings.map(s => s.transaction_id).filter((tid): tid is number => tid !== null);
+
+      // 2. 紐づく取引を transactions テーブルから削除（口座残高が自動的に全額復元）
+      if (txIds.length > 0) {
+        const placeholders = txIds.map(() => '?').join(',');
+        await db.runAsync(`DELETE FROM transactions WHERE id IN (${placeholders})`, ...txIds);
+      }
+
+      // 3. 積立履歴および欲しいもの本体を削除
+      await db.runAsync('DELETE FROM wishlist_savings WHERE wishlist_id = ?', id);
+      await db.runAsync('DELETE FROM wishlists WHERE id = ?', id);
+
+      await db.execAsync('COMMIT;');
+      return { affectedAccountIds };
+    } catch (e) {
+      await db.execAsync('ROLLBACK;');
+      throw e;
+    }
+  },
+
+  async addSavingToWishlist(input: AddSavingInput): Promise<{ affectedAccountId: string }> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    await db.execAsync('BEGIN TRANSACTION;');
+    try {
+      const item = await this.getWishlistItemById(input.wishlist_id);
+      if (!item) throw new Error('Wishlist item not found');
+
+      const dateStr = input.date || new Date().toISOString();
+      const now = new Date().toISOString();
+      const memoText = `欲しいもの積立: ${item.name}${input.memo ? ` (${input.memo})` : ''}`;
+
+      // 1. transactions テーブルに出金取引を追加 (exclude_from_budget = 1, exclude_from_balance = 0)
+      const txResult = await db.runAsync(
+        'INSERT INTO transactions (amount, category_id, account_id, to_account_id, date, memo, payee, transfer_id, fee, import_hash, is_deferred, exclude_from_balance, exclude_from_budget, tags, is_planned, auto_delete_date) VALUES (?, ?, ?, NULL, ?, ?, NULL, NULL, 0, NULL, 0, 0, 1, NULL, 0, NULL)',
+        -Math.abs(input.amount),
+        item.category_id || 'others',
+        input.account_id,
+        dateStr,
+        memoText
+      );
+      const transactionId = txResult.lastInsertRowId;
+
+      // 2. wishlist_savings に記録
+      await db.runAsync(
+        'INSERT INTO wishlist_savings (wishlist_id, account_id, amount, date, memo, transaction_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        input.wishlist_id,
+        input.account_id,
+        Math.abs(input.amount),
+        dateStr,
+        input.memo ?? null,
+        transactionId,
+        now
+      );
+
+      // 3. wishlists の saved_amount を更新
+      const newSavedAmount = item.saved_amount + Math.abs(input.amount);
+      const newStatus = newSavedAmount >= item.target_amount ? 'completed' : item.status;
+      await db.runAsync(
+        'UPDATE wishlists SET saved_amount = ?, status = ? WHERE id = ?',
+        newSavedAmount,
+        newStatus,
+        input.wishlist_id
+      );
+
+      await db.execAsync('COMMIT;');
+      return { affectedAccountId: input.account_id };
+    } catch (e) {
+      await db.execAsync('ROLLBACK;');
+      throw e;
+    }
+  },
+
+  async getSavingsByWishlistId(wishlistId: number): Promise<WishlistSaving[]> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    return await db.getAllAsync<WishlistSaving>(
+      'SELECT * FROM wishlist_savings WHERE wishlist_id = ? ORDER BY date DESC, id DESC',
+      wishlistId
+    );
+  },
+
+  async removeSavingFromWishlist(savingId: number): Promise<{ affectedAccountId: string }> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    await db.execAsync('BEGIN TRANSACTION;');
+    try {
+      const saving = await db.getFirstAsync<WishlistSaving>(
+        'SELECT * FROM wishlist_savings WHERE id = ?',
+        savingId
+      );
+      if (!saving) throw new Error('Saving record not found');
+
+      // 1. transactions の出金取引を削除（口座残高が元に戻る）
+      if (saving.transaction_id) {
+        await db.runAsync('DELETE FROM transactions WHERE id = ?', saving.transaction_id);
+      }
+
+      // 2. wishlists の saved_amount を減算
+      const item = await this.getWishlistItemById(saving.wishlist_id);
+      if (item) {
+        const newSavedAmount = Math.max(0, item.saved_amount - saving.amount);
+        const newStatus = newSavedAmount < item.target_amount ? 'saving' : item.status;
+        await db.runAsync(
+          'UPDATE wishlists SET saved_amount = ?, status = ? WHERE id = ?',
+          newSavedAmount,
+          newStatus,
+          item.id
+        );
+      }
+
+      // 3. wishlist_savings を削除
+      await db.runAsync('DELETE FROM wishlist_savings WHERE id = ?', savingId);
+
+      await db.execAsync('COMMIT;');
+      return { affectedAccountId: saving.account_id };
+    } catch (e) {
+      await db.execAsync('ROLLBACK;');
+      throw e;
     }
   }
 };
