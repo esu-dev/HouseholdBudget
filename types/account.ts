@@ -18,6 +18,7 @@ export type Account = {
   lastImportedAt: string | undefined;
   lastEmailImportedAt?: string;
   initialBalance: number;
+  creditLimit?: number;
 };
 
 // バランス計算用のヘルパー型

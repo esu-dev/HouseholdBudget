@@ -43,6 +43,7 @@ export default function AccountManagementScreen() {
     const [excludeFromNetWorth, setExcludeFromNetWorth] = useState(false);
     const [isHidden, setIsHidden] = useState(false);
     const [accountInitialBalance, setAccountInitialBalance] = useState('');
+    const [creditLimit, setCreditLimit] = useState('');
     const [showBillingMonthPicker, setShowBillingMonthPicker] = useState(false);
     const [mappingModalVisible, setMappingModalVisible] = useState(false);
     const [editingMappingName, setEditingMappingName] = useState('');
@@ -78,6 +79,7 @@ export default function AccountManagementScreen() {
 
         const closingDayNum = accountType === 'card' && closingDay ? parseInt(closingDay) : undefined;
         const withdrawalDayNum = accountType === 'card' && withdrawalDay ? parseInt(withdrawalDay) : undefined;
+        const creditLimitNum = accountType === 'card' && creditLimit ? parseInt(creditLimit) : undefined;
 
         try {
             if (editingAccount) {
@@ -94,7 +96,8 @@ export default function AccountManagementScreen() {
                     displayOrder: editingAccount.displayOrder ?? 0,
                     excludeFromNetWorth: excludeFromNetWorth,
                     isHidden: isHidden,
-                    initialBalance: parseInt(accountInitialBalance) || 0
+                    initialBalance: parseInt(accountInitialBalance) || 0,
+                    creditLimit: creditLimitNum
                 });
             } else {
                 await addAccount({
@@ -110,7 +113,8 @@ export default function AccountManagementScreen() {
                     displayOrder: accounts.length,
                     excludeFromNetWorth: excludeFromNetWorth,
                     isHidden: isHidden,
-                    initialBalance: parseInt(accountInitialBalance) || 0
+                    initialBalance: parseInt(accountInitialBalance) || 0,
+                    creditLimit: creditLimitNum
                 });
             }
             setModalVisible(false);
@@ -124,6 +128,7 @@ export default function AccountManagementScreen() {
             setExcludeFromNetWorth(false);
             setIsHidden(false);
             setAccountInitialBalance('');
+            setCreditLimit('');
             setEditingAccount(null);
             setModalVisible(false);
         } catch (e) {
@@ -280,6 +285,11 @@ export default function AccountManagementScreen() {
                                                 {account.billingStartDate ? ` [始:${account.billingStartDate}]` : ''}
                                             </Text>
                                         )}
+                                        {account.type === 'card' && account.creditLimit && (
+                                            <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                                                上限: {account.creditLimit.toLocaleString()}円
+                                            </Text>
+                                        )}
                                         {account.type === 'card' && account.withdrawalAccountId && (
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                                 <Building2 size={10} color={colors.textMuted} />
@@ -348,6 +358,7 @@ export default function AccountManagementScreen() {
                                             setExcludeFromNetWorth(!!account.excludeFromNetWorth);
                                             setIsHidden(!!account.isHidden);
                                             setAccountInitialBalance(account.initialBalance?.toString() || '0');
+                                            setCreditLimit(account.creditLimit?.toString() || '');
                                             setModalVisible(true);
                                         }}
                                         hitSlop={{ top: 30, bottom: 10, left: 10, right: 10 }}
@@ -389,6 +400,7 @@ export default function AccountManagementScreen() {
                         setExcludeFromNetWorth(false);
                         setIsHidden(false);
                         setAccountInitialBalance('0');
+                        setCreditLimit('');
                         setModalVisible(true);
                     }}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -640,6 +652,19 @@ export default function AccountManagementScreen() {
                                             />
                                             <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 4 }}>※末日の場合は0</Text>
                                         </View>
+                                    </View>
+
+                                    <View style={{ marginBottom: 20 }}>
+                                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 8 }}>利用上限額</Text>
+                                        <TextInput
+                                            style={{ backgroundColor: colors.inputBg, padding: 16, borderRadius: 16, fontSize: 16, color: colors.text }}
+                                            placeholder="例: 500000"
+                                            placeholderTextColor={colors.textMuted}
+                                            value={creditLimit}
+                                            onChangeText={setCreditLimit}
+                                            keyboardType="numeric"
+                                        />
+                                        <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 4 }}>※任意設定</Text>
                                     </View>
 
                                     <View style={{ marginBottom: 20 }}>

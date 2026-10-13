@@ -50,6 +50,32 @@ export const useTransactionAnalysis = (
     }).sort((a, b) => b.value - a.value);
   }, [transactions, majorCategories]);
 
+  // カテゴリ別の収入集計 (円グラフ用)
+  const incomeCategoryData = useMemo(() => {
+    // 振替および残高計算除外の取引は集計から除外
+    const incomes = transactions.filter(t => t.amount > 0 && t.category_id !== 'transfer' && !t.exclude_from_balance);
+    const majorTotals: Record<string, number> = {};
+
+    incomes.forEach(t => {
+      // transaction.category_id は小カテゴリのIDなので、親の大カテゴリを特定する
+      const major = majorCategories.find(maj =>
+        maj.subCategories.some(min => min.id === t.category_id)
+      );
+
+      const majorId = major?.id || 'others';
+      majorTotals[majorId] = (majorTotals[majorId] || 0) + t.amount;
+    });
+
+    return Object.entries(majorTotals).map(([id, amount]) => {
+      const major = majorCategories.find(c => c.id === id);
+      return {
+        label: major?.label || 'その他',
+        value: amount,
+        color: major?.color || '#94a3b8',
+      };
+    }).sort((a, b) => b.value - a.value);
+  }, [transactions, majorCategories]);
+
   // 期間別の収支推移 (棒グラフ用)
   const trendData = useMemo(() => {
     if (timeScale === 'day') {
@@ -189,5 +215,5 @@ export const useTransactionAnalysis = (
     }
   }, [allTransactions, transactions, targetDate, timeScale]);
 
-  return { categoryData, trendData, netWorthTrendData };
+  return { categoryData, incomeCategoryData, trendData, netWorthTrendData };
 };

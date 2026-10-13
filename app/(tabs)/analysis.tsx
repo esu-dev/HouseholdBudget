@@ -256,6 +256,11 @@ export default function AnalysisScreen() {
                 </View>
 
                 <View className="mb-8">
+                    <Text className="text-sm font-bold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-wide">カテゴリ別収入</Text>
+                    <IncomeDonutChart transactions={filteredTransactions} />
+                </View>
+
+                <View className="mb-8">
                     <Text className="text-sm font-bold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-wide">収支推移</Text>
                     <DailyTrendBarChart transactions={filteredTransactions} timeScale={timeScale} />
                 </View>
