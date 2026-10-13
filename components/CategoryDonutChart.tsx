@@ -28,7 +28,12 @@ export const CategoryDonutChart = ({ transactions }: CategoryDonutChartProps) =>
 
   return (
     <View className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm mb-6">
-      <Text className="text-lg font-bold text-slate-900 dark:text-white mb-4">カテゴリ別支出</Text>
+      <View className="flex-row items-center justify-between mb-4">
+        <Text className="text-lg font-bold text-slate-900 dark:text-white">カテゴリ別支出</Text>
+        <Text className="text-sm font-bold text-slate-900 dark:text-white">
+          合計 ¥{totalExpense.toLocaleString()}
+        </Text>
+      </View>
       <View style={{ height: 250, width: '100%', alignItems: 'center', justifyContent: 'center' }}>
         <PolarChart
           data={categoryData}

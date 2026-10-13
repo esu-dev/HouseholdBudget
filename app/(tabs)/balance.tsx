@@ -1,6 +1,6 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import { ArrowDownCircle, ArrowUpCircle, Building2, ChevronRight, CreditCard, EyeOff, Gift, Mail, Smartphone, Sparkles, Wallet, X } from 'lucide-react-native';
+import { ArrowDownCircle, ArrowUpCircle, Building2, ChevronRight, CreditCard, EyeOff, Gift, Mail, Smartphone, Wallet, X } from 'lucide-react-native';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
@@ -656,13 +656,18 @@ export default function BalanceScreen() {
                                         )}
                                     </>
                                 ) : (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: isDark ? '#273549' : '#f8fafc', padding: 12, borderRadius: 16, marginTop: 4 }}>
-                                        <Text style={{ fontSize: 12, color: colors.textMuted }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: isDark ? '#273549' : '#f8fafc', padding: 12, borderRadius: 16, marginTop: 4 }}>
+                                        <Text style={{ flex: 1, minWidth: 0, fontSize: 12, color: colors.textMuted }}>
                                             口座からお金を移して計画的に貯金を始めましょう
                                         </Text>
-                                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#ec4899' }}>
-                                            始める →
-                                        </Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: isDark ? '#3b1d2f' : '#fce7f3' }}>
+                                            <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#ec4899' }}>
+                                                始める
+                                            </Text>
+                                            <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#ec4899' }}>
+                                                →
+                                            </Text>
+                                        </View>
                                     </View>
                                 )}
                             </TouchableOpacity>
