@@ -118,8 +118,10 @@ export default function AnalysisScreen() {
                     <>
                         <TouchableOpacity
                             onPress={() => changeDate(-1)}
-                            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-                            style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                            accessibilityRole="button"
+                            accessibilityLabel={timeScale === 'day' ? '前の月' : '前年'}
+                            activeOpacity={0.7}
+                            style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 26, backgroundColor: colorScheme === 'dark' ? '#312e81' : '#eef2ff' }}
                         >
                             <ChevronLeft size={24} color="#6366f1" />
                         </TouchableOpacity>
@@ -130,8 +132,10 @@ export default function AnalysisScreen() {
 
                         <TouchableOpacity
                             onPress={() => changeDate(1)}
-                            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-                            style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                            accessibilityRole="button"
+                            accessibilityLabel={timeScale === 'day' ? '次の月' : '翌年'}
+                            activeOpacity={0.7}
+                            style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 26, backgroundColor: colorScheme === 'dark' ? '#312e81' : '#eef2ff' }}
                         >
                             <ChevronRight size={24} color="#6366f1" />
                         </TouchableOpacity>

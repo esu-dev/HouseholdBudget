@@ -240,8 +240,10 @@ export default function BudgetSettingsScreen() {
                         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 24 }}>
                             <TouchableOpacity
                                 onPress={() => changeMonth(-1)}
-                                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-                                style={{ padding: 10, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                                accessibilityRole="button"
+                                accessibilityLabel="前の月"
+                                activeOpacity={0.7}
+                                style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 26, backgroundColor: colors.indigoSub }}
                             >
                                 <ChevronLeft size={24} color={colors.indigo} />
                             </TouchableOpacity>
@@ -250,8 +252,10 @@ export default function BudgetSettingsScreen() {
                             </Text>
                             <TouchableOpacity
                                 onPress={() => changeMonth(1)}
-                                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-                                style={{ padding: 10, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                                accessibilityRole="button"
+                                accessibilityLabel="次の月"
+                                activeOpacity={0.7}
+                                style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 26, backgroundColor: colors.indigoSub }}
                             >
                                 <ChevronRight size={24} color={colors.indigo} />
                             </TouchableOpacity>

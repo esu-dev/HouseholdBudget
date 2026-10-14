@@ -1,8 +1,8 @@
 import { CategoryDonutChart } from '@/components/CategoryDonutChart';
 import { useRouter } from 'expo-router';
-import { CalendarIcon, ChevronLeft, ChevronRight, CircleEllipsis, Clock3, List, MessageSquare, Plus, Store, X } from 'lucide-react-native';
+import { CalendarIcon, ChevronLeft, ChevronRight, CircleEllipsis, Clock3, List, MessageSquare, Plus, Search, Store, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, PanResponder, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
@@ -16,6 +16,11 @@ LocaleConfig.locales['ja'] = {
     dayNamesShort: ['日', '月', '火', '水', '木', '金', '土'],
 };
 LocaleConfig.defaultLocale = 'ja';
+
+const getNormalizedText = (value?: string | null) => (value ?? '').trim().toLowerCase();
+const getLocalDateKey = (date: Date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const getTransactionDateKey = (date: string) => getLocalDateKey(new Date(date));
 
 const TransactionItem = React.memo(({
     item,
@@ -355,10 +360,11 @@ export default function HomeScreen() {
     const { transactions, accounts, fetchData, fetchBudgets, budgets, setEditingTransaction, majorCategories, deletePlannedTransactions } = useTransactionStore();
     const [selectedMonth, setSelectedMonth] = useState(new Date());
     const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
-    const [selectedDay, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [selectedDay, setSelectedDate] = useState<string>(() => getLocalDateKey(new Date()));
     const [isBudgetModalVisible, setIsBudgetModalVisible] = useState(false);
     const [selectedMajorId, setSelectedMajorId] = useState<string | null>(null);
     const [selectedMinorId, setSelectedMinorId] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const hasCheckedExpired = useRef(false);
 
     useEffect(() => {
@@ -398,6 +404,31 @@ export default function HomeScreen() {
         const month = String(selectedMonth.getMonth() + 1).padStart(2, '0');
         fetchBudgets(`${year}-${month}`);
     }, [selectedMonth]);
+
+    const matchesSearchQuery = useCallback((transaction: any) => {
+        const normalizedQuery = getNormalizedText(searchQuery);
+        if (!normalizedQuery) return true;
+
+        const major = majorCategories.find((m: any) => m.id === transaction.category_id || m.subCategories.some((s: any) => s.id === transaction.category_id));
+        const minor = major?.subCategories.find((s: any) => s.id === transaction.category_id);
+        const account = accounts.find((a: any) => a.id === transaction.account_id);
+        const toAccount = transaction.to_account_id ? accounts.find((a: any) => a.id === transaction.to_account_id) : null;
+
+        const searchableValues = [
+            transaction.payee,
+            transaction.memo,
+            account?.name,
+            toAccount?.name,
+            major?.label,
+            minor?.label,
+            transaction.category_id === 'transfer' ? '振替' : '',
+            transaction.amount.toString(),
+            Math.abs(transaction.amount).toLocaleString('ja-JP'),
+            transaction.id?.toString(),
+        ];
+
+        return searchableValues.some(value => value && getNormalizedText(value).includes(normalizedQuery));
+    }, [accounts, majorCategories, searchQuery]);
 
     const monthTransactions = useMemo(() => {
         return transactions.filter(t => {
@@ -451,13 +482,15 @@ export default function HomeScreen() {
                 }
             }
 
+            if (!matchesSearchQuery(t)) return false;
+
             return true;
         });
-    }, [monthTransactions, selectedMajorId, selectedMinorId, majorCategories]);
+    }, [monthTransactions, selectedMajorId, selectedMinorId, majorCategories, matchesSearchQuery]);
 
     const dayTransactions = useMemo(() => {
         return transactions.filter(t => {
-            const matchesDay = t.date.split('T')[0] === selectedDay;
+            const matchesDay = getTransactionDateKey(t.date) === selectedDay;
             if (!matchesDay) return false;
 
             // Category filter
@@ -472,14 +505,16 @@ export default function HomeScreen() {
                 }
             }
 
+            if (!matchesSearchQuery(t)) return false;
+
             return true;
         });
-    }, [transactions, selectedDay, selectedMajorId, selectedMinorId, majorCategories]);
+    }, [transactions, selectedDay, selectedMajorId, selectedMinorId, majorCategories, matchesSearchQuery]);
 
     const markedDates = useMemo(() => {
         const marks: any = {};
         transactions.forEach(t => {
-            const dateStr = t.date.split('T')[0];
+            const dateStr = getTransactionDateKey(t.date);
             if (!marks[dateStr]) {
                 marks[dateStr] = { marked: true, dots: [] };
             }
@@ -614,16 +649,25 @@ export default function HomeScreen() {
         return flatList;
     }, [filteredTransactions]);
 
-    const changeMonth = (offset: number) => {
-        const next = new Date(selectedMonth);
-        next.setMonth(next.getMonth() + offset);
+    const changeMonth = useCallback((offset: number) => {
+        const next = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + offset, 1);
         setSelectedMonth(next);
 
         // カレンダーの日付選択も切り替え後の月の1日に合わせる
         const year = next.getFullYear();
         const month = String(next.getMonth() + 1).padStart(2, '0');
         setSelectedDate(`${year}-${month}-01`);
-    };
+    }, [selectedMonth]);
+
+    const calendarPanResponder = useMemo(() => PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+            Math.abs(gestureState.dx) > 15 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+        onPanResponderRelease: (_, gestureState) => {
+            if (Math.abs(gestureState.dx) > 50 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy)) {
+                changeMonth(gestureState.dx < 0 ? 1 : -1);
+            }
+        },
+    }), [changeMonth]);
 
     const handleAddTransactionForSelectedDate = useCallback(() => {
         router.push({
@@ -698,8 +742,10 @@ export default function HomeScreen() {
                 <View className="flex-row items-center">
                     <TouchableOpacity
                         onPress={() => changeMonth(-1)}
-                        hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-                        style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                        accessibilityRole="button"
+                        accessibilityLabel="前の月"
+                        activeOpacity={0.7}
+                        style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 26, backgroundColor: isDark ? '#312e81' : '#eef2ff' }}
                     >
                         <ChevronLeft size={24} color="#6366f1" />
                     </TouchableOpacity>
@@ -710,8 +756,10 @@ export default function HomeScreen() {
 
                     <TouchableOpacity
                         onPress={() => changeMonth(1)}
-                        hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-                        style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                        accessibilityRole="button"
+                        accessibilityLabel="次の月"
+                        activeOpacity={0.7}
+                        style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 26, backgroundColor: isDark ? '#312e81' : '#eef2ff' }}
                     >
                         <ChevronRight size={24} color="#6366f1" />
                     </TouchableOpacity>
@@ -754,6 +802,27 @@ export default function HomeScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+                <View className="mx-4 mt-4 mb-3">
+                    <View className="flex-row items-center rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 shadow-sm">
+                        <Search size={16} color="#94a3b8" />
+                        <TextInput
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            placeholder="取引を検索"
+                            placeholderTextColor="#94a3b8"
+                            className="flex-1 ml-2 text-sm text-slate-900 dark:text-white"
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            clearButtonMode="while-editing"
+                        />
+                        {searchQuery ? (
+                            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                <X size={16} color="#94a3b8" />
+                            </TouchableOpacity>
+                        ) : null}
+                    </View>
+                </View>
+
                 <HeaderContent
                     totalBudget={totalBudget}
                     budgetExpense={budgetExpense}
@@ -770,18 +839,29 @@ export default function HomeScreen() {
 
                 {viewMode === 'list' ? (
                     <View style={{ paddingBottom: 40 }}>
-                        {sectionedTransactions.map((item, index) => (
-                            <View key={item.type === 'header' ? `header-${item.date}-${index}` : item.id?.toString() || `item-${index}`}>
-                                {renderItem({ item })}
+                        {sectionedTransactions.length === 0 && searchQuery ? (
+                            <View className="px-4 py-8 items-center">
+                                <Text className="text-sm text-slate-500 dark:text-slate-400">
+                                    「{searchQuery}」に一致する取引はありません
+                                </Text>
                             </View>
-                        ))}
+                        ) : (
+                            sectionedTransactions.map((item, index) => (
+                                <View key={item.type === 'header' ? `header-${item.date}-${index}` : item.id?.toString() || `item-${index}`}>
+                                    {renderItem({ item })}
+                                </View>
+                            ))
+                        )}
                     </View>
                 ) : (
                     <>
-                        <View className="mx-4 mb-6 rounded-3xl overflow-hidden shadow-sm">
+                        <View
+                            className="mx-4 mb-6 rounded-3xl overflow-hidden shadow-sm"
+                            {...calendarPanResponder.panHandlers}
+                        >
                             <Calendar
                                 key={selectedMonth.getFullYear() + '-' + selectedMonth.getMonth()}
-                                current={selectedMonth.toISOString().split('T')[0]}
+                                current={getLocalDateKey(selectedMonth)}
                                 onDayPress={day => setSelectedDate(day.dateString)}
                                 markedDates={markedDates}
                                 theme={calendarTheme}

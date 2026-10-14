@@ -470,6 +470,52 @@ export const databaseService = {
     });
   },
 
+  async searchTransactions(query: string): Promise<Transaction[]> {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) {
+      return this.getAllTransactions();
+    }
+
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    const likeQuery = `%${trimmedQuery}%`;
+    const rows = await db.getAllAsync<any>(
+      `SELECT t.*
+       FROM transactions t
+       LEFT JOIN accounts a ON t.account_id = a.id
+       WHERE LOWER(COALESCE(t.memo, '')) LIKE LOWER(?)
+          OR LOWER(COALESCE(t.payee, '')) LIKE LOWER(?)
+          OR LOWER(COALESCE(a.name, '')) LIKE LOWER(?)
+          OR LOWER(COALESCE(t.category_id, '')) LIKE LOWER(?)
+          OR CAST(t.amount AS TEXT) LIKE ?
+       ORDER BY t.date DESC`,
+      likeQuery,
+      likeQuery,
+      likeQuery,
+      likeQuery,
+      likeQuery
+    );
+
+    return rows.map(row => {
+      let parsedTags: string[] = [];
+      if (row.tags) {
+        try {
+          parsedTags = JSON.parse(row.tags);
+        } catch (e) {
+          parsedTags = [];
+        }
+      }
+      return {
+        ...row,
+        is_deferred: row.is_deferred === 1,
+        exclude_from_balance: row.exclude_from_balance === 1,
+        exclude_from_budget: row.exclude_from_budget === 1,
+        tags: parsedTags,
+        is_planned: row.is_planned === 1,
+        auto_delete_date: row.auto_delete_date || null
+      };
+    });
+  },
+
   async deleteTransaction(id: number): Promise<void> {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     
