@@ -624,7 +624,7 @@ export default function AccountHistoryScreen() {
                                             </Text>
                                         </View>
                                     )}
-                                    {item.exclude_from_budget && (
+                                    {item.exclude_from_budget ? (
                                         <View style={{
                                             backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
                                             paddingHorizontal: 6,
@@ -639,7 +639,22 @@ export default function AccountHistoryScreen() {
                                                 予算除外
                                             </Text>
                                         </View>
-                                    )}
+                                    ) : item.budget_amount !== null && item.budget_amount !== undefined && item.budget_amount !== Math.abs(item.amount) ? (
+                                        <View style={{
+                                            backgroundColor: isDark ? 'rgba(14, 165, 233, 0.15)' : '#e0f2fe',
+                                            paddingHorizontal: 6,
+                                            paddingVertical: 1,
+                                            borderRadius: 6
+                                        }}>
+                                            <Text style={{
+                                                fontSize: 9,
+                                                fontWeight: 'bold',
+                                                color: isDark ? '#38bdf8' : '#0284c7'
+                                            }}>
+                                                予算: ¥{item.budget_amount.toLocaleString()}
+                                            </Text>
+                                        </View>
+                                    ) : null}
                                     {item.is_planned && (
                                         <View style={{
                                             backgroundColor: isDark ? 'rgba(168, 85, 247, 0.15)' : '#f3e8ff',

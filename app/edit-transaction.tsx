@@ -28,6 +28,7 @@ const schema = z.object({
   is_deferred: z.boolean().optional(),
   exclude_from_balance: z.boolean().optional(),
   exclude_from_budget: z.boolean().optional(),
+  budget_amount: z.string().optional(),
   is_planned: z.boolean().optional(),
   auto_delete_date: z.date().optional(),
   tags: z.array(z.string()).optional(),
@@ -52,6 +53,7 @@ export default function EditTransactionScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showAutoDeleteDatePicker, setShowAutoDeleteDatePicker] = useState(false);
   const [selectedMajorId, setSelectedMajorId] = useState<string | null>(null);
+  const [budgetMode, setBudgetMode] = useState<'full' | 'custom' | 'exclude'>('full');
   const [isImporting, setIsImporting] = useState(false);
   const [isNewCategoryModalVisible, setIsNewCategoryModalVisible] = useState(false);
   const [isNewMajorModalVisible, setIsNewMajorModalVisible] = useState(false);
@@ -132,6 +134,7 @@ export default function EditTransactionScreen() {
       is_deferred: false,
       exclude_from_balance: false,
       exclude_from_budget: false,
+      budget_amount: '',
       is_planned: false,
       auto_delete_date: new Date(),
       tags: [],
@@ -139,6 +142,7 @@ export default function EditTransactionScreen() {
   });
 
   const transactionType = watch('type');
+  const watchAmount = watch('amount');
   const selectedMinorId = watch('category_id');
   const selectedAccountId = watch('account_id');
   const selectedToAccountId = watch('to_account_id');
@@ -206,7 +210,21 @@ export default function EditTransactionScreen() {
       setValue('fee', editingTransaction.fee ? editingTransaction.fee.toString() : '');
       setValue('is_deferred', editingTransaction.is_deferred || false);
       setValue('exclude_from_balance', editingTransaction.exclude_from_balance || false);
-      setValue('exclude_from_budget', editingTransaction.exclude_from_budget || false);
+
+      const isExcluded = editingTransaction.exclude_from_budget || false;
+      const bAmt = editingTransaction.budget_amount;
+      if (isExcluded) {
+        setBudgetMode('exclude');
+        setValue('budget_amount', '');
+      } else if (bAmt !== null && bAmt !== undefined) {
+        setBudgetMode('custom');
+        setValue('budget_amount', bAmt.toString());
+      } else {
+        setBudgetMode('full');
+        setValue('budget_amount', '');
+      }
+      setValue('exclude_from_budget', isExcluded);
+
       setValue('is_planned', editingTransaction.is_planned || false);
       setValue('auto_delete_date', editingTransaction.auto_delete_date ? new Date(editingTransaction.auto_delete_date + 'T00:00:00') : new Date(editingTransaction.date));
       setValue('tags', editingTransaction.tags || []);
@@ -231,10 +249,12 @@ export default function EditTransactionScreen() {
         is_deferred: false,
         exclude_from_balance: false,
         exclude_from_budget: false,
+        budget_amount: '',
         is_planned: false,
         auto_delete_date: new Date(),
         tags: [],
       });
+      setBudgetMode('full');
       setSelectedMajorId(null);
     }
 
@@ -479,6 +499,26 @@ export default function EditTransactionScreen() {
     const amount = data.type === 'income' ? Math.abs(amountNum) : -Math.abs(amountNum);
     const feeNum = data.fee ? Math.abs(Number(data.fee)) : 0;
 
+    let finalBudgetAmount: number | null = null;
+    let finalExcludeFromBudget = false;
+
+    if (budgetMode === 'exclude') {
+      finalExcludeFromBudget = true;
+      finalBudgetAmount = 0;
+    } else if (budgetMode === 'custom') {
+      const parsed = data.budget_amount ? Number(data.budget_amount) : NaN;
+      if (!isNaN(parsed) && parsed >= 0) {
+        finalBudgetAmount = parsed;
+        finalExcludeFromBudget = parsed === 0;
+      } else {
+        finalBudgetAmount = null;
+        finalExcludeFromBudget = false;
+      }
+    } else {
+      finalExcludeFromBudget = false;
+      finalBudgetAmount = null;
+    }
+
     // 自動学習除外設定の反映
     if (data.payee && data.payee.trim()) {
       if (data.ignore_learning) {
@@ -507,7 +547,8 @@ export default function EditTransactionScreen() {
           fee: feeNum,
           is_deferred: !!data.is_deferred,
           exclude_from_balance: !!data.exclude_from_balance,
-          exclude_from_budget: !!data.exclude_from_budget,
+          exclude_from_budget: finalExcludeFromBudget,
+          budget_amount: finalBudgetAmount,
           is_planned: !!data.is_planned,
           auto_delete_date: data.is_planned && data.auto_delete_date ? formatLocalDate(data.auto_delete_date) : null,
           tags: data.tags || []
@@ -528,7 +569,8 @@ export default function EditTransactionScreen() {
           fee: feeNum,
           is_deferred: !!data.is_deferred,
           exclude_from_balance: !!data.exclude_from_balance,
-          exclude_from_budget: !!data.exclude_from_budget,
+          exclude_from_budget: finalExcludeFromBudget,
+          budget_amount: finalBudgetAmount,
           is_planned: !!data.is_planned,
           auto_delete_date: data.is_planned && data.auto_delete_date ? formatLocalDate(data.auto_delete_date) : null,
           tags: data.tags || []
@@ -1082,40 +1124,156 @@ export default function EditTransactionScreen() {
                   )}
                 />
 
-                <Controller
-                  control={control}
-                  name="exclude_from_budget"
-                  render={({ field: { onChange, value } }) => (
-                    <View style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      backgroundColor: colors.inputBg,
-                      padding: 12,
-                      borderRadius: 12,
-                      marginTop: 8
-                    }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                        <Coins size={16} color={value ? colors.primary : colors.textMuted} />
-                        <View style={{ marginLeft: 12, flex: 1 }}>
-                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: value ? colors.primary : colors.text }}>
-                            予算計算から除外する
-                          </Text>
-                          <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>
-                            収支・残高には含めますが、予算管理・進捗から除外します
-                          </Text>
+                {/* 予算設定セクション */}
+                <View style={{
+                  backgroundColor: colors.inputBg,
+                  padding: 12,
+                  borderRadius: 12,
+                  marginTop: 8
+                }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                      <Coins size={16} color={budgetMode !== 'full' ? colors.primary : colors.textMuted} />
+                      <View style={{ marginLeft: 10 }}>
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.text }}>
+                          予算への反映
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', backgroundColor: isDark ? '#1e293b' : '#e2e8f0', borderRadius: 8, padding: 2 }}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setBudgetMode('full');
+                          setValue('exclude_from_budget', false);
+                          setValue('budget_amount', '');
+                        }}
+                        style={{
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 6,
+                          backgroundColor: budgetMode === 'full' ? colors.primary : 'transparent'
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: budgetMode === 'full' ? '#fff' : colors.textMuted }}>
+                          全額
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setBudgetMode('custom');
+                          setValue('exclude_from_budget', false);
+                          if (!watch('budget_amount') && watchAmount) {
+                            setValue('budget_amount', watchAmount);
+                          }
+                        }}
+                        style={{
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 6,
+                          backgroundColor: budgetMode === 'custom' ? colors.primary : 'transparent'
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: budgetMode === 'custom' ? '#fff' : colors.textMuted }}>
+                          一部指定
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setBudgetMode('exclude');
+                          setValue('exclude_from_budget', true);
+                          setValue('budget_amount', '');
+                        }}
+                        style={{
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 6,
+                          backgroundColor: budgetMode === 'exclude' ? (isDark ? '#ef4444' : '#dc2626') : 'transparent'
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: budgetMode === 'exclude' ? '#fff' : colors.textMuted }}>
+                          除外
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {budgetMode === 'custom' && (
+                    <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text }}>
+                          予算に含める金額
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                          <TouchableOpacity
+                            onPress={() => {
+                              const total = Number(watchAmount) || 0;
+                              setValue('budget_amount', Math.round(total / 2).toString());
+                            }}
+                            style={{
+                              backgroundColor: isDark ? '#334155' : '#e2e8f0',
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 6
+                            }}
+                          >
+                            <Text style={{ fontSize: 10, color: colors.text, fontWeight: '600' }}>半額 (50%)</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => {
+                              setValue('budget_amount', watchAmount || '');
+                            }}
+                            style={{
+                              backgroundColor: isDark ? '#334155' : '#e2e8f0',
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 6
+                            }}
+                          >
+                            <Text style={{ fontSize: 10, color: colors.text, fontWeight: '600' }}>全額</Text>
+                          </TouchableOpacity>
                         </View>
                       </View>
-                      <Switch
-                        value={value}
-                        onValueChange={onChange}
-                        trackColor={{ false: isDark ? '#334155' : '#e2e8f0', true: colors.primary + '80' }}
-                        thumbColor={value ? colors.primary : '#f4f3f4'}
-                        ios_backgroundColor={isDark ? '#334155' : '#e2e8f0'}
+                      <Controller
+                        control={control}
+                        name="budget_amount"
+                        render={({ field: { onChange, value } }) => (
+                          <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: colors.card,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            borderRadius: 8,
+                            paddingHorizontal: 10,
+                            paddingVertical: 6
+                          }}>
+                            <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.textMuted, marginRight: 6 }}>¥</Text>
+                            <TextInput
+                              value={value || ''}
+                              onChangeText={onChange}
+                              keyboardType="numeric"
+                              placeholder={watchAmount ? Number(watchAmount).toLocaleString() : '0'}
+                              placeholderTextColor={colors.textMuted}
+                              style={{
+                                flex: 1,
+                                fontSize: 14,
+                                fontWeight: 'bold',
+                                color: colors.text,
+                                padding: 0
+                              }}
+                            />
+                          </View>
+                        )}
                       />
                     </View>
                   )}
-                />
+
+                  <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 6 }}>
+                    {budgetMode === 'full' && `※ 取引金額${watchAmount ? ` (¥${Number(watchAmount).toLocaleString()}) ` : ''}全額を予算計算に含めます`}
+                    {budgetMode === 'custom' && '※ 収支・残高は取引金額で計上され、予算の進捗のみ指定した金額で計上されます'}
+                    {budgetMode === 'exclude' && '※ 収支・残高には含めますが、予算管理・進捗から除外します'}
+                  </Text>
+                </View>
 
                 <Controller
                   control={control}

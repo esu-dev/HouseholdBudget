@@ -13,6 +13,7 @@ export type Transaction = {
   is_deferred: boolean;
   exclude_from_balance: boolean;
   exclude_from_budget: boolean;
+  budget_amount?: number | null;
   tags?: string[];
   is_planned?: boolean;
   auto_delete_date?: string | null;
@@ -32,6 +33,7 @@ export type CreateTransactionInput = {
   is_deferred?: boolean;
   exclude_from_balance?: boolean;
   exclude_from_budget?: boolean;
+  budget_amount?: number | null;
   tags?: string[];
   duplicateEmailCandidate?: any;
   is_planned?: boolean;

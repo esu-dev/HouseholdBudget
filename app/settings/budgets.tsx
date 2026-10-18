@@ -104,6 +104,7 @@ export default function BudgetSettingsScreen() {
             if (t.category_id === 'transfer' || t.category_id === 'adjustment') return false;
             if (t.exclude_from_balance) return false;
             if (t.exclude_from_budget) return false;
+            if (t.budget_amount === 0) return false;
 
             const d = new Date(t.date);
             const lastMonthDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);
@@ -114,7 +115,8 @@ export default function BudgetSettingsScreen() {
             let sum = 0;
             lastMonthExpenses.forEach(t => {
                 if (category.subCategories.some(sub => sub.id === t.category_id)) {
-                    sum += Math.abs(t.amount);
+                    const budgetAmt = t.budget_amount !== null && t.budget_amount !== undefined ? t.budget_amount : Math.abs(t.amount);
+                    sum += budgetAmt;
                 }
             });
             usage[category.id] = sum;

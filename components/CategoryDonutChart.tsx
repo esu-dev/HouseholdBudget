@@ -42,10 +42,9 @@ export const CategoryDonutChart = ({ transactions }: CategoryDonutChartProps) =>
           labelKey="label"
           containerStyle={{ width: chartWidth, height: 250 }}
         >
-          <Pie.Chart radius={80} innerRadius={50} startAngle={-90}>
-            {({ slice }) => (
+          <Pie.Chart innerRadius={50} startAngle={-90}>
+            {() => (
               <Pie.Slice
-                {...slice}
                 animate={{ type: "timing", duration: 500 }}
               />
             )}

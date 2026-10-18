@@ -128,6 +128,15 @@ const TransactionItem = React.memo(({
                                     </Text>
                                 </View>
                             </>
+                        ) : item.budget_amount !== null && item.budget_amount !== undefined && item.budget_amount !== Math.abs(item.amount) ? (
+                            <>
+                                <Text className="text-slate-300 mx-1">|</Text>
+                                <View className="px-1.5 py-0.5 rounded-md bg-sky-100 dark:bg-sky-950">
+                                    <Text className="text-[9px] font-bold text-sky-700 dark:text-sky-300">
+                                        予算: ¥{item.budget_amount.toLocaleString()}
+                                    </Text>
+                                </View>
+                            </>
                         ) : null}
                         {item.is_planned ? (
                             <>
@@ -583,6 +592,9 @@ export default function HomeScreen() {
         // 実際の支出を合算
         monthTransactions.forEach(t => {
             if (t.amount < 0 && t.category_id !== 'transfer' && t.category_id !== 'adjustment' && !t.exclude_from_balance && !t.exclude_from_budget) {
+                const budgetAmt = t.budget_amount !== null && t.budget_amount !== undefined ? t.budget_amount : Math.abs(t.amount);
+                if (budgetAmt <= 0) return;
+
                 // 小カテゴリから親の大カテゴリを探す
                 let parentMajId = null;
                 for (const maj of majorCategories) {
@@ -593,7 +605,7 @@ export default function HomeScreen() {
                 }
 
                 if (parentMajId && breakdown[parentMajId]) {
-                    breakdown[parentMajId].spent += Math.abs(t.amount);
+                    breakdown[parentMajId].spent += budgetAmt;
                 }
             }
         });
@@ -608,7 +620,8 @@ export default function HomeScreen() {
         let sum = 0;
         monthTransactions.forEach(t => {
             if (t.amount < 0 && t.category_id !== 'transfer' && t.category_id !== 'adjustment' && !t.exclude_from_balance && !t.exclude_from_budget) {
-                sum += Math.abs(t.amount);
+                const budgetAmt = t.budget_amount !== null && t.budget_amount !== undefined ? t.budget_amount : Math.abs(t.amount);
+                sum += budgetAmt;
             }
         });
         return sum;

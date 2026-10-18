@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { CategoryDonutChart } from '../../components/CategoryDonutChart';
 import { DailyTrendBarChart } from '../../components/DailyTrendBarChart';
+import { IncomeDonutChart } from '../../components/IncomeDonutChart';
 import { NetWorthTrendChart } from '../../components/NetWorthTrendChart';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { TimeScale } from '../../hooks/useTransactionAnalysis';

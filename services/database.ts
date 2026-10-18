@@ -67,6 +67,7 @@ export const initDatabase = async () => {
       is_deferred INTEGER DEFAULT 0,
       exclude_from_balance INTEGER DEFAULT 0,
       exclude_from_budget INTEGER DEFAULT 0,
+      budget_amount INTEGER DEFAULT NULL,
       tags TEXT,
       is_planned INTEGER DEFAULT 0,
       auto_delete_date TEXT,
@@ -213,6 +214,11 @@ export const initDatabase = async () => {
   // Migration: Add exclude_from_budget to transactions if it doesn't exist
   try {
     await db.execAsync('ALTER TABLE transactions ADD COLUMN exclude_from_budget INTEGER DEFAULT 0');
+  } catch (e) {}
+
+  // Migration: Add budget_amount to transactions if it doesn't exist
+  try {
+    await db.execAsync('ALTER TABLE transactions ADD COLUMN budget_amount INTEGER DEFAULT NULL');
   } catch (e) {}
 
   // Migration: Add tags to transactions if it doesn't exist
@@ -383,7 +389,7 @@ export const databaseService = {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     const tagsJson = transaction.tags && transaction.tags.length > 0 ? JSON.stringify(transaction.tags) : null;
     const result = await db.runAsync(
-      'INSERT INTO transactions (amount, category_id, account_id, to_account_id, date, memo, payee, transfer_id, fee, import_hash, is_deferred, exclude_from_balance, exclude_from_budget, tags, is_planned, auto_delete_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO transactions (amount, category_id, account_id, to_account_id, date, memo, payee, transfer_id, fee, import_hash, is_deferred, exclude_from_balance, exclude_from_budget, budget_amount, tags, is_planned, auto_delete_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       transaction.amount,
       transaction.category_id,
       transaction.account_id,
@@ -397,6 +403,7 @@ export const databaseService = {
       transaction.is_deferred ? 1 : 0,
       transaction.exclude_from_balance ? 1 : 0,
       transaction.exclude_from_budget ? 1 : 0,
+      transaction.budget_amount !== undefined ? transaction.budget_amount : null,
       tagsJson,
       transaction.is_planned ? 1 : 0,
       transaction.auto_delete_date ?? null
@@ -416,7 +423,7 @@ export const databaseService = {
     const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
     const tagsJson = transaction.tags && transaction.tags.length > 0 ? JSON.stringify(transaction.tags) : null;
     await db.runAsync(
-      'UPDATE transactions SET amount = ?, category_id = ?, account_id = ?, to_account_id = ?, date = ?, memo = ?, payee = ?, transfer_id = ?, fee = ?, import_hash = ?, is_deferred = ?, exclude_from_balance = ?, exclude_from_budget = ?, tags = ?, is_planned = ?, auto_delete_date = ? WHERE id = ?',
+      'UPDATE transactions SET amount = ?, category_id = ?, account_id = ?, to_account_id = ?, date = ?, memo = ?, payee = ?, transfer_id = ?, fee = ?, import_hash = ?, is_deferred = ?, exclude_from_balance = ?, exclude_from_budget = ?, budget_amount = ?, tags = ?, is_planned = ?, auto_delete_date = ? WHERE id = ?',
       transaction.amount,
       transaction.category_id,
       transaction.account_id,
@@ -430,6 +437,7 @@ export const databaseService = {
       transaction.is_deferred ? 1 : 0,
       transaction.exclude_from_balance ? 1 : 0,
       transaction.exclude_from_budget ? 1 : 0,
+      transaction.budget_amount !== undefined ? transaction.budget_amount : null,
       tagsJson,
       transaction.is_planned ? 1 : 0,
       transaction.auto_delete_date ?? null,
@@ -463,6 +471,7 @@ export const databaseService = {
         is_deferred: row.is_deferred === 1,
         exclude_from_balance: row.exclude_from_balance === 1,
         exclude_from_budget: row.exclude_from_budget === 1,
+        budget_amount: row.budget_amount !== null && row.budget_amount !== undefined ? Number(row.budget_amount) : null,
         tags: parsedTags,
         is_planned: row.is_planned === 1,
         auto_delete_date: row.auto_delete_date || null
@@ -509,6 +518,7 @@ export const databaseService = {
         is_deferred: row.is_deferred === 1,
         exclude_from_balance: row.exclude_from_balance === 1,
         exclude_from_budget: row.exclude_from_budget === 1,
+        budget_amount: row.budget_amount !== null && row.budget_amount !== undefined ? Number(row.budget_amount) : null,
         tags: parsedTags,
         is_planned: row.is_planned === 1,
         auto_delete_date: row.auto_delete_date || null
@@ -920,7 +930,7 @@ export const databaseService = {
     let query = `
       SELECT 
         strftime('%Y-%m', t.date) as month,
-        SUM(t.amount) as total
+        SUM(CASE WHEN t.budget_amount IS NOT NULL THEN t.budget_amount ELSE t.amount END) as total
       FROM transactions t
       JOIN minor_categories min ON t.category_id = min.id
       JOIN major_categories maj ON min.parent_id = maj.id
@@ -930,6 +940,7 @@ export const databaseService = {
         AND t.transfer_id IS NULL
         AND (t.exclude_from_balance IS NULL OR t.exclude_from_balance = 0)
         AND (t.exclude_from_budget IS NULL OR t.exclude_from_budget = 0)
+        AND (t.budget_amount IS NULL OR t.budget_amount > 0)
         AND t.date >= date(?, 'start of month', '-' || ? || ' months')
         AND t.date < date(?, 'start of month')
     `;
@@ -962,7 +973,7 @@ export const databaseService = {
       SELECT 
         maj.id as major_id,
         strftime('%Y-%m', t.date) as month,
-        SUM(ABS(t.amount)) as total
+        SUM(CASE WHEN t.budget_amount IS NOT NULL THEN t.budget_amount ELSE ABS(t.amount) END) as total
       FROM transactions t
       JOIN minor_categories min ON t.category_id = min.id
       JOIN major_categories maj ON min.parent_id = maj.id
@@ -972,6 +983,7 @@ export const databaseService = {
         AND t.transfer_id IS NULL
         AND (t.exclude_from_balance IS NULL OR t.exclude_from_balance = 0)
         AND (t.exclude_from_budget IS NULL OR t.exclude_from_budget = 0)
+        AND (t.budget_amount IS NULL OR t.budget_amount > 0)
         AND t.date >= date(?, 'start of month', '-' || ? || ' months')
         AND t.date < date(?, 'start of month')
       GROUP BY major_id, month
@@ -1004,7 +1016,7 @@ export const databaseService = {
       SELECT 
         maj.id as major_id,
         strftime('%Y-%m', t.date) as month,
-        SUM(ABS(t.amount)) as total
+        SUM(CASE WHEN t.budget_amount IS NOT NULL THEN t.budget_amount ELSE ABS(t.amount) END) as total
       FROM transactions t
       JOIN minor_categories min ON t.category_id = min.id
       JOIN major_categories maj ON min.parent_id = maj.id
@@ -1014,6 +1026,7 @@ export const databaseService = {
         AND t.transfer_id IS NULL
         AND (t.exclude_from_balance IS NULL OR t.exclude_from_balance = 0)
         AND (t.exclude_from_budget IS NULL OR t.exclude_from_budget = 0)
+        AND (t.budget_amount IS NULL OR t.budget_amount > 0)
         AND t.date >= date(?, 'start of month', '-' || ? || ' months')
         AND t.date < date(?, 'start of month')
       GROUP BY major_id, month
@@ -1043,7 +1056,7 @@ export const databaseService = {
     const result = await db.getAllAsync<{month: string, total: number}>(`
       SELECT 
         strftime('%Y-%m', t.date) as month,
-        SUM(ABS(t.amount)) as total
+        SUM(CASE WHEN t.budget_amount IS NOT NULL THEN t.budget_amount ELSE ABS(t.amount) END) as total
       FROM transactions t
       JOIN minor_categories min ON t.category_id = min.id
       JOIN major_categories maj ON min.parent_id = maj.id
@@ -1053,6 +1066,7 @@ export const databaseService = {
         AND t.transfer_id IS NULL
         AND (t.exclude_from_balance IS NULL OR t.exclude_from_balance = 0)
         AND (t.exclude_from_budget IS NULL OR t.exclude_from_budget = 0)
+        AND (t.budget_amount IS NULL OR t.budget_amount > 0)
         AND t.date >= date(?, 'start of month', '-' || ? || ' months')
         AND t.date < date(?, 'start of month')
       GROUP BY month
@@ -1231,7 +1245,7 @@ export const databaseService = {
 
       // 1. transactions テーブルに出金取引を追加 (exclude_from_budget = 1, exclude_from_balance = 0)
       const txResult = await db.runAsync(
-        'INSERT INTO transactions (amount, category_id, account_id, to_account_id, date, memo, payee, transfer_id, fee, import_hash, is_deferred, exclude_from_balance, exclude_from_budget, tags, is_planned, auto_delete_date) VALUES (?, ?, ?, NULL, ?, ?, NULL, NULL, 0, NULL, 0, 0, 1, NULL, 0, NULL)',
+        'INSERT INTO transactions (amount, category_id, account_id, to_account_id, date, memo, payee, transfer_id, fee, import_hash, is_deferred, exclude_from_balance, exclude_from_budget, budget_amount, tags, is_planned, auto_delete_date) VALUES (?, ?, ?, NULL, ?, ?, NULL, NULL, 0, NULL, 0, 0, 1, 0, NULL, 0, NULL)',
         -Math.abs(input.amount),
         item.category_id || 'others',
         input.account_id,
