@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Calendar, CircleEllipsis, Clock3, ExternalLink, EyeOff, FileUp, MessageSquare, MoreVertical, RefreshCw, RotateCcw, Store, Trash2, Wallet, X } from 'lucide-react-native';
-import React, { useMemo, useRef, useState } from 'react';
+import { ArrowLeft, Calendar, CircleEllipsis, Clock3, ExternalLink, EyeOff, FileUp, MessageSquare, MoreVertical, RefreshCw, RotateCcw, Search, Store, Trash2, Wallet, X } from 'lucide-react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, InputAccessoryView, Keyboard, Linking, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { CATEGORY_ICONS } from '../../constants/categories';
@@ -9,6 +9,8 @@ import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { csvImportService } from '../../services/csvImportService';
 import { databaseService } from '../../services/database';
 import { useTransactionStore } from '../../store/useTransactionStore';
+
+const getNormalizedText = (value?: string | null) => (value ?? '').trim().toLowerCase();
 
 export default function AccountHistoryScreen() {
     const { id } = useLocalSearchParams();
@@ -19,6 +21,7 @@ export default function AccountHistoryScreen() {
 
     const isAllAccounts = id === 'all';
 
+    const [searchQuery, setSearchQuery] = useState('');
     const [isAdjustModalVisible, setIsAdjustModalVisible] = useState(false);
     const [newActualBalance, setNewActualBalance] = useState('');
     const [isMenuModalVisible, setIsMenuModalVisible] = useState(false);
@@ -402,28 +405,54 @@ export default function AccountHistoryScreen() {
         return major.subCategories.filter(min => catIds.has(min.id));
     }, [transactions, id, majorCategories, selectedMajorId]);
 
+    const matchesSearchQuery = useCallback((transaction: any) => {
+        const normalizedQuery = getNormalizedText(searchQuery);
+        if (!normalizedQuery) return true;
+
+        const major = majorCategories.find((m: any) => m.id === transaction.category_id || m.subCategories.some((s: any) => s.id === transaction.category_id));
+        const minor = major?.subCategories.find((s: any) => s.id === transaction.category_id);
+        const acc = accounts.find((a: any) => a.id === transaction.account_id);
+        const toAccount = transaction.to_account_id ? accounts.find((a: any) => a.id === transaction.to_account_id) : null;
+
+        const searchableValues = [
+            transaction.payee,
+            transaction.memo,
+            transaction.tags,
+            acc?.name,
+            toAccount?.name,
+            major?.label,
+            minor?.label,
+            transaction.category_id === 'transfer' ? '振替' : '',
+            transaction.amount.toString(),
+            Math.abs(transaction.amount).toLocaleString('ja-JP'),
+            transaction.id?.toString(),
+        ];
+
+        return searchableValues.some(value => value && getNormalizedText(value).includes(normalizedQuery));
+    }, [accounts, majorCategories, searchQuery]);
+
     const filteredTransactions = useMemo(() => {
         const baseTxs = isAllAccounts
             ? transactions
             : transactions.filter(t => t.account_id === id);
         return baseTxs.filter(t => {
-
             if (selectedMajorId === 'transfer') {
-                return t.category_id === 'transfer';
+                if (t.category_id !== 'transfer') return false;
+            } else if (selectedMajorId) {
+                if (selectedMinorId) {
+                    if (t.category_id !== selectedMinorId) return false;
+                } else {
+                    // 大カテゴリに属する全小カテゴリをフィルタ対象にする
+                    const major = majorCategories.find(m => m.id === selectedMajorId);
+                    if (!major?.subCategories.some(min => min.id === t.category_id)) return false;
+                }
             }
 
-            if (selectedMajorId) {
-                if (selectedMinorId) {
-                    return t.category_id === selectedMinorId;
-                }
-                // 大カテゴリに属する全小カテゴリをフィルタ対象にする
-                const major = majorCategories.find(m => m.id === selectedMajorId);
-                return major?.subCategories.some(min => min.id === t.category_id) ?? false;
-            }
+            if (!matchesSearchQuery(t)) return false;
 
             return true;
         });
-    }, [transactions, id, selectedMajorId, selectedMinorId, majorCategories, isAllAccounts]);
+    }, [transactions, id, selectedMajorId, selectedMinorId, majorCategories, isAllAccounts, matchesSearchQuery]);
 
     const sectionedTransactions = useMemo(() => {
         const groups: Record<string, any[]> = {};
@@ -829,7 +858,7 @@ export default function AccountHistoryScreen() {
                 keyExtractor={(item, index) => item.type === 'header' ? `header-${item.date}-${index}` : `item-${item.id}-${index}`}
                 getItemType={(item) => item.type}
                 drawDistance={1000}
-                ListHeaderComponent={() => (
+                ListHeaderComponent={(
                     <View style={{ paddingTop: 16, paddingBottom: 4 }}>
                         <View style={{ paddingHorizontal: 24, marginBottom: 10 }}>
                             <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>
@@ -928,12 +957,55 @@ export default function AccountHistoryScreen() {
                                 )}
                             </View>
                         )}
+
+                        <View style={{ marginHorizontal: 24, marginBottom: 12, marginTop: availableMajors.length > 0 ? 0 : 4 }}>
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                borderRadius: 16,
+                                borderWidth: 1,
+                                borderColor: colors.border,
+                                backgroundColor: colors.card,
+                                paddingHorizontal: 12,
+                                paddingVertical: Platform.OS === 'ios' ? 8 : 4,
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 1 },
+                                shadowOpacity: 0.05,
+                                shadowRadius: 2,
+                                elevation: 1
+                            }}>
+                                <Search size={16} color={colors.textMuted} />
+                                <TextInput
+                                    value={searchQuery}
+                                    onChangeText={setSearchQuery}
+                                    placeholder="取引を検索"
+                                    placeholderTextColor={colors.textMuted}
+                                    style={{
+                                        flex: 1,
+                                        marginLeft: 8,
+                                        fontSize: 14,
+                                        color: colors.text,
+                                        paddingVertical: 0
+                                    }}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    clearButtonMode="while-editing"
+                                />
+                                {searchQuery ? (
+                                    <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                        <X size={16} color={colors.textMuted} />
+                                    </TouchableOpacity>
+                                ) : null}
+                            </View>
+                        </View>
                     </View>
                 )}
-                ListEmptyComponent={() => (
+                ListEmptyComponent={(
                     <View style={{ padding: 60, alignItems: 'center' }}>
                         <Text style={{ color: colors.textMuted }}>
-                            {isAllAccounts ? '取引履歴がありません' : 'このアカウントの取引履歴はありません'}
+                            {searchQuery
+                                ? `「${searchQuery}」に一致する取引はありません`
+                                : (isAllAccounts ? '取引履歴がありません' : 'このアカウントの取引履歴はありません')}
                         </Text>
                     </View>
                 )}

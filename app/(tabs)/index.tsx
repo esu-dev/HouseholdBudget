@@ -201,7 +201,9 @@ const HeaderContent = React.memo(({
     setSelectedMinorId,
     availableMajors,
     availableMinors,
-    setIsBudgetModalVisible
+    setIsBudgetModalVisible,
+    plannedBudget,
+    plannedBalance
 }: any) => {
     const remainingBudget = totalBudget - budgetExpense;
     const progress = totalBudget > 0 ? Math.min(budgetExpense / totalBudget, 1) : 0;
@@ -244,6 +246,15 @@ const HeaderContent = React.memo(({
                         <Text className="text-[10px] text-slate-400 font-medium">{Math.round(progress * 100)}%</Text>
                     </View>
 
+                    {plannedBudget.count > 0 && (
+                        <View className="flex-row items-center mt-3">
+                            <View className="flex-row items-center bg-purple-50 dark:bg-purple-950/50 px-2.5 py-1 rounded-full border border-purple-200 dark:border-purple-800">
+                                <Clock3 size={10} color="#a855f7" style={{ marginRight: 4 }} />
+                                <Text className="text-[10px] font-bold text-purple-600 dark:text-purple-400">先入れ {plannedBudget.count}件 (¥{plannedBudget.amount.toLocaleString()}) 含む</Text>
+                            </View>
+                        </View>
+                    )}
+
                     <View className="flex-row items-center justify-center mt-4">
                         <Text className="text-[10px] text-indigo-500 font-bold mr-1">カテゴリ別の詳細を表示</Text>
                         <ChevronRight size={10} color="#6366f1" />
@@ -282,6 +293,15 @@ const HeaderContent = React.memo(({
                         {totals.balance >= 0 ? '+' : ''}¥{totals.balance.toLocaleString()}
                     </Text>
                 </View>
+
+                {plannedBalance.count > 0 && (
+                    <View className="flex-row items-center mt-3">
+                        <View className="flex-row items-center bg-purple-50 dark:bg-purple-950/50 px-2.5 py-1 rounded-full border border-purple-200 dark:border-purple-800">
+                            <Clock3 size={10} color="#a855f7" style={{ marginRight: 4 }} />
+                            <Text className="text-[10px] font-bold text-purple-600 dark:text-purple-400">先入れ {plannedBalance.count}件 ({plannedBalance.amount >= 0 ? '+' : ''}¥{plannedBalance.amount.toLocaleString()}) 含む</Text>
+                        </View>
+                    </View>
+                )}
             </View>
 
             <CategoryDonutChart transactions={monthTransactions} />
@@ -426,6 +446,7 @@ export default function HomeScreen() {
         const searchableValues = [
             transaction.payee,
             transaction.memo,
+            transaction.tags,
             account?.name,
             toAccount?.name,
             major?.label,
@@ -627,6 +648,36 @@ export default function HomeScreen() {
         return sum;
     }, [monthTransactions]);
 
+    // 先入れ取引の件数・合計金額（予算計上対象）
+    const plannedBudget = useMemo(() => {
+        const targets = monthTransactions.filter(t =>
+            t.is_planned &&
+            t.amount < 0 &&
+            t.category_id !== 'transfer' &&
+            t.category_id !== 'adjustment' &&
+            !t.exclude_from_balance &&
+            !t.exclude_from_budget
+        );
+        const count = targets.length;
+        const amount = targets.reduce((sum, t) => {
+            const budgetAmt = t.budget_amount !== null && t.budget_amount !== undefined ? t.budget_amount : Math.abs(t.amount);
+            return sum + budgetAmt;
+        }, 0);
+        return { count, amount };
+    }, [monthTransactions]);
+
+    // 先入れ取引の件数・合計金額（収支計上対象）
+    const plannedBalance = useMemo(() => {
+        const targets = monthTransactions.filter(t =>
+            t.is_planned &&
+            t.category_id !== 'transfer' &&
+            t.category_id !== 'adjustment' &&
+            !t.exclude_from_balance
+        );
+        const count = targets.length;
+        const amount = targets.reduce((sum, t) => sum + t.amount, 0);
+        return { count, amount };
+    }, [monthTransactions]);
 
 
     const sectionedTransactions = useMemo(() => {
@@ -815,7 +866,23 @@ export default function HomeScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-                <View className="mx-4 mt-4 mb-3">
+                <HeaderContent
+                    totalBudget={totalBudget}
+                    budgetExpense={budgetExpense}
+                    totals={totals}
+                    monthTransactions={monthTransactions}
+                    selectedMajorId={selectedMajorId}
+                    setSelectedMajorId={setSelectedMajorId}
+                    selectedMinorId={selectedMinorId}
+                    setSelectedMinorId={setSelectedMinorId}
+                    availableMajors={availableMajors}
+                    availableMinors={availableMinors}
+                    setIsBudgetModalVisible={setIsBudgetModalVisible}
+                    plannedBudget={plannedBudget}
+                    plannedBalance={plannedBalance}
+                />
+
+                <View className="mx-4 mb-3">
                     <View className="flex-row items-center rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 shadow-sm">
                         <Search size={16} color="#94a3b8" />
                         <TextInput
@@ -835,20 +902,6 @@ export default function HomeScreen() {
                         ) : null}
                     </View>
                 </View>
-
-                <HeaderContent
-                    totalBudget={totalBudget}
-                    budgetExpense={budgetExpense}
-                    totals={totals}
-                    monthTransactions={monthTransactions}
-                    selectedMajorId={selectedMajorId}
-                    setSelectedMajorId={setSelectedMajorId}
-                    selectedMinorId={selectedMinorId}
-                    setSelectedMinorId={setSelectedMinorId}
-                    availableMajors={availableMajors}
-                    availableMinors={availableMinors}
-                    setIsBudgetModalVisible={setIsBudgetModalVisible}
-                />
 
                 {viewMode === 'list' ? (
                     <View style={{ paddingBottom: 40 }}>
