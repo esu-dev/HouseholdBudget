@@ -6,20 +6,41 @@ import { DailyTrendBarChart } from '../../components/DailyTrendBarChart';
 import { IncomeDonutChart } from '../../components/IncomeDonutChart';
 import { NetWorthTrendChart } from '../../components/NetWorthTrendChart';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
-import { TimeScale } from '../../hooks/useTransactionAnalysis';
+import {
+    AnalysisPeriod,
+    ChartGranularity,
+    getAvailableGranularities,
+    getDefaultGranularity,
+} from '../../hooks/useTransactionAnalysis';
 import { useTransactionStore } from '../../store/useTransactionStore';
 
 export default function AnalysisScreen() {
     const colorScheme = useAppColorScheme();
     const { transactions, fetchData, accounts } = useTransactionStore();
     const [selectedDate, setSelectedDate] = useState(new Date());
-    const [timeScale, setTimeScale] = useState<TimeScale>('day');
+    const [period, setPeriod] = useState<AnalysisPeriod>('month');
+    const [trendGranularity, setTrendGranularity] = useState<ChartGranularity>('day');
+    const [netWorthGranularity, setNetWorthGranularity] = useState<ChartGranularity>('day');
     const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
     const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
     }, []);
+
+    const handlePeriodChange = (newPeriod: AnalysisPeriod) => {
+        setPeriod(newPeriod);
+        setExpandedCategory(null);
+
+        // 期間変更時に、その期間で利用可能な目盛り粒度をチェックし、非対応ならデフォルトにリセット
+        const available = getAvailableGranularities(newPeriod);
+        if (!available.includes(trendGranularity)) {
+            setTrendGranularity(getDefaultGranularity(newPeriod));
+        }
+        if (!available.includes(netWorthGranularity)) {
+            setNetWorthGranularity(getDefaultGranularity(newPeriod));
+        }
+    };
 
     const availableTags = useMemo(() => {
         const tagSet = new Set<string>();
@@ -33,9 +54,9 @@ export default function AnalysisScreen() {
 
     const changeDate = (offset: number) => {
         const next = new Date(selectedDate);
-        if (timeScale === 'day') {
+        if (period === 'month') {
             next.setMonth(next.getMonth() + offset);
-        } else if (timeScale === 'month') {
+        } else if (period === 'year') {
             next.setFullYear(next.getFullYear() + offset);
         }
         setExpandedCategory(null);
@@ -52,14 +73,14 @@ export default function AnalysisScreen() {
             }
 
             const d = new Date(t.date);
-            if (timeScale === 'day') {
+            if (period === 'month') {
                 return d.getMonth() === selectedDate.getMonth() && d.getFullYear() === selectedDate.getFullYear();
-            } else if (timeScale === 'month') {
+            } else if (period === 'year') {
                 return d.getFullYear() === selectedDate.getFullYear();
             }
-            return true; // Year view uses all
+            return true; // all (全期間)
         });
-    }, [transactions, selectedDate, timeScale, accounts, selectedTag]);
+    }, [transactions, selectedDate, period, accounts, selectedTag]);
 
     const groupedTransactions = useMemo(() => {
         const groups: Record<string, typeof transactions> = {};
@@ -88,39 +109,38 @@ export default function AnalysisScreen() {
     }, [filteredTransactions]);
 
     const dateLabel = useMemo(() => {
-        if (timeScale === 'day') {
+        if (period === 'month') {
             return `${selectedDate.getFullYear()}年 ${selectedDate.getMonth() + 1}月`;
-        } else if (timeScale === 'month') {
+        } else if (period === 'year') {
             return `${selectedDate.getFullYear()}年`;
         }
         return '全期間';
-    }, [selectedDate, timeScale]);
+    }, [selectedDate, period]);
 
-    const ScaleButton = ({ label, value }: { label: string, value: TimeScale }) => (
-        <TouchableOpacity
-            onPress={() => {
-                setTimeScale(value);
-                setExpandedCategory(null);
-            }}
-            hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
-            className={`flex-1 py-2 rounded-xl items-center ${timeScale === value ? 'bg-indigo-600 shadow-md' : 'bg-white dark:bg-slate-800'
-                }`}
-        >
-            <Text className={`font-bold text-xs ${timeScale === value ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`}>
-                {label}
-            </Text>
-        </TouchableOpacity>
-    );
+    const PeriodButton = ({ label, value }: { label: string, value: AnalysisPeriod }) => {
+        const isSelected = period === value;
+        return (
+            <TouchableOpacity
+                onPress={() => handlePeriodChange(value)}
+                hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
+                className={`flex-1 py-2.5 rounded-xl items-center ${isSelected ? 'bg-indigo-600 shadow-sm' : 'bg-white dark:bg-slate-800'}`}
+            >
+                <Text className={`font-bold text-xs ${isSelected ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`}>
+                    {label}
+                </Text>
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <View className="flex-1 bg-slate-50 dark:bg-slate-900">
             <View className="bg-white dark:bg-slate-800 px-4 pt-[30px] pb-4 flex-row justify-between items-center shadow-sm z-10">
-                {timeScale !== 'year' ? (
+                {period !== 'all' ? (
                     <>
                         <TouchableOpacity
                             onPress={() => changeDate(-1)}
                             accessibilityRole="button"
-                            accessibilityLabel={timeScale === 'day' ? '前の月' : '前年'}
+                            accessibilityLabel={period === 'month' ? '前の月' : '前年'}
                             activeOpacity={0.7}
                             style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 26, backgroundColor: colorScheme === 'dark' ? '#312e81' : '#eef2ff' }}
                         >
@@ -134,7 +154,7 @@ export default function AnalysisScreen() {
                         <TouchableOpacity
                             onPress={() => changeDate(1)}
                             accessibilityRole="button"
-                            accessibilityLabel={timeScale === 'day' ? '次の月' : '翌年'}
+                            accessibilityLabel={period === 'month' ? '次の月' : '翌年'}
                             activeOpacity={0.7}
                             style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 26, backgroundColor: colorScheme === 'dark' ? '#312e81' : '#eef2ff' }}
                         >
@@ -148,10 +168,16 @@ export default function AnalysisScreen() {
                 )}
             </View>
 
-            <View className="flex-row p-4 gap-2">
-                <ScaleButton label="月" value="day" />
-                <ScaleButton label="年" value="month" />
-                <ScaleButton label="全期間" value="year" />
+            {/* 全体の期間選択 */}
+            <View className="px-4 pt-3 pb-2">
+                <Text className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1.5 uppercase tracking-wider">
+                    集計期間
+                </Text>
+                <View className="flex-row gap-2">
+                    <PeriodButton label="月間" value="month" />
+                    <PeriodButton label="年間" value="year" />
+                    <PeriodButton label="全期間" value="all" />
+                </View>
             </View>
 
             <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
@@ -228,7 +254,7 @@ export default function AnalysisScreen() {
                                         <View className="border-t border-slate-50 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-900/10 p-2">
                                             {txs.map((t, idx) => {
                                                 const d = new Date(t.date);
-                                                const dateStr = timeScale === 'day'
+                                                const dateStr = period === 'month'
                                                     ? `${d.getMonth() + 1}/${d.getDate()}`
                                                     : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
                                                 const minorCat = major?.subCategories.find(s => s.id === t.category_id);
@@ -265,13 +291,19 @@ export default function AnalysisScreen() {
                     <IncomeDonutChart transactions={filteredTransactions} />
                 </View>
 
+                {/* 収支推移グラフ */}
                 <View className="mb-8">
-                    <Text className="text-sm font-bold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-wide">収支推移</Text>
-                    <DailyTrendBarChart transactions={filteredTransactions} timeScale={timeScale} />
+                    <DailyTrendBarChart
+                        transactions={filteredTransactions}
+                        period={period}
+                        granularity={trendGranularity}
+                        onGranularityChange={setTrendGranularity}
+                        targetDate={selectedDate}
+                    />
                 </View>
 
+                {/* 資産成長トレンドグラフ */}
                 <View className="mb-4">
-                    <Text className="text-sm font-bold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-wide">資産成長トレンド</Text>
                     <NetWorthTrendChart
                         transactions={filteredTransactions}
                         allTransactions={transactions.filter(t => {
@@ -279,16 +311,17 @@ export default function AnalysisScreen() {
                             return !excludedAccountIds.has(t.account_id);
                         })}
                         targetDate={selectedDate}
-                        timeScale={timeScale}
+                        period={period}
+                        granularity={netWorthGranularity}
+                        onGranularityChange={setNetWorthGranularity}
                     />
                 </View>
 
                 <View className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm mb-6">
                     <Text className="text-lg font-bold text-slate-900 dark:text-white mb-2">表示モードのヒント</Text>
                     <Text className="text-slate-500 dark:text-slate-400 text-sm leading-6">
-                        ・<Text className="font-bold">日表示</Text>: 月間の細かいお金の動き。{"\n"}
-                        ・<Text className="font-bold">月表示</Text>: 年間を通じた資産の積み上がり。{"\n"}
-                        ・<Text className="font-bold">年表示</Text>: 長期的な資産形成の歩み。
+                        ・<Text className="font-bold">集計期間</Text>: 上部で月間・年間・全期間を切り替えて対象データを絞り込みます。{"\n"}
+                        ・<Text className="font-bold">グラフの目盛り</Text>: 各推移グラフの右上ボタン（日・週・月・年）で、グラフの細かさを個別に変更できます。
                     </Text>
                 </View>
 

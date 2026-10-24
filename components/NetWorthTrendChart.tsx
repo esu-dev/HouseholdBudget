@@ -1,22 +1,65 @@
 import { useFont } from '@shopify/react-native-skia';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { Area, CartesianChart, Line, useChartPressState } from 'victory-native';
 import { useAppColorScheme } from '../hooks/useAppColorScheme';
-import { TimeScale, useTransactionAnalysis } from '../hooks/useTransactionAnalysis';
+import {
+  AnalysisPeriod,
+  ChartGranularity,
+  getAvailableGranularities,
+  getDefaultGranularity,
+  TimeScale,
+  useTransactionAnalysis,
+} from '../hooks/useTransactionAnalysis';
 import { Transaction } from '../types/transaction';
 
 interface NetWorthTrendChartProps {
   transactions: Transaction[];
   allTransactions: Transaction[];
   targetDate: Date;
-  timeScale: TimeScale;
+  period?: AnalysisPeriod;
+  granularity?: ChartGranularity;
+  onGranularityChange?: (granularity: ChartGranularity) => void;
+  availableGranularities?: ChartGranularity[];
+  /** 後方互換用プロパティ */
+  timeScale?: TimeScale;
 }
 
-export const NetWorthTrendChart = ({ transactions, allTransactions, targetDate, timeScale }: NetWorthTrendChartProps) => {
+const GRANULARITY_LABELS: Record<ChartGranularity, string> = {
+  day: '日',
+  week: '週',
+  month: '月',
+  year: '年',
+};
+
+export const NetWorthTrendChart = ({
+  transactions,
+  allTransactions,
+  targetDate,
+  period: propsPeriod,
+  granularity: propsGranularity,
+  onGranularityChange,
+  availableGranularities: propsAvailableGranularities,
+  timeScale,
+}: NetWorthTrendChartProps) => {
   const colorScheme = useAppColorScheme();
   const isDark = colorScheme === 'dark';
-  const { netWorthTrendData } = useTransactionAnalysis(transactions, allTransactions, targetDate, timeScale);
+
+  // 互換性考慮
+  const period: AnalysisPeriod = propsPeriod || (timeScale === 'year' ? 'all' : timeScale === 'month' ? 'year' : 'month');
+  const availableGranularities = propsAvailableGranularities || getAvailableGranularities(period);
+  const granularity: ChartGranularity =
+    propsGranularity && availableGranularities.includes(propsGranularity)
+      ? propsGranularity
+      : getDefaultGranularity(period);
+
+  const { netWorthTrendData } = useTransactionAnalysis(
+    transactions,
+    allTransactions,
+    targetDate,
+    period,
+    granularity
+  );
 
   // 追加された Roboto フォントを読み込む
   const font = useFont(require('../assets/fonts/Roboto.ttf'), 12);
@@ -25,8 +68,12 @@ export const NetWorthTrendChart = ({ transactions, allTransactions, targetDate, 
     y: { amount: 0 },
   });
 
-  // データの統計情報を計算（ラベルが表示されない時の補助用）
+  // データの統計情報を計算
   const stats = React.useMemo(() => {
+    if (netWorthTrendData.length === 0) {
+      return { min: 0, max: 0, start: 0, end: 0, periodLabel: '' };
+    }
+
     const amounts = netWorthTrendData.map(d => d.amount);
     const min = Math.min(...amounts);
     const max = Math.max(...amounts);
@@ -37,17 +84,19 @@ export const NetWorthTrendChart = ({ transactions, allTransactions, targetDate, 
     const endDateRaw = netWorthTrendData[netWorthTrendData.length - 1].date;
 
     // 期間の表示フォーマット
-    let periodLabel = "";
-    if (timeScale === "day") {
-      periodLabel = `${startDateRaw.replace(/-/g, '/')} 〜 ${endDateRaw.split('-').pop()}日`;
-    } else if (timeScale === "month") {
-      periodLabel = `${startDateRaw.replace(/-/g, '/')}月 〜 ${endDateRaw.split('-').pop()}月`;
+    let periodLabel = '';
+    if (granularity === 'day') {
+      periodLabel = `${startDateRaw.replace(/-/g, '/')} 〜 ${endDateRaw.replace(/-/g, '/')}`;
+    } else if (granularity === 'week') {
+      periodLabel = `${startDateRaw} 〜 ${endDateRaw}`;
+    } else if (granularity === 'month') {
+      periodLabel = `${startDateRaw.replace(/-/g, '/')}月 〜 ${endDateRaw.replace(/-/g, '/')}月`;
     } else {
       periodLabel = `${startDateRaw}年 〜 ${endDateRaw}年`;
     }
 
     return { min, max, start, end, periodLabel };
-  }, [netWorthTrendData, timeScale]);
+  }, [netWorthTrendData, granularity]);
 
   if (netWorthTrendData.length === 0) {
     return (
@@ -59,57 +108,96 @@ export const NetWorthTrendChart = ({ transactions, allTransactions, targetDate, 
 
   const formatXLabel = (value: any) => {
     const label = String(value);
-    if (!label || label === "undefined") return '';
+    if (!label || label === 'undefined') return '';
 
-    if (timeScale === 'day') {
+    if (granularity === 'day') {
       const parts = label.split('-');
-      return parts.length > 2 ? `${parts[2]}` : label;
-    } else if (timeScale === 'month') {
+      return parts.length > 2 ? `${parseInt(parts[2])}` : label;
+    } else if (granularity === 'week') {
+      return label;
+    } else if (granularity === 'month') {
       const parts = label.split('-');
-      return parts.length > 1 ? `${parseInt(parts[1])}` : label;
+      return parts.length > 1 ? `${parseInt(parts[1])}月` : label;
     } else {
       return `${label}`;
     }
   };
 
   const formatAmount = (val: number) => `¥${val.toLocaleString()}`;
-  const selectedPoint = isChartPressed && chartPressState.matchedIndex.value >= 0
-    ? netWorthTrendData[chartPressState.matchedIndex.value]
-    : null;
+  const selectedPoint =
+    isChartPressed && chartPressState.matchedIndex.value >= 0
+      ? netWorthTrendData[chartPressState.matchedIndex.value]
+      : null;
+
+  const granularityBadgeText = {
+    day: '日次推移',
+    week: '週次推移',
+    month: '月次推移',
+    year: '年次推移',
+  }[granularity];
 
   return (
     <View className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm mb-6 border-l-4 border-emerald-500">
-      <View className="flex-row justify-between items-center mb-6">
+      <View className="flex-row justify-between items-center mb-4">
         <View>
-          <Text className="text-lg font-bold text-slate-900 dark:text-white">純資産推移</Text>
-          <Text className="text-xs text-slate-400 font-medium">通算資産額の推移</Text>
+          <View className="flex-row items-center gap-2">
+            <Text className="text-lg font-bold text-slate-900 dark:text-white">資産成長トレンド</Text>
+            <View className="bg-emerald-100 dark:bg-emerald-900/30 px-2.5 py-0.5 rounded-full">
+              <Text className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">
+                {granularityBadgeText}
+              </Text>
+            </View>
+          </View>
+          <Text className="text-xs text-slate-400 font-medium mt-0.5">通算資産額の推移</Text>
         </View>
-        <View className="bg-emerald-100 dark:bg-emerald-900/30 px-3 py-1 rounded-full">
-          <Text className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">
-            {timeScale === 'day' ? '日次推移' : timeScale === 'month' ? '月次推移' : '年次推移'}
-          </Text>
-        </View>
+
+        {/* グラフ目盛り切り替えボタン */}
+        {availableGranularities.length > 1 && (
+          <View className="flex-row bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl">
+            {availableGranularities.map(g => {
+              const isSelected = granularity === g;
+              return (
+                <TouchableOpacity
+                  key={g}
+                  onPress={() => onGranularityChange?.(g)}
+                  className={`px-3 py-1 rounded-lg ${
+                    isSelected ? 'bg-emerald-600 shadow-sm' : ''
+                  }`}
+                  hitSlop={{ top: 5, bottom: 5, left: 2, right: 2 }}
+                >
+                  <Text
+                    className={`text-xs font-bold ${
+                      isSelected ? 'text-white' : 'text-slate-500 dark:text-slate-400'
+                    }`}
+                  >
+                    {GRANULARITY_LABELS[g]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
       </View>
 
       <View style={{ height: 250, width: '100%' }}>
         <CartesianChart
           data={netWorthTrendData}
           xKey="date"
-          yKeys={["amount"]}
+          yKeys={['amount']}
           chartPressState={chartPressState}
           domainPadding={{ right: 15 }}
           axisOptions={{
             font: font ?? undefined,
-            tickCount: timeScale === 'day' ? 8 : timeScale === 'month' ? 12 : Math.min(netWorthTrendData.length, 5),
-            labelColor: "#94a3b8",
-            lineColor: "#e2e8f0",
+            tickCount: Math.min(netWorthTrendData.length, granularity === 'day' ? 7 : 6),
+            labelColor: '#94a3b8',
+            lineColor: '#e2e8f0',
             labelOffset: 8,
             formatXLabel: formatXLabel,
-            formatYLabel: (value) => {
+            formatYLabel: value => {
               if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(0)}M`;
               if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}k`;
               return `¥${value}`;
-            }
+            },
           }}
         >
           {({ points, chartBounds }) => (
@@ -118,13 +206,13 @@ export const NetWorthTrendChart = ({ transactions, allTransactions, targetDate, 
                 points={points.amount}
                 y0={chartBounds.bottom}
                 color="#10b98120"
-                animate={{ type: "timing", duration: 700 }}
+                animate={{ type: 'timing', duration: 700 }}
               />
               <Line
                 points={points.amount}
                 color="#10b981"
                 strokeWidth={3}
-                animate={{ type: "timing", duration: 700 }}
+                animate={{ type: 'timing', duration: 700 }}
               />
             </>
           )}
@@ -136,7 +224,9 @@ export const NetWorthTrendChart = ({ transactions, allTransactions, targetDate, 
           <Text className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">選択した時点</Text>
           <View className="flex-row justify-between items-center mt-1">
             <Text className="text-xs text-slate-600 dark:text-slate-300">{selectedPoint.date}</Text>
-            <Text className="text-base font-bold text-emerald-700 dark:text-emerald-300">{formatAmount(selectedPoint.amount)}</Text>
+            <Text className="text-base font-bold text-emerald-700 dark:text-emerald-300">
+              {formatAmount(selectedPoint.amount)}
+            </Text>
           </View>
         </View>
       )}
