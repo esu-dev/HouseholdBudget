@@ -1,6 +1,6 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import { ArrowDownCircle, ArrowUpCircle, Building2, ChevronRight, CreditCard, EyeOff, Gift, Mail, Smartphone, Wallet, X } from 'lucide-react-native';
+import { ArrowDownCircle, ArrowUpCircle, Building2, ChevronRight, Clock3, CreditCard, EyeOff, Gift, Mail, Smartphone, Wallet, X } from 'lucide-react-native';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
@@ -453,6 +453,17 @@ export default function BalanceScreen() {
         return { income, expenses, balance: income - expenses };
     }, [transactions]);
 
+    // 口座ごとの先入れ（予定取引）件数を集計
+    const plannedCountsByAccount = useMemo(() => {
+        const counts: Record<string, number> = {};
+        transactions.forEach(t => {
+            if (t.is_planned) {
+                counts[t.account_id] = (counts[t.account_id] || 0) + 1;
+            }
+        });
+        return counts;
+    }, [transactions]);
+
     return (
         <View style={{ flex: 1, backgroundColor: colors.background }}>
             <ScrollView style={{ flex: 1 }}>
@@ -713,6 +724,30 @@ export default function BalanceScreen() {
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
                                                 <EyeOff size={10} color="#f43f5e" />
                                                 <Text style={{ fontSize: 10, color: '#f43f5e', fontWeight: 'bold' }}>非計算</Text>
+                                            </View>
+                                        )}
+                                        {plannedCountsByAccount[account.id] > 0 && (
+                                            <View
+                                                style={{
+                                                    backgroundColor: isDark ? 'rgba(168, 85, 247, 0.15)' : '#f3e8ff',
+                                                    paddingHorizontal: 6,
+                                                    paddingVertical: 1.5,
+                                                    borderRadius: 6,
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    gap: 3,
+                                                }}
+                                            >
+                                                <Clock3 size={10} color={isDark ? '#c084fc' : '#9333ea'} />
+                                                <Text
+                                                    style={{
+                                                        fontSize: 10,
+                                                        fontWeight: 'bold',
+                                                        color: isDark ? '#c084fc' : '#9333ea'
+                                                    }}
+                                                >
+                                                    先入れ{plannedCountsByAccount[account.id] > 1 ? ` (${plannedCountsByAccount[account.id]})` : ''}
+                                                </Text>
                                             </View>
                                         )}
                                     </View>

@@ -567,7 +567,7 @@ export const databaseService = {
       return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     })();
     const all = await this.getAllTransactions();
-    return all.filter(t => t.is_planned && t.auto_delete_date && t.auto_delete_date <= today);
+    return all.filter(t => t.is_planned && (t.auto_delete_date || t.date.slice(0, 10)) <= today);
   },
 
   // Accounts

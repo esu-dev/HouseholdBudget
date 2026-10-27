@@ -709,7 +709,7 @@ export default function WishlistScreen() {
                                 </View>
 
                                 {/* Buttons Row */}
-                                <View style={{ flexDirection: 'row', gap: 8, marginTop: 16, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14 }}>
+                                <View style={{ flexDirection: 'row', gap: 6, marginTop: 16, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14 }}>
                                     <TouchableOpacity
                                         onPress={() => handleOpenSavingModal(item)}
                                         style={{
@@ -719,12 +719,13 @@ export default function WishlistScreen() {
                                             justifyContent: 'center',
                                             backgroundColor: colors.primary,
                                             paddingVertical: 10,
+                                            paddingHorizontal: 8,
                                             borderRadius: 14,
-                                            gap: 6,
+                                            gap: 4,
                                         }}
                                     >
-                                        <Coins size={16} color="white" />
-                                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 13 }}>お金を移す</Text>
+                                        <Coins size={14} color="white" />
+                                        <Text numberOfLines={1} style={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>お金を移す</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
@@ -734,14 +735,14 @@ export default function WishlistScreen() {
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             backgroundColor: colors.cardSecondary,
-                                            paddingHorizontal: 14,
+                                            paddingHorizontal: 8,
                                             paddingVertical: 10,
                                             borderRadius: 14,
-                                            gap: 6,
+                                            gap: 4,
                                         }}
                                     >
-                                        <Clock size={15} color={colors.text} />
-                                        <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 12 }}>履歴</Text>
+                                        <Clock size={14} color={colors.text} />
+                                        <Text numberOfLines={1} style={{ color: colors.text, fontWeight: 'bold', fontSize: 12 }}>履歴</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
@@ -751,18 +752,19 @@ export default function WishlistScreen() {
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             backgroundColor: item.status === 'completed' ? colors.cardSecondary : colors.successSub,
-                                            paddingHorizontal: 14,
+                                            paddingHorizontal: 8,
                                             paddingVertical: 10,
                                             borderRadius: 14,
                                             gap: 4,
                                         }}
                                     >
-                                        <CheckCircle2 size={15} color={item.status === 'completed' ? colors.textMuted : colors.success} />
+                                        <CheckCircle2 size={14} color={item.status === 'completed' ? colors.textMuted : colors.success} />
                                         <Text
+                                            numberOfLines={1}
                                             style={{
                                                 color: item.status === 'completed' ? colors.textMuted : colors.success,
                                                 fontWeight: 'bold',
-                                                fontSize: 12,
+                                                fontSize: 11,
                                             }}
                                         >
                                             {item.status === 'completed' ? '貯金中に戻す' : '達成済みにする'}
