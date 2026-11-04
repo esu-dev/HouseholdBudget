@@ -144,7 +144,7 @@ const TransactionItem = React.memo(({
                                 <View className="px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950 flex-row items-center">
                                     <Clock3 size={10} color="#a855f7" style={{ marginRight: 2 }} />
                                     <Text className="text-[9px] font-bold text-purple-700 dark:text-purple-300">
-                                        先入れ{item.auto_delete_date ? ` (${item.auto_delete_date.slice(5).replace('-', '/')})` : ''}
+                                        先入れ{item.auto_delete_date && item.auto_delete_date !== item.date.slice(0, 10) ? ` (${item.auto_delete_date.slice(5).replace('-', '/')})` : ''}
                                     </Text>
                                 </View>
                             </>
@@ -408,7 +408,7 @@ export default function HomeScreen() {
             return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         })();
 
-        const expired = transactions.filter(t => t.is_planned && t.auto_delete_date && t.auto_delete_date <= todayStr);
+        const expired = transactions.filter(t => t.is_planned && (t.auto_delete_date || t.date.slice(0, 10)) <= todayStr);
         if (expired.length > 0) {
             hasCheckedExpired.current = true;
             Alert.alert(
@@ -446,7 +446,7 @@ export default function HomeScreen() {
         const searchableValues = [
             transaction.payee,
             transaction.memo,
-            transaction.tags,
+            Array.isArray(transaction.tags) ? transaction.tags.join(' ') : transaction.tags,
             account?.name,
             toAccount?.name,
             major?.label,

@@ -417,7 +417,7 @@ export default function AccountHistoryScreen() {
         const searchableValues = [
             transaction.payee,
             transaction.memo,
-            transaction.tags,
+            Array.isArray(transaction.tags) ? transaction.tags.join(' ') : transaction.tags,
             acc?.name,
             toAccount?.name,
             major?.label,
@@ -699,7 +699,7 @@ export default function AccountHistoryScreen() {
                                                 fontWeight: 'bold',
                                                 color: isDark ? '#c084fc' : '#9333ea'
                                             }}>
-                                                先入れ{item.auto_delete_date ? ` (${item.auto_delete_date.slice(5).replace('-', '/')})` : ''}
+                                                先入れ{item.auto_delete_date && item.auto_delete_date !== item.date.slice(0, 10) ? ` (${item.auto_delete_date.slice(5).replace('-', '/')})` : ''}
                                             </Text>
                                         </View>
                                     )}

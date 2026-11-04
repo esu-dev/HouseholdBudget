@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { Stack, useRouter } from 'expo-router';
-import { Bell, ChevronRight, FileDown, FileUp, Gift, ListTree, Palette, PieChart, PiggyBank, Save, Shield, Trash2, Wallet, ZapOff } from 'lucide-react-native';
+import { ChevronRight, FileDown, FileUp, Gift, ListTree, Palette, PieChart, PiggyBank, Save, Shield, Trash2, Wallet, ZapOff } from 'lucide-react-native';
 import React from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
@@ -199,28 +199,7 @@ export default function SettingsScreen() {
                     onPress={() => router.push('/settings/payee-mappings')}
                 />
 
-                <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginTop: 12, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 }}>アプリ設定</Text>
-
-                <MenuItem
-                    icon={Bell}
-                    title="通知設定"
-                    subtitle="入力忘れ防止リマインダーなど"
-                    onPress={() => { }}
-                />
-
-                <MenuItem
-                    icon={Shield}
-                    title="プライバシーとセキュリティ"
-                    subtitle="画面ロック、パスコード設定"
-                    onPress={() => { }}
-                />
-
-                <MenuItem
-                    icon={PieChart}
-                    title="データ管理"
-                    subtitle="データのバックアップ・復元"
-                    onPress={() => { }}
-                />
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginTop: 12, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 }}>データ管理</Text>
 
                 <View style={{ gap: 12, marginBottom: 24 }}>
                     <MenuItem
