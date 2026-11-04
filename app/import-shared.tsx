@@ -104,29 +104,17 @@ export default function ImportSharedScreen() {
         });
         setEmailTransactions(emailTxs);
 
-        const duplicates = txs.filter(t => (t as any).duplicateEmailCandidate !== null);
-        const rakutenId = await databaseService.getSetting('gmail_account_id_rakuten');
-        const vpassId = await databaseService.getSetting('gmail_account_id_vpass');
-        const jcbId = await databaseService.getSetting('gmail_account_id_jcb');
-        const isEmailImportAccount = [rakutenId, vpassId, jcbId].filter(id => id !== null).includes(accountId);
-
-        if (isEmailImportAccount || duplicates.length > 0) {
-            setPendingImportTransactions(txs);
-            setPendingAccountId(accountId);
-            const candidates = txs.map((t, idx) => ({
-                id: idx,
-                csvTx: t,
-                existingTx: (t as any).duplicateEmailCandidate,
-                resolution: (t as any).duplicateEmailCandidate ? 'replace' : 'new'
-            }));
-            setDuplicateCandidates(candidates);
-            setIsDuplicateModalVisible(true);
-        } else {
-            await databaseService.updateLastImportedAt(accountId, new Date().toISOString());
-            await addTransactions(txs);
-            Alert.alert('完了', `${txs.length}件の取引をインポートしました`);
-            router.replace('/');
-        }
+        // 全CSVインポートで常に確認モーダルを表示する（新規追加 or 置換をユーザーが選べるよう）
+        setPendingImportTransactions(txs);
+        setPendingAccountId(accountId);
+        const candidates = txs.map((t, idx) => ({
+            id: idx,
+            csvTx: t,
+            existingTx: (t as any).duplicateEmailCandidate,
+            resolution: (t as any).duplicateEmailCandidate ? 'replace' : 'new'
+        }));
+        setDuplicateCandidates(candidates);
+        setIsDuplicateModalVisible(true);
     };
 
     const handleAccountSelect = async (accountId: string) => {
