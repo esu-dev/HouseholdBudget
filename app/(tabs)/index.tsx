@@ -189,10 +189,14 @@ const TransactionItem = React.memo(({
         </TouchableOpacity>
     );
 });
+TransactionItem.displayName = 'TransactionItem';
 
 const HeaderContent = React.memo(({
     totalBudget,
     budgetExpense,
+    remainingDays,
+    dailyBudgetLimit,
+    isPastMonth,
     totals,
     monthTransactions,
     selectedMajorId,
@@ -254,6 +258,28 @@ const HeaderContent = React.memo(({
                             </View>
                         </View>
                     )}
+
+                    {/* 残り日数と1日の利用可能目安 */}
+                    <View className="mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-700/60 flex-row items-center justify-between">
+                        <View className="flex-row items-center">
+                            <View className="w-7 h-7 rounded-full bg-indigo-50 dark:bg-indigo-950/60 items-center justify-center mr-2">
+                                <CalendarIcon size={14} color="#6366f1" />
+                            </View>
+                            <View>
+                                <Text className="text-[10px] text-slate-400 font-bold">残り日数</Text>
+                                <Text className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                                    {isPastMonth ? '今月は終了' : `${remainingDays} 日`}
+                                </Text>
+                            </View>
+                        </View>
+                        <View className="items-end">
+                            <Text className="text-[10px] text-slate-400 font-bold">1日あたり利用可能額</Text>
+                            <Text className={`text-base font-black ${remainingBudget < 0 ? 'text-rose-600' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                                {isPastMonth ? '-' : `¥${Math.max(0, dailyBudgetLimit).toLocaleString()}`}
+                                {!isPastMonth && <Text className="text-[10px] font-normal text-slate-400"> /日</Text>}
+                            </Text>
+                        </View>
+                    </View>
 
                     <View className="flex-row items-center justify-center mt-4">
                         <Text className="text-[10px] text-indigo-500 font-bold mr-1">カテゴリ別の詳細を表示</Text>
@@ -381,6 +407,7 @@ const HeaderContent = React.memo(({
         </View>
     );
 });
+HeaderContent.displayName = 'HeaderContent';
 
 export default function HomeScreen() {
     const router = useRouter();
@@ -679,6 +706,36 @@ export default function HomeScreen() {
         return { count, amount };
     }, [monthTransactions]);
 
+    const remainingBudget = totalBudget - budgetExpense;
+
+    // 残り日数と1日の利用可能目安の計算
+    const { remainingDays, dailyBudgetLimit, isPastMonth } = useMemo(() => {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+        const currentDay = now.getDate();
+
+        const targetYear = selectedMonth.getFullYear();
+        const targetMonth = selectedMonth.getMonth();
+
+        const isCurrentMonth = targetYear === currentYear && targetMonth === currentMonth;
+        const past = targetYear < currentYear || (targetYear === currentYear && targetMonth < currentMonth);
+
+        let days = 0;
+        if (past) {
+            days = 0;
+        } else if (isCurrentMonth) {
+            const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+            days = Math.max(1, lastDay - currentDay + 1); // 当日を含む
+        } else {
+            // 未来月
+            days = new Date(targetYear, targetMonth + 1, 0).getDate();
+        }
+
+        const limit = days > 0 && remainingBudget > 0 ? Math.floor(remainingBudget / days) : 0;
+        return { remainingDays: days, dailyBudgetLimit: limit, isPastMonth: past };
+    }, [selectedMonth, remainingBudget]);
+
 
     const sectionedTransactions = useMemo(() => {
         const groups: Record<string, any[]> = {};
@@ -869,6 +926,9 @@ export default function HomeScreen() {
                 <HeaderContent
                     totalBudget={totalBudget}
                     budgetExpense={budgetExpense}
+                    remainingDays={remainingDays}
+                    dailyBudgetLimit={dailyBudgetLimit}
+                    isPastMonth={isPastMonth}
                     totals={totals}
                     monthTransactions={monthTransactions}
                     selectedMajorId={selectedMajorId}
@@ -1009,7 +1069,7 @@ export default function HomeScreen() {
             >
                 <View className="flex-1 justify-end bg-black/50">
                     <View className="bg-slate-50 dark:bg-slate-900 rounded-t-[40px] h-[85%] p-6">
-                        <View className="flex-row justify-between items-center mb-6">
+                        <View className="flex-row justify-between items-center mb-4">
                             <Text className="text-xl font-black text-slate-900 dark:text-white">予算の内訳</Text>
                             <TouchableOpacity
                                 onPress={() => setIsBudgetModalVisible(false)}
@@ -1020,12 +1080,30 @@ export default function HomeScreen() {
                             </TouchableOpacity>
                         </View>
 
+                        {/* モーダル上部サマリー */}
+                        <View className="bg-white dark:bg-slate-800 p-4 rounded-2xl mb-4 flex-row justify-between items-center shadow-sm">
+                            <View>
+                                <Text className="text-[10px] text-slate-400 font-bold mb-0.5">残り日数</Text>
+                                <Text className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                                    {isPastMonth ? '今月は終了' : `${remainingDays} 日`}
+                                </Text>
+                            </View>
+                            <View className="items-end">
+                                <Text className="text-[10px] text-slate-400 font-bold mb-0.5">1日あたり利用可能額</Text>
+                                <Text className={`text-base font-black ${remainingBudget < 0 ? 'text-rose-600' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                                    {isPastMonth ? '-' : `¥${Math.max(0, dailyBudgetLimit).toLocaleString()}`}
+                                    {!isPastMonth && <Text className="text-[10px] font-normal text-slate-400"> /日</Text>}
+                                </Text>
+                            </View>
+                        </View>
+
                         <ScrollView showsVerticalScrollIndicator={false}>
                             {budgetBreakdown.map((item) => {
                                 const remaining = item.budget - item.spent;
                                 const progress = item.budget > 0 ? Math.min(item.spent / item.budget, 1) : 0;
                                 const progressColor = progress > 0.9 ? 'bg-rose-500' : progress > 0.7 ? 'bg-amber-500' : 'bg-indigo-500';
                                 const IconComp = CATEGORY_ICONS[item.icon] || CircleEllipsis;
+                                const categoryDailyLimit = remainingDays > 0 && remaining > 0 ? Math.floor(remaining / remainingDays) : 0;
 
                                 return (
                                     <View key={item.id} className="bg-white dark:bg-slate-800 p-5 rounded-3xl mb-4 shadow-sm">
@@ -1045,6 +1123,11 @@ export default function HomeScreen() {
                                             <View className="items-end">
                                                 <Text className="text-xs text-slate-400 font-medium">予算: ¥{item.budget.toLocaleString()}</Text>
                                                 <Text className="text-sm font-black text-slate-900 dark:text-white">¥{item.spent.toLocaleString()}</Text>
+                                                {!isPastMonth && remainingDays > 0 && item.budget > 0 && (
+                                                    <Text className="text-[10px] text-slate-400 font-medium mt-0.5">
+                                                        目安: ¥{categoryDailyLimit.toLocaleString()}/日
+                                                    </Text>
+                                                )}
                                             </View>
                                         </View>
 
