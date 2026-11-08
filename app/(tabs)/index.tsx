@@ -2,7 +2,7 @@ import { CategoryDonutChart } from '@/components/CategoryDonutChart';
 import { useRouter } from 'expo-router';
 import { CalendarIcon, ChevronLeft, ChevronRight, CircleEllipsis, Clock3, List, MessageSquare, Plus, Search, Store, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Modal, PanResponder, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Animated, Dimensions, Easing, Modal, PanResponder, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
@@ -21,6 +21,8 @@ const getNormalizedText = (value?: string | null) => (value ?? '').trim().toLowe
 const getLocalDateKey = (date: Date) =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const getTransactionDateKey = (date: string) => getLocalDateKey(new Date(date));
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const TransactionItem = React.memo(({
     item,
@@ -770,6 +772,9 @@ export default function HomeScreen() {
         return flatList;
     }, [filteredTransactions]);
 
+    const calendarTranslateX = useRef(new Animated.Value(0)).current;
+    const isCalendarAnimating = useRef(false);
+
     const changeMonth = useCallback((offset: number) => {
         const next = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + offset, 1);
         setSelectedMonth(next);
@@ -780,15 +785,84 @@ export default function HomeScreen() {
         setSelectedDate(`${year}-${month}-01`);
     }, [selectedMonth]);
 
+    const transitionMonth = useCallback((offset: number, fromGesture = false) => {
+        if (isCalendarAnimating.current) return;
+        isCalendarAnimating.current = true;
+
+        const exitTarget = offset > 0 ? -SCREEN_WIDTH : SCREEN_WIDTH;
+        const enterStart = offset > 0 ? SCREEN_WIDTH : -SCREEN_WIDTH;
+
+        Animated.timing(calendarTranslateX, {
+            toValue: exitTarget,
+            duration: fromGesture ? 130 : 180,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+        }).start(() => {
+            changeMonth(offset);
+            calendarTranslateX.setValue(enterStart);
+            Animated.spring(calendarTranslateX, {
+                toValue: 0,
+                tension: 65,
+                friction: 9,
+                useNativeDriver: true,
+            }).start(() => {
+                isCalendarAnimating.current = false;
+            });
+        });
+    }, [changeMonth, calendarTranslateX]);
+
     const calendarPanResponder = useMemo(() => PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) =>
-            Math.abs(gestureState.dx) > 15 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+            if (isCalendarAnimating.current) return false;
+            return Math.abs(gestureState.dx) > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        },
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderMove: (_, gestureState) => {
+            if (isCalendarAnimating.current) return;
+            calendarTranslateX.setValue(gestureState.dx);
+        },
         onPanResponderRelease: (_, gestureState) => {
-            if (Math.abs(gestureState.dx) > 50 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy)) {
-                changeMonth(gestureState.dx < 0 ? 1 : -1);
+            if (isCalendarAnimating.current) return;
+
+            const isQuickFlick = Math.abs(gestureState.vx) > 0.35;
+            const isFarEnough = Math.abs(gestureState.dx) > 50;
+            const isHorizontal = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+
+            if (isHorizontal && (isFarEnough || isQuickFlick)) {
+                const isNext = gestureState.dx < 0 || (gestureState.dx === 0 && gestureState.vx < 0);
+                transitionMonth(isNext ? 1 : -1, true);
+            } else {
+                Animated.spring(calendarTranslateX, {
+                    toValue: 0,
+                    tension: 70,
+                    friction: 8,
+                    useNativeDriver: true,
+                }).start();
             }
         },
-    }), [changeMonth]);
+        onPanResponderTerminate: () => {
+            Animated.spring(calendarTranslateX, {
+                toValue: 0,
+                tension: 70,
+                friction: 8,
+                useNativeDriver: true,
+            }).start();
+        },
+    }), [transitionMonth, calendarTranslateX]);
+
+    const handleMonthNav = useCallback((offset: number) => {
+        if (viewMode === 'calendar') {
+            transitionMonth(offset);
+        } else {
+            changeMonth(offset);
+        }
+    }, [viewMode, transitionMonth, changeMonth]);
+
+    const calendarOpacity = calendarTranslateX.interpolate({
+        inputRange: [-SCREEN_WIDTH * 0.8, 0, SCREEN_WIDTH * 0.8],
+        outputRange: [0.5, 1, 0.5],
+        extrapolate: 'clamp',
+    });
 
     const handleAddTransactionForSelectedDate = useCallback(() => {
         router.push({
@@ -862,7 +936,7 @@ export default function HomeScreen() {
             <View className="bg-white dark:bg-slate-800 px-4 pt-[30px] pb-4 flex-row justify-between items-center shadow-sm z-10">
                 <View className="flex-row items-center">
                     <TouchableOpacity
-                        onPress={() => changeMonth(-1)}
+                        onPress={() => handleMonthNav(-1)}
                         accessibilityRole="button"
                         accessibilityLabel="前の月"
                         activeOpacity={0.7}
@@ -876,7 +950,7 @@ export default function HomeScreen() {
                     </Text>
 
                     <TouchableOpacity
-                        onPress={() => changeMonth(1)}
+                        onPress={() => handleMonthNav(1)}
                         accessibilityRole="button"
                         accessibilityLabel="次の月"
                         activeOpacity={0.7}
@@ -981,8 +1055,12 @@ export default function HomeScreen() {
                     </View>
                 ) : (
                     <>
-                        <View
+                        <Animated.View
                             className="mx-4 mb-6 rounded-3xl overflow-hidden shadow-sm"
+                            style={{
+                                transform: [{ translateX: calendarTranslateX }],
+                                opacity: calendarOpacity,
+                            }}
                             {...calendarPanResponder.panHandlers}
                         >
                             <Calendar
@@ -995,7 +1073,7 @@ export default function HomeScreen() {
                                 hideArrows={true}
                                 enableSwipeMonths={false}
                             />
-                        </View>
+                        </Animated.View>
 
                         <View className="mb-10">
                             <View className="flex-row justify-between items-center pr-6 mb-2">
