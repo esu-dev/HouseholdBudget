@@ -474,7 +474,9 @@ export default function AccountHistoryScreen() {
 
         const flatList: any[] = [];
         Object.entries(groups).forEach(([date, items]) => {
-            flatList.push({ type: 'header', date });
+            const income = items.reduce((sum, t) => sum + (t.amount > 0 ? t.amount : 0), 0);
+            const expense = items.reduce((sum, t) => sum + (t.amount < 0 ? t.amount : 0), 0);
+            flatList.push({ type: 'header', date, income, expense });
             items.forEach(item => flatList.push({ type: 'item', ...item }));
         });
 
@@ -484,11 +486,25 @@ export default function AccountHistoryScreen() {
     const renderItem = ({ item }: { item: any }) => {
         if (item.type === 'header') {
             return (
-                <View style={{ paddingHorizontal: 24, paddingVertical: 8, marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
-                    <Calendar size={12} color={colors.textMuted} />
-                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textMuted, marginLeft: 8 }}>
-                        {item.date}
-                    </Text>
+                <View style={{ paddingHorizontal: 24, paddingVertical: 8, marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Calendar size={12} color={colors.textMuted} />
+                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textMuted, marginLeft: 8 }}>
+                            {item.date}
+                        </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        {item.income > 0 && (
+                            <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#22c55e' }}>
+                                +¥{item.income.toLocaleString()}
+                            </Text>
+                        )}
+                        {item.expense < 0 && (
+                            <Text style={{ fontSize: 11, fontWeight: 'bold', color: isDark ? '#f87171' : '#ef4444' }}>
+                                ¥{item.expense.toLocaleString()}
+                            </Text>
+                        )}
+                    </View>
                 </View>
             );
         }
