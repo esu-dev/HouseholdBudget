@@ -1,5 +1,5 @@
 import { Stack, useRouter } from 'expo-router';
-import { Check, ChevronLeft, ChevronRight, Lightbulb, Save, Settings, Target, TrendingDown, TrendingUp } from 'lucide-react-native';
+import { Calendar, Check, ChevronLeft, ChevronRight, Lightbulb, Repeat, Save, Settings, Target, TrendingDown, TrendingUp } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CATEGORY_ICONS } from '../../constants/categories';
@@ -29,7 +29,9 @@ export default function BudgetSettingsScreen() {
         updateSavingsGoal,
         incomeCategoryIdsForAverage,
         updateIncomeCategoriesForAverage,
-        transactions
+        transactions,
+        fixedExpenses,
+        fetchFixedExpenses
     } = useTransactionStore();
 
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -62,6 +64,7 @@ export default function BudgetSettingsScreen() {
 
     useEffect(() => {
         fetchData(monthStr + '-01');
+        fetchFixedExpenses();
     }, []);
 
     useEffect(() => {
@@ -69,10 +72,15 @@ export default function BudgetSettingsScreen() {
         fetchStatistics(monthStr + '-01');
     }, [monthStr]);
 
+    const lastMonthDate = useMemo(() => {
+        return new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);
+    }, [selectedDate]);
+
     useEffect(() => {
         const fetchLastMonthBudgets = async () => {
-            const lastMonthDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);
-            const lastMonthStr = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
+            const lastMonthYear = lastMonthDate.getFullYear();
+            const lastMonthMonth = String(lastMonthDate.getMonth() + 1).padStart(2, '0');
+            const lastMonthStr = `${lastMonthYear}-${lastMonthMonth}`;
             try {
                 const dbBudgets = await databaseService.getBudgetsByMonth(lastMonthStr);
                 const budgetMap: Record<string, number> = {};
@@ -85,7 +93,62 @@ export default function BudgetSettingsScreen() {
             }
         };
         fetchLastMonthBudgets();
-    }, [selectedDate]);
+    }, [lastMonthDate]);
+
+    // 先月の実績収支集計（収入、支出、収支差額）
+    const lastMonthTotals = useMemo(() => {
+        const targetYear = lastMonthDate.getFullYear();
+        const targetMonth = lastMonthDate.getMonth();
+
+        let income = 0;
+        let expense = 0;
+
+        transactions.forEach(t => {
+            if (t.category_id === 'transfer' || t.category_id === 'adjustment') return;
+            if (t.exclude_from_balance) return;
+
+            const d = new Date(t.date);
+            if (d.getFullYear() === targetYear && d.getMonth() === targetMonth) {
+                if (t.amount > 0) {
+                    income += t.amount;
+                } else {
+                    expense += Math.abs(t.amount);
+                }
+            }
+        });
+
+        return {
+            year: targetYear,
+            month: targetMonth + 1,
+            income,
+            expense,
+            balance: income - expense,
+        };
+    }, [transactions, lastMonthDate]);
+
+    const lastMonthTotalBudget = useMemo(() => {
+        return Object.values(lastMonthBudgets).reduce((sum, val) => sum + val, 0);
+    }, [lastMonthBudgets]);
+
+    // 固定支出の集計
+    const activeFixedExpenses = useMemo(() => {
+        return fixedExpenses.filter(e => e.is_active);
+    }, [fixedExpenses]);
+
+    const totalFixedExpenses = useMemo(() => {
+        return activeFixedExpenses.reduce((sum, e) => sum + e.amount, 0);
+    }, [activeFixedExpenses]);
+
+    const fixedExpensesByCategory = useMemo(() => {
+        const map: Record<string, number> = {};
+        activeFixedExpenses.forEach(e => {
+            const major = majorCategories.find(maj => maj.subCategories.some(sub => sub.id === e.category_id));
+            if (major) {
+                map[major.id] = (map[major.id] || 0) + e.amount;
+            }
+        });
+        return map;
+    }, [activeFixedExpenses, majorCategories]);
 
     const expenseCategories = useMemo(() => {
         return majorCategories.filter(cat => cat.type === 'expense');
@@ -263,6 +326,138 @@ export default function BudgetSettingsScreen() {
                             </TouchableOpacity>
                         </View>
 
+                        {/* 先月分の収支カード */}
+                        <View
+                            style={{
+                                backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+                                borderRadius: 20,
+                                padding: 16,
+                                marginBottom: 14,
+                                borderWidth: 1,
+                                borderColor: colors.border,
+                            }}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Calendar size={16} color={colors.indigo} />
+                                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.text, marginLeft: 6 }}>
+                                        先月（{lastMonthTotals.month}月）の実績収支
+                                    </Text>
+                                </View>
+                                <View
+                                    style={{
+                                        backgroundColor: lastMonthTotals.balance >= 0 ? colors.greenSub : (isDark ? '#451a1a' : '#fef2f2'),
+                                        paddingHorizontal: 10,
+                                        paddingVertical: 3,
+                                        borderRadius: 12,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            fontSize: 13,
+                                            fontWeight: 'black',
+                                            color: lastMonthTotals.balance >= 0 ? colors.green : '#ef4444',
+                                        }}
+                                    >
+                                        収支 {lastMonthTotals.balance >= 0 ? '+' : ''}¥{lastMonthTotals.balance.toLocaleString()}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                                <View style={{ flex: 1, backgroundColor: colors.greenSub, padding: 12, borderRadius: 14 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                        <TrendingUp size={13} color={colors.green} />
+                                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.green, marginLeft: 4 }}>先月収入</Text>
+                                    </View>
+                                    <Text style={{ fontSize: 16, fontWeight: 'black', color: isDark ? '#fff' : '#064e3b' }}>
+                                        ¥{lastMonthTotals.income.toLocaleString()}
+                                    </Text>
+                                </View>
+
+                                <View style={{ flex: 1, backgroundColor: isDark ? '#451a1a' : '#fef2f2', padding: 12, borderRadius: 14 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                        <TrendingDown size={13} color="#ef4444" />
+                                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#ef4444', marginLeft: 4 }}>先月支出</Text>
+                                    </View>
+                                    <Text style={{ fontSize: 16, fontWeight: 'black', color: isDark ? '#fff' : '#451a1a' }}>
+                                        ¥{lastMonthTotals.expense.toLocaleString()}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {lastMonthTotalBudget > 0 && (
+                                <View
+                                    style={{
+                                        flexDirection: 'row',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        marginTop: 10,
+                                        paddingTop: 8,
+                                        borderTopWidth: 1,
+                                        borderTopColor: colors.border,
+                                    }}
+                                >
+                                    <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                                        先月予算合計: ¥{lastMonthTotalBudget.toLocaleString()}
+                                    </Text>
+                                    <Text
+                                        style={{
+                                            fontSize: 11,
+                                            fontWeight: 'bold',
+                                            color: lastMonthTotals.expense <= lastMonthTotalBudget ? colors.green : '#ef4444',
+                                        }}
+                                    >
+                                        {lastMonthTotals.expense <= lastMonthTotalBudget
+                                            ? `¥${(lastMonthTotalBudget - lastMonthTotals.expense).toLocaleString()} 予算内`
+                                            : `¥${(lastMonthTotals.expense - lastMonthTotalBudget).toLocaleString()} 超過`}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* 固定支出情報カード */}
+                        <TouchableOpacity
+                            onPress={() => router.push('/settings/fixed-expenses' as any)}
+                            activeOpacity={0.7}
+                            style={{
+                                backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+                                borderRadius: 20,
+                                padding: 14,
+                                marginBottom: 14,
+                                borderWidth: 1,
+                                borderColor: colors.border,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                            }}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                <View
+                                    style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: 12,
+                                        backgroundColor: colors.indigoSub,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <Repeat size={18} color={colors.indigo} />
+                                </View>
+                                <View style={{ marginLeft: 10, flex: 1 }}>
+                                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.textMuted }}>毎月の固定支出合計</Text>
+                                    <Text style={{ fontSize: 15, fontWeight: 'black', color: colors.text, marginTop: 2 }}>
+                                        ¥{totalFixedExpenses.toLocaleString()} <Text style={{ fontSize: 10, fontWeight: 'normal', color: colors.textMuted }}>({activeFixedExpenses.length}件 有効)</Text>
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Text style={{ fontSize: 12, color: colors.indigo, fontWeight: 'bold' }}>設定・管理</Text>
+                                <ChevronRight size={16} color={colors.indigo} />
+                            </View>
+                        </TouchableOpacity>
+
                         <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
                             <View style={{ flex: 1, backgroundColor: colors.greenSub, padding: 16, borderRadius: 20 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
@@ -361,6 +556,16 @@ export default function BudgetSettingsScreen() {
                                     ¥{totalBudget.toLocaleString()}
                                 </Text>
                             </View>
+                            {totalFixedExpenses > 0 && targetBudget > 0 && (
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                                    <Text style={{ fontSize: 10, color: colors.textMuted }}>
+                                        固定費: ¥{totalFixedExpenses.toLocaleString()}
+                                    </Text>
+                                    <Text style={{ fontSize: 10, color: colors.textMuted }}>
+                                        変動費目安: ¥{Math.max(0, targetBudget - totalFixedExpenses).toLocaleString()}
+                                    </Text>
+                                </View>
+                            )}
                             {totalBudget > targetBudget && targetBudget > 0 && (
                                 <Text style={{ fontSize: 11, color: colors.amber, marginTop: 4, fontWeight: 'bold', textAlign: 'right' }}>
                                     目安を ¥{(totalBudget - targetBudget).toLocaleString()} 超過しています
@@ -372,12 +577,81 @@ export default function BudgetSettingsScreen() {
 
                 {/* 2. カテゴリ別予算セクション */}
                 <View style={{ paddingHorizontal: 20 }}>
-                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1 }}>
-                        カテゴリ別予算
-                    </Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, marginLeft: 4 }}>
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>
+                            カテゴリ別予算
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    Alert.alert(
+                                        '先月予算のコピー',
+                                        '先月の予算設定を今月の入力欄にコピーしますか？（保存するまで確定されません）',
+                                        [
+                                            { text: 'キャンセル', style: 'cancel' },
+                                            {
+                                                text: 'コピーする',
+                                                onPress: () => {
+                                                    const newBudgets: Record<string, string> = {};
+                                                    expenseCategories.forEach(cat => {
+                                                        if (lastMonthBudgets[cat.id] !== undefined) {
+                                                            newBudgets[cat.id] = String(lastMonthBudgets[cat.id]);
+                                                        }
+                                                    });
+                                                    setLocalBudgets(prev => ({ ...prev, ...newBudgets }));
+                                                }
+                                            }
+                                        ]
+                                    );
+                                }}
+                                style={{
+                                    backgroundColor: isDark ? '#334155' : '#f1f5f9',
+                                    paddingHorizontal: 8,
+                                    paddingVertical: 5,
+                                    borderRadius: 8,
+                                }}
+                            >
+                                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.indigo }}>先月予算をコピー</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    Alert.alert(
+                                        '先月使用量の反映',
+                                        '先月の実績使用量を今月の予算入力欄に反映しますか？（保存するまで確定されません）',
+                                        [
+                                            { text: 'キャンセル', style: 'cancel' },
+                                            {
+                                                text: '反映する',
+                                                onPress: () => {
+                                                    const newBudgets: Record<string, string> = {};
+                                                    expenseCategories.forEach(cat => {
+                                                        if (lastMonthUsageByCategory[cat.id] !== undefined) {
+                                                            newBudgets[cat.id] = String(lastMonthUsageByCategory[cat.id]);
+                                                        }
+                                                    });
+                                                    setLocalBudgets(prev => ({ ...prev, ...newBudgets }));
+                                                }
+                                            }
+                                        ]
+                                    );
+                                }}
+                                style={{
+                                    backgroundColor: isDark ? '#334155' : '#f1f5f9',
+                                    paddingHorizontal: 8,
+                                    paddingVertical: 5,
+                                    borderRadius: 8,
+                                }}
+                            >
+                                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.indigo }}>先月実績を反映</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
 
                     {expenseCategories.map(category => {
                         const IconComp = CATEGORY_ICONS[category.icon] || Save;
+                        const catFixedAmount = fixedExpensesByCategory[category.id] || 0;
+                        const lastBudget = lastMonthBudgets[category.id] || 0;
+                        const lastUsage = lastMonthUsageByCategory[category.id] || 0;
                         return (
                             <View key={category.id} style={{
                                 backgroundColor: colors.card,
@@ -396,9 +670,19 @@ export default function BudgetSettingsScreen() {
                                         <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: category.color + '20', alignItems: 'center', justifyContent: 'center' }}>
                                             <IconComp size={20} color={category.color} />
                                         </View>
-                                        <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginLeft: 12 }} numberOfLines={1}>
-                                            {category.label}
-                                        </Text>
+                                        <View style={{ marginLeft: 12, flex: 1 }}>
+                                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }} numberOfLines={1}>
+                                                {category.label}
+                                            </Text>
+                                            {catFixedAmount > 0 && (
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.indigoSub, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, alignSelf: 'flex-start', marginTop: 3 }}>
+                                                    <Repeat size={10} color={colors.indigo} style={{ marginRight: 3 }} />
+                                                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.indigo }}>
+                                                        固定支出: ¥{catFixedAmount.toLocaleString()}
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
                                     </View>
 
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -436,10 +720,15 @@ export default function BudgetSettingsScreen() {
                                 }}>
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <Text style={{ fontSize: 11, color: colors.textMuted }}>
-                                            先月予算: <Text style={{ color: colors.text, fontWeight: '600' }}>¥{(lastMonthBudgets[category.id] || 0).toLocaleString()}</Text>
+                                            先月予算: <Text style={{ color: colors.text, fontWeight: '600' }}>¥{lastBudget.toLocaleString()}</Text>
                                         </Text>
                                         <Text style={{ fontSize: 11, color: colors.textMuted }}>
-                                            先月使用量: <Text style={{ color: colors.text, fontWeight: '600' }}>¥{(lastMonthUsageByCategory[category.id] || 0).toLocaleString()}</Text>
+                                            先月使用量: <Text style={{ color: colors.text, fontWeight: '600' }}>¥{lastUsage.toLocaleString()}</Text>
+                                            {lastBudget > 0 && (
+                                                <Text style={{ fontWeight: 'bold', color: lastUsage <= lastBudget ? colors.green : '#ef4444' }}>
+                                                    {lastUsage <= lastBudget ? ` (-¥${(lastBudget - lastUsage).toLocaleString()})` : ` (+¥${(lastUsage - lastBudget).toLocaleString()})`}
+                                                </Text>
+                                            )}
                                         </Text>
                                     </View>
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>

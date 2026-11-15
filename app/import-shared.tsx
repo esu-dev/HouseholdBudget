@@ -44,20 +44,6 @@ export default function ImportSharedScreen() {
         bank: '#0066cc',
     };
 
-    if (!uri) {
-        return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-                <Text style={{ color: colors.text, marginBottom: 20 }}>ファイルが見つかりません</Text>
-                <TouchableOpacity
-                    onPress={() => router.replace('/')}
-                    style={{ padding: 12, backgroundColor: colors.primary, borderRadius: 12 }}
-                >
-                    <Text style={{ color: 'white', fontWeight: 'bold' }}>ホームに戻る</Text>
-                </TouchableOpacity>
-            </View>
-        );
-    }
-
     const handleTypeSelect = (type: CardType | 'external') => {
         if (type === 'external') {
             router.replace({
@@ -87,6 +73,20 @@ export default function ImportSharedScreen() {
             return aDateDiff - bDateDiff;
         });
     }, [emailTransactions, duplicateCandidates, activeCandidateId]);
+
+    if (!uri) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+                <Text style={{ color: colors.text, marginBottom: 20 }}>ファイルが見つかりません</Text>
+                <TouchableOpacity
+                    onPress={() => router.replace('/')}
+                    style={{ padding: 12, backgroundColor: colors.primary, borderRadius: 12 }}
+                >
+                    <Text style={{ color: 'white', fontWeight: 'bold' }}>ホームに戻る</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
 
     const processTransactionsWithDuplicateCheck = async (accountId: string, txs: CreateTransactionInput[]) => {
         if (txs.length === 0) {

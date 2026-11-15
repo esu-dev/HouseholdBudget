@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { Stack, useRouter } from 'expo-router';
-import { ChevronRight, FileDown, FileUp, Gift, ListTree, Palette, PieChart, PiggyBank, Save, Shield, Trash2, Wallet, ZapOff } from 'lucide-react-native';
+import { ChevronRight, FileDown, FileUp, Gift, ListTree, Palette, PieChart, PiggyBank, Repeat, Save, Shield, Trash2, Wallet, ZapOff } from 'lucide-react-native';
 import React from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
@@ -149,12 +149,21 @@ export default function SettingsScreen() {
                 />
 
                 <MenuItem
+                    icon={Repeat}
+                    title="固定支出設定"
+                    subtitle="毎月の固定費・サブスク等の定期支出を管理"
+                    iconColor="#06b6d4"
+                    iconBgColor={isDark ? '#164e63' : '#cffafe'}
+                    onPress={() => router.push('/settings/fixed-expenses' as any)}
+                />
+
+                <MenuItem
                     icon={Gift}
                     title="欲しいものリスト"
                     subtitle="欲しいものの記録と計画的な積立貯金"
                     iconColor="#ec4899"
                     iconBgColor={isDark ? '#831843' : '#fce7f3'}
-                    onPress={() => router.push('/wishlist')}
+                    onPress={() => router.push('/wishlist' as any)}
                 />
 
                 <MenuItem

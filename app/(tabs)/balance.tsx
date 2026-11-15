@@ -575,7 +575,7 @@ export default function BalanceScreen() {
 
                         return (
                             <TouchableOpacity
-                                onPress={() => router.push('/wishlist')}
+                                onPress={() => router.push('/wishlist' as any)}
                                 activeOpacity={0.85}
                                 style={{
                                     backgroundColor: colors.card,

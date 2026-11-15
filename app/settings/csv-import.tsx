@@ -111,7 +111,7 @@ export default function CsvImportScreen() {
         checkMappings(result.data, result.type);
     };
     const checkMappings = (data: string[][], type: ExternalCsvType) => {
-        const missingCats: string[] = [];
+        const missingCats: { name: string, type: 'expense' | 'income' }[] = [];
         const missingAccs: string[] = [];
         const normalize = (val: string) => val ? val.trim().replace(/\s+/g, ' ') : '';
 

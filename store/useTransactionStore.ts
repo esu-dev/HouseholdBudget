@@ -4,6 +4,7 @@ import { creditCardPaymentService } from '../services/creditCardPaymentService';
 import { databaseService } from '../services/database';
 import { Account } from '../types/account';
 import { Budget, CreateBudgetInput } from '../types/budget';
+import { CreateFixedExpenseInput, FixedExpense, UpdateFixedExpenseInput } from '../types/fixedExpense';
 import { CreateTransactionInput, Transaction } from '../types/transaction';
 
 interface TransactionState {
@@ -13,6 +14,7 @@ interface TransactionState {
   majorCategories: MajorCategory[];
   accountBalances: Record<string, number>;
   csvAccountMappings: Record<string, string>;
+  fixedExpenses: FixedExpense[];
   averageMonthlyIncome: number;
   averageMonthlyExpense: number;
   averageMonthlyExpensesByCategory: Record<string, number>;
@@ -59,6 +61,13 @@ interface TransactionState {
   removeIgnoredPayee: (payee: string) => Promise<void>;
   fetchCsvAccountMappings: () => Promise<void>;
   setCsvAccountMapping: (externalName: string, internalId: string) => Promise<void>;
+  // Fixed Expense Actions
+  fetchFixedExpenses: () => Promise<void>;
+  addFixedExpense: (input: CreateFixedExpenseInput) => Promise<void>;
+  updateFixedExpense: (input: UpdateFixedExpenseInput) => Promise<void>;
+  deleteFixedExpense: (id: number) => Promise<void>;
+  toggleFixedExpenseActive: (id: number, isActive: boolean) => Promise<void>;
+  recordFixedExpensesForMonth: (monthStr: string, expenseIds?: number[]) => Promise<{ addedCount: number; skippedCount: number }>;
 }
 
 export const useTransactionStore = create<TransactionState>((set, get) => ({
@@ -68,6 +77,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   majorCategories: [],
   accountBalances: {},
   csvAccountMappings: {},
+  fixedExpenses: [],
   averageMonthlyIncome: 0,
   averageMonthlyExpense: 0,
   averageMonthlyExpensesByCategory: {},
@@ -82,7 +92,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   fetchData: async (baseDate?: string) => {
     set({ isLoading: true });
     try {
-      const [transactions, accounts, balances, categories, expectedMonthlyIncome, savingsGoal, incomeCats, csvMappings] = await Promise.all([
+      const [transactions, accounts, balances, categories, expectedMonthlyIncome, savingsGoal, incomeCats, csvMappings, fixedExpenses] = await Promise.all([
         databaseService.getAllTransactions(),
         databaseService.getAllAccounts(),
         databaseService.getAccountBalances(),
@@ -91,6 +101,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         databaseService.getSetting('savings_goal'),
         databaseService.getSetting('income_categories_for_average'),
         databaseService.getAllCsvAccountMappings(),
+        databaseService.getAllFixedExpenses(),
       ]);
 
       const incomeCategoryIds = incomeCats ? JSON.parse(incomeCats) : [];
@@ -120,6 +131,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         savingsGoal: savingsGoal ? parseInt(savingsGoal) : 0,
         incomeCategoryIdsForAverage: incomeCategoryIds,
         csvAccountMappings: csvMappings || {},
+        fixedExpenses: fixedExpenses || [],
         isLoading: false
       });
     } catch (error) {
@@ -511,5 +523,108 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   setCsvAccountMapping: async (externalName, internalId) => {
     await databaseService.setCsvAccountMapping(externalName, internalId);
     await get().fetchCsvAccountMappings();
+  },
+
+  fetchFixedExpenses: async () => {
+    try {
+      const fixedExpenses = await databaseService.getAllFixedExpenses();
+      set({ fixedExpenses });
+    } catch (error) {
+      console.error('Failed to fetch fixed expenses:', error);
+    }
+  },
+
+  addFixedExpense: async (input: CreateFixedExpenseInput) => {
+    try {
+      await databaseService.addFixedExpense(input);
+      await get().fetchFixedExpenses();
+    } catch (error) {
+      console.error('Failed to add fixed expense:', error);
+      throw error;
+    }
+  },
+
+  updateFixedExpense: async (input: UpdateFixedExpenseInput) => {
+    try {
+      await databaseService.updateFixedExpense(input);
+      await get().fetchFixedExpenses();
+    } catch (error) {
+      console.error('Failed to update fixed expense:', error);
+      throw error;
+    }
+  },
+
+  deleteFixedExpense: async (id: number) => {
+    try {
+      await databaseService.deleteFixedExpense(id);
+      await get().fetchFixedExpenses();
+    } catch (error) {
+      console.error('Failed to delete fixed expense:', error);
+      throw error;
+    }
+  },
+
+  toggleFixedExpenseActive: async (id: number, isActive: boolean) => {
+    try {
+      await databaseService.toggleFixedExpenseActive(id, isActive);
+      await get().fetchFixedExpenses();
+    } catch (error) {
+      console.error('Failed to toggle fixed expense:', error);
+      throw error;
+    }
+  },
+
+  recordFixedExpensesForMonth: async (monthStr: string, expenseIds?: number[]) => {
+    try {
+      const { fixedExpenses, transactions, addTransactions } = get();
+      const [yearStr, mStr] = monthStr.split('-');
+      const year = parseInt(yearStr, 10);
+      const month = parseInt(mStr, 10);
+      const daysInMonth = new Date(year, month, 0).getDate();
+
+      const targetExpenses = fixedExpenses.filter(f => {
+        if (!f.is_active) return false;
+        if (expenseIds && !expenseIds.includes(f.id)) return false;
+        return true;
+      });
+
+      const existingHashes = new Set(transactions.map(t => t.import_hash).filter(Boolean));
+      const toAdd: CreateTransactionInput[] = [];
+      let skippedCount = 0;
+
+      for (const expense of targetExpenses) {
+        const importHash = `fixed_${expense.id}_${monthStr}`;
+        if (existingHashes.has(importHash)) {
+          skippedCount++;
+          continue;
+        }
+
+        const day = Math.min(Math.max(1, expense.payment_day), daysInMonth);
+        const dayStr = String(day).padStart(2, '0');
+        const dateStr = `${yearStr}-${mStr}-${dayStr}`;
+
+        toAdd.push({
+          amount: -Math.abs(expense.amount),
+          category_id: expense.category_id,
+          account_id: expense.account_id,
+          date: dateStr,
+          payee: expense.payee || expense.name,
+          memo: expense.memo ? `[固定費] ${expense.memo}` : `[固定費] ${expense.name}`,
+          import_hash: importHash,
+          tags: ['固定費'],
+          exclude_from_balance: false,
+          exclude_from_budget: false,
+        });
+      }
+
+      if (toAdd.length > 0) {
+        await addTransactions(toAdd);
+      }
+
+      return { addedCount: toAdd.length, skippedCount };
+    } catch (error) {
+      console.error('Failed to record fixed expenses:', error);
+      throw error;
+    }
   },
 }));

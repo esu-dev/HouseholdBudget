@@ -15,7 +15,7 @@ export type Account = {
   billingStartDate?: string;
   excludeFromNetWorth?: boolean;
   isHidden?: boolean;
-  lastImportedAt: string | undefined;
+  lastImportedAt?: string;
   lastEmailImportedAt?: string;
   initialBalance: number;
   creditLimit?: number;

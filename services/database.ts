@@ -4,6 +4,7 @@ import { CATEGORIES, MajorCategory, MinorCategory } from '../constants/categorie
 import { Account } from '../types/account';
 import { Budget, CreateBudgetInput } from '../types/budget';
 import { CreateTransactionInput, Transaction } from '../types/transaction';
+import { CreateFixedExpenseInput, FixedExpense, UpdateFixedExpenseInput } from '../types/fixedExpense';
 import { AddSavingInput, CreateWishlistInput, UpdateWishlistInput, WishlistItem, WishlistSaving } from '../types/wishlist';
 
 const DATABASE_NAME = 'household_budget.db';
@@ -131,7 +132,40 @@ export const initDatabase = async () => {
       FOREIGN KEY (wishlist_id) REFERENCES wishlists(id) ON DELETE CASCADE,
       FOREIGN KEY (account_id) REFERENCES accounts(id)
     );
+
+    CREATE TABLE IF NOT EXISTS fixed_expenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      category_id TEXT NOT NULL,
+      account_id TEXT NOT NULL,
+      payment_day INTEGER NOT NULL DEFAULT 1,
+      payee TEXT,
+      memo TEXT,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (account_id) REFERENCES accounts(id)
+    );
   `);
+
+  // Migration: Create fixed_expenses table if it doesn't exist
+  try {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS fixed_expenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        category_id TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        payment_day INTEGER NOT NULL DEFAULT 1,
+        payee TEXT,
+        memo TEXT,
+        is_active INTEGER DEFAULT 1,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (account_id) REFERENCES accounts(id)
+      );
+    `);
+  } catch (e) {}
 
   // Migration: Add account_id to transactions if it doesn't exist
   try {
@@ -1085,6 +1119,7 @@ export const databaseService = {
     await db.execAsync('BEGIN TRANSACTION;');
     try {
       // 全テーブルのデータを削除
+      await db.execAsync('DELETE FROM fixed_expenses;');
       await db.execAsync('DELETE FROM wishlist_savings;');
       await db.execAsync('DELETE FROM wishlists;');
       await db.execAsync('DELETE FROM transactions;');
@@ -1329,5 +1364,73 @@ export const databaseService = {
       await db.execAsync('ROLLBACK;');
       throw e;
     }
+  },
+
+  // Fixed Expenses
+  async getAllFixedExpenses(): Promise<FixedExpense[]> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    const rows = await db.getAllAsync<any>(
+      'SELECT * FROM fixed_expenses ORDER BY payment_day ASC, id ASC'
+    );
+    return rows.map(r => ({
+      ...r,
+      is_active: r.is_active === 1 || r.is_active === true
+    }));
+  },
+
+  async addFixedExpense(input: CreateFixedExpenseInput): Promise<number> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    const result = await db.runAsync(
+      `INSERT INTO fixed_expenses (name, amount, category_id, account_id, payment_day, payee, memo, is_active, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      input.name,
+      input.amount,
+      input.category_id,
+      input.account_id,
+      input.payment_day,
+      input.payee ?? null,
+      input.memo ?? null,
+      input.is_active === false ? 0 : 1,
+      new Date().toISOString()
+    );
+    return result.lastInsertRowId;
+  },
+
+  async updateFixedExpense(input: UpdateFixedExpenseInput): Promise<void> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    const current = await db.getFirstAsync<any>('SELECT * FROM fixed_expenses WHERE id = ?', input.id);
+    if (!current) throw new Error('Fixed expense not found');
+
+    await db.runAsync(
+      `UPDATE fixed_expenses SET 
+        name = ?,
+        amount = ?,
+        category_id = ?,
+        account_id = ?,
+        payment_day = ?,
+        payee = ?,
+        memo = ?,
+        is_active = ?
+       WHERE id = ?`,
+      input.name ?? current.name,
+      input.amount ?? current.amount,
+      input.category_id ?? current.category_id,
+      input.account_id ?? current.account_id,
+      input.payment_day ?? current.payment_day,
+      input.payee !== undefined ? input.payee : current.payee,
+      input.memo !== undefined ? input.memo : current.memo,
+      input.is_active !== undefined ? (input.is_active ? 1 : 0) : current.is_active,
+      input.id
+    );
+  },
+
+  async deleteFixedExpense(id: number): Promise<void> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    await db.runAsync('DELETE FROM fixed_expenses WHERE id = ?', id);
+  },
+
+  async toggleFixedExpenseActive(id: number, isActive: boolean): Promise<void> {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    await db.runAsync('UPDATE fixed_expenses SET is_active = ? WHERE id = ?', isActive ? 1 : 0, id);
   }
 };

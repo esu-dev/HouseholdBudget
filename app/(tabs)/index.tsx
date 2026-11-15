@@ -923,9 +923,9 @@ export default function HomeScreen() {
         arrowColor: '#6366f1',
         monthTextColor: isDark ? '#f1f5f9' : '#0f172a',
         indicatorColor: '#6366f1',
-        textDayFontWeight: '500',
-        textMonthFontWeight: 'bold',
-        textDayHeaderFontWeight: 'bold',
+        textDayFontWeight: '500' as const,
+        textMonthFontWeight: 'bold' as const,
+        textDayHeaderFontWeight: 'bold' as const,
         textDayFontSize: 14,
         textMonthFontSize: 16,
         textDayHeaderFontSize: 12
