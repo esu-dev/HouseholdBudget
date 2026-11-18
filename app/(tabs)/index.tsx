@@ -4,6 +4,7 @@ import { CalendarIcon, ChevronLeft, ChevronRight, CircleEllipsis, Clock3, List, 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Dimensions, Easing, Modal, PanResponder, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { useAppColorScheme } from '../../hooks/useAppColorScheme';
 import { useTransactionStore } from '../../store/useTransactionStore';
@@ -412,6 +413,7 @@ const HeaderContent = React.memo(({
 HeaderContent.displayName = 'HeaderContent';
 
 export default function HomeScreen() {
+    const insets = useSafeAreaInsets();
     const router = useRouter();
     const colorScheme = useAppColorScheme();
     const isDark = colorScheme === 'dark';
@@ -775,6 +777,19 @@ export default function HomeScreen() {
     const calendarTranslateX = useRef(new Animated.Value(0)).current;
     const isCalendarAnimating = useRef(false);
 
+    const isCurrentMonth = useMemo(() => {
+        const now = new Date();
+        return selectedMonth.getFullYear() === now.getFullYear() && selectedMonth.getMonth() === now.getMonth();
+    }, [selectedMonth]);
+
+    const goToCurrentMonth = useCallback(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        setSelectedMonth(now);
+        setSelectedDate(getLocalDateKey(now));
+    }, []);
+
     const changeMonth = useCallback((offset: number) => {
         const next = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + offset, 1);
         setSelectedMonth(next);
@@ -933,28 +948,59 @@ export default function HomeScreen() {
 
     return (
         <View className="flex-1 bg-slate-50 dark:bg-slate-900">
-            <View className="bg-white dark:bg-slate-800 px-4 pt-[30px] pb-4 flex-row justify-between items-center shadow-sm z-10">
+            <View
+                style={{ paddingTop: Math.max(insets.top + 6, 20) }}
+                className="bg-white dark:bg-slate-800 px-4 pb-4 flex-row justify-between items-center shadow-sm z-10"
+            >
                 <View className="flex-row items-center">
                     <TouchableOpacity
                         onPress={() => handleMonthNav(-1)}
                         accessibilityRole="button"
                         accessibilityLabel="前の月"
-                        activeOpacity={0.7}
-                        style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 26, backgroundColor: isDark ? '#312e81' : '#eef2ff' }}
+                        activeOpacity={0.6}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 8 }}
+                        style={{
+                            width: 48,
+                            height: 48,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: 24,
+                            backgroundColor: isDark ? '#312e81' : '#eef2ff'
+                        }}
                     >
                         <ChevronLeft size={24} color="#6366f1" />
                     </TouchableOpacity>
 
-                    <Text className="text-lg font-bold text-slate-900 dark:text-white min-w-[100px] text-center">
-                        {monthLabel}
-                    </Text>
+                    <TouchableOpacity
+                        onPress={goToCurrentMonth}
+                        disabled={isCurrentMonth}
+                        activeOpacity={0.7}
+                        style={{ paddingHorizontal: 10, paddingVertical: 4, alignItems: 'center', justifyContent: 'center', minWidth: 110 }}
+                    >
+                        <Text className="text-lg font-bold text-slate-900 dark:text-white text-center">
+                            {monthLabel}
+                        </Text>
+                        {!isCurrentMonth && (
+                            <Text className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 mt-0.5">
+                                今月に戻る
+                            </Text>
+                        )}
+                    </TouchableOpacity>
 
                     <TouchableOpacity
                         onPress={() => handleMonthNav(1)}
                         accessibilityRole="button"
                         accessibilityLabel="次の月"
-                        activeOpacity={0.7}
-                        style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 26, backgroundColor: isDark ? '#312e81' : '#eef2ff' }}
+                        activeOpacity={0.6}
+                        hitSlop={{ top: 12, bottom: 12, left: 8, right: 12 }}
+                        style={{
+                            width: 48,
+                            height: 48,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: 24,
+                            backgroundColor: isDark ? '#312e81' : '#eef2ff'
+                        }}
                     >
                         <ChevronRight size={24} color="#6366f1" />
                     </TouchableOpacity>
@@ -963,7 +1009,7 @@ export default function HomeScreen() {
                 <View style={{ flexDirection: 'row', backgroundColor: isDark ? '#334155' : '#f1f5f9', borderRadius: 12, padding: 4 }}>
                     <TouchableOpacity
                         onPress={() => setViewMode('list')}
-                        hitSlop={{ top: 30, bottom: 30, left: 30, right: 30 }}
+                        hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                         style={{
                             padding: 8,
                             borderRadius: 8,
@@ -979,7 +1025,7 @@ export default function HomeScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                         onPress={() => setViewMode('calendar')}
-                        hitSlop={{ top: 10, bottom: 10, left: 0, right: 10 }}
+                        hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
                         style={{
                             padding: 8,
                             borderRadius: 8,
