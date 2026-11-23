@@ -232,35 +232,24 @@ export default function AccountHistoryScreen() {
                 setLocalAccountMappings({});
                 setIsMappingModalVisible(true);
             } else if (result.transactions.length > 0) {
-                const rakutenId = await databaseService.getSetting('gmail_account_id_rakuten');
-                const vpassId = await databaseService.getSetting('gmail_account_id_vpass');
-                const jcbId = await databaseService.getSetting('gmail_account_id_jcb');
-                const isEmailImportAccount = [rakutenId, vpassId, jcbId].filter(x => x !== null).includes(accountId);
                 const existingTransactions = await databaseService.getAllTransactions();
                 const emailTxs = existingTransactions.filter(t => {
                     const isEmailTx = t.import_hash !== null && /^(mock_msg|[0-9a-f]{16})/.test(t.import_hash);
                     return t.account_id === accountId && isEmailTx;
                 });
                 setEmailTransactions(emailTxs);
-                const duplicates = result.transactions.filter(t => t.duplicateEmailCandidate !== null);
-                if (isEmailImportAccount) {
-                    setPendingImportTransactions(result.transactions);
-                    setPendingAccountId(accountId);
-                    const candidates = result.transactions.map((t, idx) => ({ id: idx, csvTx: t, existingTx: t.duplicateEmailCandidate, resolution: t.duplicateEmailCandidate ? 'replace' : 'new' }));
-                    setDuplicateCandidates(candidates);
-                    setIsDuplicateModalVisible(true);
-                } else if (duplicates.length > 0) {
-                    setPendingImportTransactions(result.transactions);
-                    setPendingAccountId(accountId);
-                    const candidates = duplicates.map((t, idx) => ({ id: idx, csvTx: t, existingTx: t.duplicateEmailCandidate, resolution: 'replace' }));
-                    setDuplicateCandidates(candidates);
-                    setIsDuplicateModalVisible(true);
-                } else {
-                    await databaseService.updateLastImportedAt(accountId, new Date().toISOString());
-                    await addTransactions(result.transactions);
-                    await fetchData();
-                    Alert.alert('完了', `${result.transactions.length}件の取引をインポートしました`);
-                }
+
+                // 全CSVインポートで常に置換確認モーダルを表示する（新規追加 or 置換をユーザーが選べるよう）
+                setPendingImportTransactions(result.transactions);
+                setPendingAccountId(accountId);
+                const candidates = result.transactions.map((t, idx) => ({
+                    id: idx,
+                    csvTx: t,
+                    existingTx: t.duplicateEmailCandidate,
+                    resolution: t.duplicateEmailCandidate ? 'replace' : 'new'
+                }));
+                setDuplicateCandidates(candidates);
+                setIsDuplicateModalVisible(true);
             } else {
                 await databaseService.updateLastImportedAt(accountId, new Date().toISOString());
                 await fetchData();
@@ -297,25 +286,18 @@ export default function AccountHistoryScreen() {
                     return t.account_id === pendingCsvResult.accountId && isEmailTx;
                 });
                 setEmailTransactions(emailTxs);
-                const duplicates = txs.filter(t => t.duplicateEmailCandidate !== null);
-                if (isEmailImportAccount) {
-                    setPendingImportTransactions(txs);
-                    setPendingAccountId(pendingCsvResult.accountId);
-                    const candidates = txs.map((t, idx) => ({ id: idx, csvTx: t, existingTx: t.duplicateEmailCandidate, resolution: t.duplicateEmailCandidate ? 'replace' : 'new' }));
-                    setDuplicateCandidates(candidates);
-                    setIsDuplicateModalVisible(true);
-                } else if (duplicates.length > 0) {
-                    setPendingImportTransactions(txs);
-                    setPendingAccountId(pendingCsvResult.accountId);
-                    const candidates = duplicates.map((t, idx) => ({ id: idx, csvTx: t, existingTx: t.duplicateEmailCandidate, resolution: 'replace' }));
-                    setDuplicateCandidates(candidates);
-                    setIsDuplicateModalVisible(true);
-                } else {
-                    await databaseService.updateLastImportedAt(pendingCsvResult.accountId, new Date().toISOString());
-                    await addTransactions(txs);
-                    await fetchData();
-                    Alert.alert('完了', `${txs.length}件の取引をインポートしました`);
-                }
+
+                // 全CSVインポートで常に置換確認モーダルを表示する
+                setPendingImportTransactions(txs);
+                setPendingAccountId(pendingCsvResult.accountId);
+                const candidates = txs.map((t, idx) => ({
+                    id: idx,
+                    csvTx: t,
+                    existingTx: t.duplicateEmailCandidate,
+                    resolution: t.duplicateEmailCandidate ? 'replace' : 'new'
+                }));
+                setDuplicateCandidates(candidates);
+                setIsDuplicateModalVisible(true);
             } else {
                 await databaseService.updateLastImportedAt(pendingCsvResult.accountId, new Date().toISOString());
                 await fetchData();
@@ -357,6 +339,7 @@ export default function AccountHistoryScreen() {
             }
             const { creditCardPaymentService } = require('../../services/creditCardPaymentService');
             await creditCardPaymentService.updateTransferForDate(pendingAccountId);
+            await databaseService.updateLastImportedAt(pendingAccountId, new Date().toISOString());
             await fetchData();
             Alert.alert('インポート完了', `CSVの取り込みが完了しました。\n(新規追加: ${importedCount}件、置換更新: ${replacedCount}件)`);
             setPendingImportTransactions([]);

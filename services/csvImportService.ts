@@ -123,6 +123,13 @@ export const csvImportService = {
   ): { transactions: CreateTransactionInput[], missingMappings: string[] } {
     const transactions: CreateTransactionInput[] = [];
     const missingMappings = new Set<string>();
+    const matchedEmailTxIds = new Set<number>();
+
+    const getLocalDateString = (dStr: string) => {
+      const d = new Date(dStr);
+      if (isNaN(d.getTime())) return '';
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
 
     // Filter existing transactions once for this account to speed up comparison
     const accountTransactions = existingTransactions.filter(t => t.account_id === accountId);
@@ -310,20 +317,38 @@ export const csvImportService = {
       }
 
       if (!isNaN(amount) && date) {
-        
+        const importLocalDate = getLocalDateString(date);
+
         // 日付と金額が一致し、かつメールから取り込まれた取引（import_hashがメール形式）を特定
-        const duplicateEmailCandidate = accountTransactions.find(t => {
-          const tDate = t.date.split('T')[0];
-          const importDate = date.split('T')[0];
+        // 1. 同日かつ同額のメール取引を優先して特定
+        let duplicateEmailCandidate = accountTransactions.find(t => {
+          if (matchedEmailTxIds.has(t.id)) return false;
           const isEmailTx = t.import_hash !== null && /^(mock_msg|[0-9a-f]{16})/.test(t.import_hash);
-          return tDate === importDate && t.amount === amount && isEmailTx;
+          if (!isEmailTx || t.amount !== amount) return false;
+          return getLocalDateString(t.date) === importLocalDate;
         }) || null;
+
+        // 2. 同日で見つからない場合、±1.5日以内かつ同額のメール取引を探す
+        if (!duplicateEmailCandidate) {
+          const importTime = new Date(date).getTime();
+          duplicateEmailCandidate = accountTransactions.find(t => {
+            if (matchedEmailTxIds.has(t.id)) return false;
+            const isEmailTx = t.import_hash !== null && /^(mock_msg|[0-9a-f]{16})/.test(t.import_hash);
+            if (!isEmailTx || t.amount !== amount) return false;
+            const tTime = new Date(t.date).getTime();
+            const diffDays = Math.abs(importTime - tTime) / (1000 * 60 * 60 * 24);
+            return diffDays <= 1.5;
+          }) || null;
+        }
+
+        if (duplicateEmailCandidate) {
+          matchedEmailTxIds.add(duplicateEmailCandidate.id);
+        }
 
         // 重複チェック (通常のアカウントの場合、またはメール重複候補以外の完全一致)
         const isStandardDuplicate = accountTransactions.some(t => {
-          const tDate = t.date.split('T')[0];
-          const importDate = date.split('T')[0];
-          return tDate === importDate && t.payee === payee && t.amount === amount && (!duplicateEmailCandidate || t.id !== duplicateEmailCandidate.id);
+          const tLocalDate = getLocalDateString(t.date);
+          return tLocalDate === importLocalDate && t.payee === payee && t.amount === amount && (!duplicateEmailCandidate || t.id !== duplicateEmailCandidate.id);
         });
 
         if (isStandardDuplicate) {

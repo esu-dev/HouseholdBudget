@@ -198,12 +198,6 @@ export default function BalanceScreen() {
                 setLocalAccountMappings({});
                 setIsMappingModalVisible(true);
             } else if (result.transactions.length > 0) {
-                // 重複メール取引の候補があるかチェック
-                const rakutenId = await databaseService.getSetting('gmail_account_id_rakuten');
-                const vpassId = await databaseService.getSetting('gmail_account_id_vpass');
-                const jcbId = await databaseService.getSetting('gmail_account_id_jcb');
-                const isEmailImportAccount = [rakutenId, vpassId, jcbId].filter(id => id !== null).includes(accountId);
-
                 const existingTransactions = await databaseService.getAllTransactions();
                 const emailTxs = existingTransactions.filter(t => {
                     const isEmailTx = t.import_hash !== null && /^(mock_msg|[0-9a-f]{16})/.test(t.import_hash);
@@ -211,35 +205,17 @@ export default function BalanceScreen() {
                 });
                 setEmailTransactions(emailTxs);
 
-                const duplicates = result.transactions.filter(t => t.duplicateEmailCandidate !== null);
-                if (isEmailImportAccount) {
-                    setPendingImportTransactions(result.transactions);
-                    setPendingAccountId(accountId);
-                    const candidates = result.transactions.map((t, idx) => ({
-                        id: idx,
-                        csvTx: t,
-                        existingTx: t.duplicateEmailCandidate,
-                        resolution: t.duplicateEmailCandidate ? 'replace' : 'new'
-                    }));
-                    setDuplicateCandidates(candidates);
-                    setIsDuplicateModalVisible(true);
-                } else if (duplicates.length > 0) {
-                    setPendingImportTransactions(result.transactions);
-                    setPendingAccountId(accountId);
-                    const candidates = duplicates.map((t, idx) => ({
-                        id: idx,
-                        csvTx: t,
-                        existingTx: t.duplicateEmailCandidate,
-                        resolution: 'replace'
-                    }));
-                    setDuplicateCandidates(candidates);
-                    setIsDuplicateModalVisible(true);
-                } else {
-                    await databaseService.updateLastImportedAt(accountId, new Date().toISOString());
-                    await addTransactions(result.transactions);
-                    await fetchData();
-                    Alert.alert('完了', `${result.transactions.length}件の取引をインポートしました`);
-                }
+                // 全CSVインポートで常に置換確認モーダルを表示する（新規追加 or 置換をユーザーが選べるよう）
+                setPendingImportTransactions(result.transactions);
+                setPendingAccountId(accountId);
+                const candidates = result.transactions.map((t, idx) => ({
+                    id: idx,
+                    csvTx: t,
+                    existingTx: t.duplicateEmailCandidate,
+                    resolution: t.duplicateEmailCandidate ? 'replace' : 'new'
+                }));
+                setDuplicateCandidates(candidates);
+                setIsDuplicateModalVisible(true);
             } else {
                 await databaseService.updateLastImportedAt(accountId, new Date().toISOString());
                 await fetchData();
@@ -294,35 +270,17 @@ export default function BalanceScreen() {
                 });
                 setEmailTransactions(emailTxs);
 
-                const duplicates = transactions.filter(t => t.duplicateEmailCandidate !== null);
-                if (isEmailImportAccount) {
-                    setPendingImportTransactions(transactions);
-                    setPendingAccountId(pendingCsvResult.accountId);
-                    const candidates = transactions.map((t, idx) => ({
-                        id: idx,
-                        csvTx: t,
-                        existingTx: t.duplicateEmailCandidate,
-                        resolution: t.duplicateEmailCandidate ? 'replace' : 'new'
-                    }));
-                    setDuplicateCandidates(candidates);
-                    setIsDuplicateModalVisible(true);
-                } else if (duplicates.length > 0) {
-                    setPendingImportTransactions(transactions);
-                    setPendingAccountId(pendingCsvResult.accountId);
-                    const candidates = duplicates.map((t, idx) => ({
-                        id: idx,
-                        csvTx: t,
-                        existingTx: t.duplicateEmailCandidate,
-                        resolution: 'replace'
-                    }));
-                    setDuplicateCandidates(candidates);
-                    setIsDuplicateModalVisible(true);
-                } else {
-                    await databaseService.updateLastImportedAt(pendingCsvResult.accountId, new Date().toISOString());
-                    await addTransactions(transactions);
-                    await fetchData();
-                    Alert.alert('完了', `${transactions.length}件の取引をインポートしました`);
-                }
+                // 全CSVインポートで常に置換確認モーダルを表示する
+                setPendingImportTransactions(transactions);
+                setPendingAccountId(pendingCsvResult.accountId);
+                const candidates = transactions.map((t, idx) => ({
+                    id: idx,
+                    csvTx: t,
+                    existingTx: t.duplicateEmailCandidate,
+                    resolution: t.duplicateEmailCandidate ? 'replace' : 'new'
+                }));
+                setDuplicateCandidates(candidates);
+                setIsDuplicateModalVisible(true);
             } else {
                 await databaseService.updateLastImportedAt(pendingCsvResult.accountId, new Date().toISOString());
                 await fetchData();
@@ -351,6 +309,11 @@ export default function BalanceScreen() {
                         // 既存のメモがGmail自動インポート以外ならそれを引き継ぎ、そうでなければCSVのものを適用
                         const finalMemo = (existingTx.memo && existingTx.memo !== 'Gmail自動インポート' && existingTx.memo !== 'Gmail自動インポート(Mock)') ? existingTx.memo : t.memo;
 
+                        // 置換時は 'csv_replaced_' プレフィックス付きのハッシュを保存する
+                        const replacedHash = existingTx.import_hash
+                            ? (existingTx.import_hash.startsWith('csv_replaced_') ? existingTx.import_hash : `csv_replaced_${existingTx.import_hash}`)
+                            : t.import_hash;
+
                         await databaseService.updateTransaction({
                             ...existingTx,
                             amount: t.amount,
@@ -358,7 +321,7 @@ export default function BalanceScreen() {
                             payee: t.payee,
                             memo: finalMemo,
                             category_id: finalCategory,
-                            import_hash: t.import_hash || existingTx.import_hash
+                            import_hash: replacedHash
                         });
                         replacedCount++;
                     } else {
@@ -383,6 +346,7 @@ export default function BalanceScreen() {
 
             const { creditCardPaymentService } = require('../../services/creditCardPaymentService');
             await creditCardPaymentService.updateTransferForDate(pendingAccountId);
+            await databaseService.updateLastImportedAt(pendingAccountId, new Date().toISOString());
 
             await fetchData();
 
