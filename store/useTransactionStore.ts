@@ -614,6 +614,8 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
           tags: ['固定費'],
           exclude_from_balance: false,
           exclude_from_budget: false,
+          is_planned: true,
+          auto_delete_date: dateStr,
         });
       }
 

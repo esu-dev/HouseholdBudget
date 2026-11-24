@@ -19,6 +19,7 @@ import {
     KeyboardAvoidingView,
     Modal,
     Platform,
+    Pressable,
     ScrollView,
     Switch,
     Text,
@@ -277,7 +278,7 @@ export default function FixedExpensesScreen() {
 
         Alert.alert(
             '固定支出の記帳',
-            `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月分の未記帳な固定支出（${unrecordedCount}件）を取引履歴に記帳しますか？`,
+            `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月分の未記帳な固定支出（${unrecordedCount}件）を取引履歴に先入れ（予定取引）として記帳しますか？`,
             [
                 { text: 'キャンセル', style: 'cancel' },
                 {
@@ -285,7 +286,7 @@ export default function FixedExpensesScreen() {
                     onPress: async () => {
                         try {
                             const result = await recordFixedExpensesForMonth(monthStr);
-                            Alert.alert('記帳完了', `${result.addedCount}件の取引を記帳しました。`);
+                            Alert.alert('記帳完了', `${result.addedCount}件の固定支出を先入れ取引として記帳しました。`);
                         } catch (e) {
                             Alert.alert('エラー', '記帳に失敗しました');
                         }
@@ -298,7 +299,7 @@ export default function FixedExpensesScreen() {
     const handleSingleRecord = async (expense: FixedExpense) => {
         Alert.alert(
             '固定支出の記帳',
-            `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月分の「${expense.name}（¥${expense.amount.toLocaleString()}）」を取引履歴に記帳しますか？`,
+            `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月分の「${expense.name}（¥${expense.amount.toLocaleString()}）」を取引履歴に先入れ（予定取引）として記帳しますか？`,
             [
                 { text: 'キャンセル', style: 'cancel' },
                 {
@@ -307,7 +308,7 @@ export default function FixedExpensesScreen() {
                         try {
                             const result = await recordFixedExpensesForMonth(monthStr, [expense.id]);
                             if (result.addedCount > 0) {
-                                Alert.alert('記帳完了', `「${expense.name}」を記帳しました。`);
+                                Alert.alert('記帳完了', `「${expense.name}」を先入れ取引として記帳しました。`);
                             } else {
                                 Alert.alert('確認', `すでに記帳されています。`);
                             }
@@ -757,25 +758,44 @@ export default function FixedExpensesScreen() {
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                     style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
                 >
+                    {/* 背景タップで閉じるためのオーバーレイ */}
+                    <Pressable
+                        style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+                        onPress={() => setIsModalOpen(false)}
+                    />
+
                     <View
                         style={{
                             backgroundColor: colors.card,
                             borderTopLeftRadius: 28,
                             borderTopRightRadius: 28,
                             padding: 24,
-                            maxHeight: '90%',
+                            maxHeight: '85%',
+                            marginTop: Platform.OS === 'ios' ? 44 : 20,
                         }}
                     >
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>
+                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, flex: 1, marginRight: 12 }}>
                                 {editingExpense ? '固定支出を編集' : '新しい固定支出を追加'}
                             </Text>
-                            <TouchableOpacity onPress={() => setIsModalOpen(false)}>
-                                <X size={24} color={colors.textMuted} />
+                            <TouchableOpacity
+                                onPress={() => setIsModalOpen(false)}
+                                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                                style={{
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 18,
+                                    backgroundColor: isDark ? '#334155' : '#f1f5f9',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <X size={20} color={colors.textMuted} />
                             </TouchableOpacity>
                         </View>
 
-                        <ScrollView showsVerticalScrollIndicator={false}>
+                        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                             {/* 支出名 */}
                             <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.textMuted, marginBottom: 6 }}>
                                 支出項目名 <Text style={{ color: colors.danger }}>*</Text>
@@ -1016,11 +1036,27 @@ export default function FixedExpensesScreen() {
                                     paddingVertical: 16,
                                     borderRadius: 16,
                                     alignItems: 'center',
-                                    marginBottom: Platform.OS === 'ios' ? 24 : 12,
+                                    marginBottom: 10,
                                 }}
                             >
                                 <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>
                                     {editingExpense ? '変更を保存する' : '固定支出を追加する'}
+                                </Text>
+                            </TouchableOpacity>
+
+                            {/* キャンセルボタン */}
+                            <TouchableOpacity
+                                onPress={() => setIsModalOpen(false)}
+                                style={{
+                                    backgroundColor: isDark ? '#334155' : '#f1f5f9',
+                                    paddingVertical: 14,
+                                    borderRadius: 16,
+                                    alignItems: 'center',
+                                    marginBottom: Platform.OS === 'ios' ? 24 : 12,
+                                }}
+                            >
+                                <Text style={{ color: colors.textMuted, fontSize: 15, fontWeight: 'bold' }}>
+                                    キャンセル
                                 </Text>
                             </TouchableOpacity>
                         </ScrollView>
